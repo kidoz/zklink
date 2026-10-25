@@ -58,3 +58,7 @@ zk-matrix:
 # Connect with the managed driver, authenticate, sync and close on every pinned server node.
 zk-driver-matrix:
     bash dev/test-zookeeper-matrix.sh --driver
+
+# Verify node and ACL operations against both pinned live server versions.
+zk-operations-matrix:
+    bash dev/test-zookeeper-matrix.sh --operations
