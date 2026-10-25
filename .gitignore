@@ -1,0 +1,32 @@
+# Build and package output
+bin/
+obj/
+artifacts/
+/packages/
+*.nupkg
+*.snupkg
+
+# Test, coverage and benchmark output
+TestResults/
+*.trx
+*.coverage
+coverage/
+BenchmarkDotNet.Artifacts/
+*.binlog
+
+# IDE and editor state
+.idea/
+.vs/
+*.user
+*.suo
+riderModule.iml
+/_ReSharper.Caches/
+
+# OS metadata
+.DS_Store
+
+# Local Docker Compose configuration
+.env
+compose.override.yaml
+compose.override.yml
+
