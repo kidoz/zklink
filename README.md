@@ -6,15 +6,15 @@
 
 ZkLink is a proposed managed .NET client for Apache ZooKeeper: a first-class C# implementation of the ZooKeeper client TCP protocol, targeting .NET 10. Native AOT compatibility is a planned, separately tested requirement, not a current capability.
 
-**Status: under development.** Internal Jute codecs and framing, immutable result models, create options and request-failure contracts are implemented and tested. There is no usable client yet; connections, sessions, node operations, watches and secure transport remain unimplemented.
+**Status: under development.** Internal protocol codecs, handshake records, transactions, connection-string/path/chroot handling, immutable result models and request-failure contracts are implemented and tested. There is no usable client yet; session management, node-operation APIs, watch delivery and secure transport remain unimplemented.
 
 ## Current repository state
 
 - **Solution:** `ZkLink.slnx` with `src/ZkLink`, `tests/ZkLink.Tests` and `tests/ZkLink.Protocol.Tests`.
 - **Target:** `net10.0`, C# 14, nullable reference types, and warnings as errors.
-- **Code:** internal checked Jute codecs and asynchronous framing; public immutable data/ACL/children/stat models, version conditions, create options, request-outcome exceptions and watch-removal results. These supporting types do not yet connect to a server.
-- **Tests:** server-free xUnit suites check Java/Jute primitive bytes, fragmented/malformed frames, input snapshots, TTL boundaries, failure metadata and safe default formatting. Live node operations, transactions, path/chroot handling, session recovery and watch delivery remain untested.
-- **Build:** SDK 10.0.402 is pinned, with central dependency versions and lock files; core has no third-party runtime dependencies. Public API changes are checked against nullable baselines. The [build workflow](.github/workflows/build.yml) runs formatting, locked restore, Release build and server-free tests on Linux, Windows and macOS. Only local macOS arm64 execution has been verified; remote runs and Native AOT remain unverified.
+- **Code:** checked protocol encoding/decoding for node, ACL, transaction and control messages; bounded asynchronous framing; new/resume handshake records; connection-string parsing and namespace translation. Public supporting types include immutable results, create options and failure/removal contracts. No running client session is implemented yet.
+- **Tests:** xUnit suites cover Apache Java fixtures for all implemented opcodes, transaction success/error shapes, every reply split and truncation, all UTF-16 path code units, chroot boundaries and supporting public contracts. A bounded scripted stream and loopback fake server exercise delayed delivery, partial writes, dropped replies and handshake exchanges. Actual ZooKeeper operation behavior, session recovery, authorization and watch delivery remain unverified.
+- **Build:** SDK 10.0.402 is pinned, with central dependency versions and lock files; core has no third-party runtime dependencies. Public API changes are checked against nullable baselines. The [build workflow](.github/workflows/build.yml) defines Linux/Windows/macOS checks and separate Gradle-based Apache Java verification. Only local macOS arm64 execution has been verified; remote runs and Native AOT remain unverified.
 - **Distribution:** no package has been released. License selection, package metadata and release qualification remain open. See the [dependency inventory](THIRD-PARTY-NOTICES.md).
 
 The library lives in `src/`; `tests/` contains public-contract tests, protocol tests and an optional Java oracle. Samples and benchmarks are not yet available.
@@ -32,7 +32,7 @@ Install [just](https://just.systems/) and .NET SDK **10.0.402**. Docker with Com
 | `just check` | Check formatting and build |
 | `just test tests/ZkLink.Protocol.Tests` | Run the server-free protocol suite |
 | `just test tests/ZkLink.Tests` | Run the public model and failure-contract suite |
-| `bash dev/test-jute-oracle.sh` | Regenerate/compare Java fixtures and verify C# bytes with Java |
+| `bash dev/test-jute-oracle.sh` | Use the Gradle wrapper to compare Java fixtures and verify C# requests |
 | `just zk-check [version]` | Validate the selected ZooKeeper configuration |
 | `just zk-up [version]` | Start the selected ensemble and wait for readiness |
 | `just zk-status [version]` | Show container health and endpoints |
@@ -42,7 +42,7 @@ Install [just](https://just.systems/) and .NET SDK **10.0.402**. Docker with Com
 
 CSharpier **1.3.0** is pinned in [dotnet-tools.json](dotnet-tools.json). The format shortcuts restore the local tool automatically. Direct equivalents are `dotnet tool restore`, `dotnet csharpier format .`, and `dotnet csharpier check .`.
 
-The test runner is Microsoft.Testing.Platform: use `dotnet test --project tests/ZkLink.Protocol.Tests -c Release`. For reproducible dependency checks, run `dotnet restore ZkLink.slnx --locked-mode`. The optional [Java oracle](tests/ZkLink.JavaOracle/README.md) requires JDK 17+, curl and Python 3; ordinary .NET tests use checked-in fixtures and require no Java/server.
+The test runner is Microsoft.Testing.Platform: use `dotnet test --project tests/ZkLink.Protocol.Tests -c Release`. For reproducible dependency checks, run `dotnet restore ZkLink.slnx --locked-mode`. The optional [Apache Java reference utility](tests/ZkLink.JavaOracle/README.md) uses the pinned Gradle wrapper and a JDK; no global Gradle installation is required. Ordinary .NET tests use checked-in fixtures and require no Java or ZooKeeper installation.
 
 ## Documentation
 

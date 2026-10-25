@@ -21,6 +21,10 @@ implementation, Native AOT validation or performance data yet. See
 - Internal ZooKeeper Jute primitives: checked big-endian integers, booleans,
   strings, buffers and vectors, with explicit protocol limits.
 - Internal `Stat` and request/reply header wire records.
+- Internal request/response bodies for node, ACL, transaction and control
+  messages, with strict handshake, result-shape and transaction-terminator checks.
+- Connection-string parsing, upstream-compatible path validation and bounded
+  chroot translation for requests, results, notifications and restoration paths.
 - Bounded asynchronous ZooKeeper frame reader and writer with validated frame
   and buffer limits.
 - Initial public contract types and an unshipped public API baseline: endpoints,
@@ -32,6 +36,10 @@ implementation, Native AOT validation or performance data yet. See
   Java/Jute golden bytes for primitive and record encoding, plus framing and
   malformed-input coverage.
 - Contract tests for the initial public types.
+- Gradle-managed Apache Java fixtures for every implemented opcode and all
+  UTF-16 path code units, with request verification in both languages.
+- Bounded scripted peers and loopback fake-server tests for fragmented,
+  delayed, partial and dropped messages, plus an initial codec allocation check.
 - Apache ZooKeeper 3.8.7 and 3.9.6 local Compose fixtures pinned by image
   digest, with `just` lifecycle commands and a two-version smoke matrix that
   verifies the exact server version and authenticated readiness.

@@ -17,8 +17,12 @@ The resolved dependency graphs and integrity hashes are in the project `packages
 | Microsoft.Bcl.AsyncInterfaces, System.Diagnostics.EventLog | 6.0.0 | Transitive test only | MIT |
 | Microsoft.Win32.Registry | 5.0.0 | Transitive test only | MIT |
 | System.Security.AccessControl | 6.0.1 | Transitive test only | MIT |
-| Apache ZooKeeper Jute | 3.9.6 | Optional Java fixture generator/verifier | Apache-2.0 |
+| Apache ZooKeeper Jute and Java client | 3.9.6 | Optional Java fixture generator/verifier | Apache-2.0 |
+| SLF4J API | 2.0.17 | Test-only Java logging API; no logging provider loaded | MIT |
+| Gradle wrapper | 9.8.2 | Java reference build tool | Apache-2.0 |
 
-Apache ZooKeeper is a project of the Apache Software Foundation. Its Jute schema and archive behavior define the wire format. The fixture utility uses the published Jute classes; no Apache implementation source or binary is checked into this repository. The downloaded jar stays under ignored `artifacts/`. The upstream source license and notice are preserved under `tests/ZkLink.JavaOracle/licenses/` at the same pinned commit; the Maven jar itself has no license/notice entries. Binary fixture data is produced by the original utility in `tests/ZkLink.JavaOracle/JuteOracle.java`.
+Apache ZooKeeper is a project of the Apache Software Foundation. Its Jute schema and archive behavior define the wire format. The fixture utilities use published Jute and client classes; no ZooKeeper implementation source or jar is checked into this repository. Gradle downloads the jars into its dependency cache. The upstream source license and notice are preserved under `tests/ZkLink.JavaOracle/licenses/` at the same pinned commit; the Maven Jute jar itself has no license/notice entries. Fixture data is produced by the original utilities under `tests/ZkLink.JavaOracle/src/main/java/`.
+
+Gradle wrapper scripts and their bootstrap jar are checked in using the standard generated wrapper, preserving their upstream license headers. Its distribution checksum is pinned. Exact Java dependencies are locked in `gradle.lockfile`, and jar/POM integrity hashes are in `gradle/verification-metadata.xml`. These tools and dependencies are not included in the managed driver.
 
 Java tooling provenance, artifact hash, source commit, exact fixture semantics and reproduction commands are in [the fixture guide](tests/ZkLink.JavaOracle/README.md). Review upstream notices and final redistribution assets again before packaging. No Apache endorsement is implied.
