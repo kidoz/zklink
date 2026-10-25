@@ -9,6 +9,10 @@ static ZkLink.ZNodeVersion.Exact(int value) -> ZkLink.ZNodeVersion
 static ZkLink.ZNodeVersion.operator !=(ZkLink.ZNodeVersion left, ZkLink.ZNodeVersion right) -> bool
 static ZkLink.ZNodeVersion.operator ==(ZkLink.ZNodeVersion left, ZkLink.ZNodeVersion right) -> bool
 static ZkLink.ZooKeeperAcl.OpenUnsafe.get -> ZkLink.ZooKeeperAcl!
+static ZkLink.ZooKeeperAuthentication.Digest(string! userName, string! password) -> ZkLink.ZooKeeperAuthentication!
+static ZkLink.ZooKeeperClient.ConnectAsync(ZkLink.ZooKeeperClientOptions! options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<ZkLink.ZooKeeperClient!>!
+static ZkLink.ZooKeeperTlsOptions.Disabled() -> ZkLink.ZooKeeperTlsOptions!
+static ZkLink.ZooKeeperTlsOptions.Required(System.Security.Cryptography.X509Certificates.X509RevocationMode revocationMode = System.Security.Cryptography.X509Certificates.X509RevocationMode.Online, System.Security.Cryptography.X509Certificates.X509Certificate2? clientCertificate = null, System.Collections.Generic.IReadOnlyList<System.Security.Cryptography.X509Certificates.X509Certificate2!>? trustRoots = null, string? serverName = null) -> ZkLink.ZooKeeperTlsOptions!
 ZkLink.CreateMode
 ZkLink.CreateMode.Container = 4 -> ZkLink.CreateMode
 ZkLink.CreateMode.Ephemeral = 1 -> ZkLink.CreateMode
@@ -91,15 +95,83 @@ ZkLink.ZooKeeperAcl.Id.get -> string!
 ZkLink.ZooKeeperAcl.Permissions.get -> ZkLink.ZooKeeperPermissions
 ZkLink.ZooKeeperAcl.Scheme.get -> string!
 ZkLink.ZooKeeperAcl.ZooKeeperAcl(ZkLink.ZooKeeperPermissions permissions, string! scheme, string! id) -> void
+ZkLink.ZooKeeperAuthentication
+ZkLink.ZooKeeperAuthentication.Dispose() -> void
 ZkLink.ZooKeeperBackpressureException
 ZkLink.ZooKeeperBackpressureException.ZooKeeperBackpressureException(ZkLink.ZooKeeperRequestInfo! request) -> void
+ZkLink.ZooKeeperClient
+ZkLink.ZooKeeperClient.CloseAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+ZkLink.ZooKeeperClient.DisposeAsync() -> System.Threading.Tasks.ValueTask
+ZkLink.ZooKeeperClient.Session.get -> ZkLink.ZooKeeperSessionSnapshot!
+ZkLink.ZooKeeperClient.SubscribeStateChanges() -> ZkLink.ZooKeeperStateSubscription!
+ZkLink.ZooKeeperClient.SyncAsync(string! path, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+ZkLink.ZooKeeperClient.UpdateEndpointsAsync(System.Collections.Generic.IReadOnlyList<ZkLink.ZooKeeperEndpoint!>! endpoints, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+ZkLink.ZooKeeperClient.WaitForConnectionAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 ZkLink.ZooKeeperClientIdentity
 ZkLink.ZooKeeperClientIdentity.Scheme.get -> string!
 ZkLink.ZooKeeperClientIdentity.User.get -> string!
 ZkLink.ZooKeeperClientIdentity.ZooKeeperClientIdentity(string! scheme, string! user) -> void
+ZkLink.ZooKeeperClientOptions
+ZkLink.ZooKeeperClientOptions.AllowUnsafePlaintextDigest.get -> bool
+ZkLink.ZooKeeperClientOptions.AllowUnsafePlaintextDigest.init -> void
+ZkLink.ZooKeeperClientOptions.Authentication.get -> System.Collections.Generic.IReadOnlyList<ZkLink.ZooKeeperAuthentication!>!
+ZkLink.ZooKeeperClientOptions.Authentication.init -> void
+ZkLink.ZooKeeperClientOptions.Chroot.get -> string?
+ZkLink.ZooKeeperClientOptions.Chroot.init -> void
+ZkLink.ZooKeeperClientOptions.CloseTimeout.get -> System.TimeSpan
+ZkLink.ZooKeeperClientOptions.CloseTimeout.init -> void
+ZkLink.ZooKeeperClientOptions.CompatibilityProfile.get -> ZkLink.ZooKeeperCompatibilityProfile
+ZkLink.ZooKeeperClientOptions.CompatibilityProfile.init -> void
+ZkLink.ZooKeeperClientOptions.ConnectAttemptTimeout.get -> System.TimeSpan
+ZkLink.ZooKeeperClientOptions.ConnectAttemptTimeout.init -> void
+ZkLink.ZooKeeperClientOptions.ConnectionString.get -> string!
+ZkLink.ZooKeeperClientOptions.ConnectionString.init -> void
+ZkLink.ZooKeeperClientOptions.InitialConnectTimeout.get -> System.TimeSpan
+ZkLink.ZooKeeperClientOptions.InitialConnectTimeout.init -> void
+ZkLink.ZooKeeperClientOptions.MaxBufferedEvents.get -> int
+ZkLink.ZooKeeperClientOptions.MaxBufferedEvents.init -> void
+ZkLink.ZooKeeperClientOptions.MaxCollectionElements.get -> int
+ZkLink.ZooKeeperClientOptions.MaxCollectionElements.init -> void
+ZkLink.ZooKeeperClientOptions.MaxDataBytes.get -> int
+ZkLink.ZooKeeperClientOptions.MaxDataBytes.init -> void
+ZkLink.ZooKeeperClientOptions.MaxFrameBytes.get -> int
+ZkLink.ZooKeeperClientOptions.MaxFrameBytes.init -> void
+ZkLink.ZooKeeperClientOptions.MaxInFlightRequests.get -> int
+ZkLink.ZooKeeperClientOptions.MaxInFlightRequests.init -> void
+ZkLink.ZooKeeperClientOptions.MaxPendingRequestBytes.get -> int
+ZkLink.ZooKeeperClientOptions.MaxPendingRequestBytes.init -> void
+ZkLink.ZooKeeperClientOptions.MaxQueuedRequests.get -> int
+ZkLink.ZooKeeperClientOptions.MaxQueuedRequests.init -> void
+ZkLink.ZooKeeperClientOptions.OperationTimeout.get -> System.TimeSpan
+ZkLink.ZooKeeperClientOptions.OperationTimeout.init -> void
+ZkLink.ZooKeeperClientOptions.SessionTimeout.get -> System.TimeSpan
+ZkLink.ZooKeeperClientOptions.SessionTimeout.init -> void
+ZkLink.ZooKeeperClientOptions.Tls.get -> ZkLink.ZooKeeperTlsOptions!
+ZkLink.ZooKeeperClientOptions.Tls.init -> void
+ZkLink.ZooKeeperClientOptions.ZooKeeperClientOptions() -> void
 ZkLink.ZooKeeperCloseException
 ZkLink.ZooKeeperCloseException.CloseAcknowledged.get -> bool
 ZkLink.ZooKeeperCloseException.ZooKeeperCloseException(ZkLink.ZooKeeperRequestInfo! request, ZkLink.RequestOutcome outcome, int? errorCode = null) -> void
+ZkLink.ZooKeeperCloseStatus
+ZkLink.ZooKeeperCloseStatus.Acknowledged = 1 -> ZkLink.ZooKeeperCloseStatus
+ZkLink.ZooKeeperCloseStatus.None = 0 -> ZkLink.ZooKeeperCloseStatus
+ZkLink.ZooKeeperCloseStatus.SessionExpired = 3 -> ZkLink.ZooKeeperCloseStatus
+ZkLink.ZooKeeperCloseStatus.Unacknowledged = 2 -> ZkLink.ZooKeeperCloseStatus
+ZkLink.ZooKeeperCompatibilityProfile
+ZkLink.ZooKeeperCompatibilityProfile.ZooKeeper38 = 0 -> ZkLink.ZooKeeperCompatibilityProfile
+ZkLink.ZooKeeperCompatibilityProfile.ZooKeeper39 = 1 -> ZkLink.ZooKeeperCompatibilityProfile
+ZkLink.ZooKeeperConnectionException
+ZkLink.ZooKeeperConnectionException.Endpoint.get -> ZkLink.ZooKeeperEndpoint?
+ZkLink.ZooKeeperConnectionException.ErrorCode.get -> int?
+ZkLink.ZooKeeperConnectionException.Failure.get -> ZkLink.ZooKeeperConnectionFailure
+ZkLink.ZooKeeperConnectionException.ZooKeeperConnectionException(ZkLink.ZooKeeperConnectionFailure failure, ZkLink.ZooKeeperEndpoint? endpoint = null, int? errorCode = null) -> void
+ZkLink.ZooKeeperConnectionFailure
+ZkLink.ZooKeeperConnectionFailure.Authentication = 5 -> ZkLink.ZooKeeperConnectionFailure
+ZkLink.ZooKeeperConnectionFailure.Protocol = 3 -> ZkLink.ZooKeeperConnectionFailure
+ZkLink.ZooKeeperConnectionFailure.SessionRejected = 4 -> ZkLink.ZooKeeperConnectionFailure
+ZkLink.ZooKeeperConnectionFailure.Timeout = 0 -> ZkLink.ZooKeeperConnectionFailure
+ZkLink.ZooKeeperConnectionFailure.Tls = 2 -> ZkLink.ZooKeeperConnectionFailure
+ZkLink.ZooKeeperConnectionFailure.Unreachable = 1 -> ZkLink.ZooKeeperConnectionFailure
 ZkLink.ZooKeeperEndpoint
 ZkLink.ZooKeeperEndpoint.Host.get -> string!
 ZkLink.ZooKeeperEndpoint.Port.get -> int
@@ -135,6 +207,8 @@ ZkLink.ZooKeeperErrorCode.SystemError = -1 -> ZkLink.ZooKeeperErrorCode
 ZkLink.ZooKeeperErrorCode.ThrottledOperation = -127 -> ZkLink.ZooKeeperErrorCode
 ZkLink.ZooKeeperErrorCode.Unimplemented = -6 -> ZkLink.ZooKeeperErrorCode
 ZkLink.ZooKeeperErrorCode.UnknownSession = -12 -> ZkLink.ZooKeeperErrorCode
+ZkLink.ZooKeeperEventOverflowException
+ZkLink.ZooKeeperEventOverflowException.ZooKeeperEventOverflowException() -> void
 ZkLink.ZooKeeperException
 ZkLink.ZooKeeperException.ErrorCode.get -> int?
 ZkLink.ZooKeeperException.KnownErrorCode.get -> ZkLink.ZooKeeperErrorCode?
@@ -197,8 +271,42 @@ ZkLink.ZooKeeperRequestInfo.Operation.get -> ZkLink.ZooKeeperOperation
 ZkLink.ZooKeeperRequestInfo.Path.get -> string?
 ZkLink.ZooKeeperRequestInfo.RequestId.get -> int?
 ZkLink.ZooKeeperRequestInfo.ZooKeeperRequestInfo(ZkLink.ZooKeeperOperation operation, int? requestId = null, ZkLink.ZooKeeperEndpoint? endpoint = null, string? path = null) -> void
+ZkLink.ZooKeeperSessionException
+ZkLink.ZooKeeperSessionException.ErrorCode.get -> int?
+ZkLink.ZooKeeperSessionException.State.get -> ZkLink.ZooKeeperSessionState
+ZkLink.ZooKeeperSessionException.ZooKeeperSessionException(ZkLink.ZooKeeperSessionState state, int? errorCode = null) -> void
+ZkLink.ZooKeeperSessionSnapshot
+ZkLink.ZooKeeperSessionSnapshot.CloseStatus.get -> ZkLink.ZooKeeperCloseStatus
+ZkLink.ZooKeeperSessionSnapshot.ConnectionGeneration.get -> long
+ZkLink.ZooKeeperSessionSnapshot.ErrorCode.get -> int?
+ZkLink.ZooKeeperSessionSnapshot.LastReplyZxid.get -> long
+ZkLink.ZooKeeperSessionSnapshot.NegotiatedTimeout.get -> System.TimeSpan?
+ZkLink.ZooKeeperSessionSnapshot.RequestedTimeout.get -> System.TimeSpan
+ZkLink.ZooKeeperSessionSnapshot.SessionId.get -> long
+ZkLink.ZooKeeperSessionSnapshot.State.get -> ZkLink.ZooKeeperSessionState
+ZkLink.ZooKeeperSessionState
+ZkLink.ZooKeeperSessionState.Authenticating = 1 -> ZkLink.ZooKeeperSessionState
+ZkLink.ZooKeeperSessionState.AuthFailed = 7 -> ZkLink.ZooKeeperSessionState
+ZkLink.ZooKeeperSessionState.Closed = 10 -> ZkLink.ZooKeeperSessionState
+ZkLink.ZooKeeperSessionState.Closing = 9 -> ZkLink.ZooKeeperSessionState
+ZkLink.ZooKeeperSessionState.Connected = 3 -> ZkLink.ZooKeeperSessionState
+ZkLink.ZooKeeperSessionState.Connecting = 0 -> ZkLink.ZooKeeperSessionState
+ZkLink.ZooKeeperSessionState.Disconnected = 4 -> ZkLink.ZooKeeperSessionState
+ZkLink.ZooKeeperSessionState.Expired = 5 -> ZkLink.ZooKeeperSessionState
+ZkLink.ZooKeeperSessionState.Faulted = 8 -> ZkLink.ZooKeeperSessionState
+ZkLink.ZooKeeperSessionState.Lost = 6 -> ZkLink.ZooKeeperSessionState
+ZkLink.ZooKeeperSessionState.Restoring = 2 -> ZkLink.ZooKeeperSessionState
+ZkLink.ZooKeeperStateSubscription
+ZkLink.ZooKeeperStateSubscription.DisposeAsync() -> System.Threading.Tasks.ValueTask
+ZkLink.ZooKeeperStateSubscription.ReadStatesAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<ZkLink.ZooKeeperSessionSnapshot!>!
 ZkLink.ZooKeeperTimeoutException
 ZkLink.ZooKeeperTimeoutException.ZooKeeperTimeoutException(ZkLink.ZooKeeperRequestInfo! request, ZkLink.RequestOutcome outcome) -> void
+ZkLink.ZooKeeperTlsOptions
+ZkLink.ZooKeeperTlsOptions.ClientCertificate.get -> System.Security.Cryptography.X509Certificates.X509Certificate2?
+ZkLink.ZooKeeperTlsOptions.Enabled.get -> bool
+ZkLink.ZooKeeperTlsOptions.RevocationMode.get -> System.Security.Cryptography.X509Certificates.X509RevocationMode
+ZkLink.ZooKeeperTlsOptions.ServerName.get -> string?
+ZkLink.ZooKeeperTlsOptions.TrustRoots.get -> System.Collections.Generic.IReadOnlyList<System.Security.Cryptography.X509Certificates.X509Certificate2!>!
 ZkLink.ZooKeeperWatchRemovalResult
 ZkLink.ZooKeeperWatchRemovalResult.RegistrationId.get -> long
 ZkLink.ZooKeeperWatchRemovalResult.Status.get -> ZkLink.WatchRemovalStatus

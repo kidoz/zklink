@@ -13,16 +13,22 @@ internal static class NamespaceTranslator
     )
     {
         limits ??= DefaultLimits;
-        int xid = request.Opcode switch
+        _ = Measure(request, paths, limits);
+        return TranslateRequest(request, paths);
+    }
+
+    internal static int Measure(WireRequest request, ChrootPath paths, ProtocolLimits limits)
+    {
+        var xid = request.Opcode switch
         {
             11 => -2,
             100 => -4,
             101 or 105 => -8,
             _ => 1,
         };
-        int remaining = limits.MaxFrameBytes - RequestCodec.Measure(xid, request, limits);
+        var remaining = limits.MaxFrameBytes - RequestCodec.Measure(xid, request, limits);
         CheckExpansion(request, paths, ref remaining);
-        return TranslateRequest(request, paths);
+        return limits.MaxFrameBytes - remaining;
     }
 
     private static WireRequest TranslateRequest(WireRequest request, ChrootPath paths) =>
@@ -89,7 +95,7 @@ internal static class NamespaceTranslator
 
     private static void CheckExpansion(WireRequest request, ChrootPath paths, ref int remaining)
     {
-        (string? path, bool sequential) = request switch
+        (var path, var sequential) = request switch
         {
             PathRequest p => (p.Path, false),
             ReadRequest p => (p.Path, false),
@@ -102,23 +108,33 @@ internal static class NamespaceTranslator
         };
         if (path is not null)
         {
-            int added = paths.AddedBytes(path, sequential);
+            var added = paths.AddedBytes(path, sequential);
             if (added > remaining)
+            {
                 throw new InvalidDataException("Chroot expansion exceeds frame bounds.");
+            }
             remaining -= added;
         }
         if (request is MultiRequest multi)
-            foreach (WireRequest member in multi.Members)
+        {
+            foreach (var member in multi.Members)
+            {
                 CheckExpansion(member, paths, ref remaining);
+            }
+        }
         if (request is RestoreRequest restore)
         {
             CheckPaths(restore.Data, paths, ref remaining);
             CheckPaths(restore.Exists, paths, ref remaining);
             CheckPaths(restore.Children, paths, ref remaining);
             if (restore.Persistent is not null)
+            {
                 CheckPaths(restore.Persistent, paths, ref remaining);
+            }
             if (restore.Recursive is not null)
+            {
                 CheckPaths(restore.Recursive, paths, ref remaining);
+            }
         }
     }
 
@@ -128,11 +144,13 @@ internal static class NamespaceTranslator
         ref int remaining
     )
     {
-        for (int i = 0; i < values.Count; i++)
+        foreach (var value in values)
         {
-            int added = paths.AddedBytes(values[i]!);
+            var added = paths.AddedBytes(value!);
             if (added > remaining)
+            {
                 throw new InvalidDataException("Chroot expansion exceeds frame bounds.");
+            }
             remaining -= added;
         }
     }
