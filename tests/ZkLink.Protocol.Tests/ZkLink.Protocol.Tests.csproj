@@ -8,6 +8,7 @@
     <PackageReference Include="xunit.v3.mtp-v2" />
     <PackageReference Include="NSubstitute" />
     <ProjectReference Include="../../src/ZkLink/ZkLink.csproj" />
-    <None Include="Fixtures/*.hex" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures/**/*.hex" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures/**/*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
