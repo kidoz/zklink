@@ -44,9 +44,11 @@ internal ref struct JuteReader
         }
     }
 
-    internal byte[]? ReadBuffer()
+    internal byte[]? ReadBuffer(int? maxBytes = null)
     {
         int length = ReadLength();
+        if (maxBytes is { } maximum && length > maximum)
+            throw new InvalidDataException("Buffer exceeds the configured bound.");
         return length == -1 ? null : Take(length).ToArray();
     }
 

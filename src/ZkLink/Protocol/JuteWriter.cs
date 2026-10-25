@@ -4,7 +4,7 @@ using System.Text;
 namespace ZkLink.Protocol;
 
 // Writes into caller-owned storage; no growth or hidden pooling.
-internal ref struct JuteWriter
+internal ref struct JuteWriter : IJuteOutput
 {
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private readonly Span<byte> destination;
@@ -20,15 +20,15 @@ internal ref struct JuteWriter
 
     internal readonly int WrittenCount => position;
 
-    internal void WriteInt32(int value) =>
+    public void WriteInt32(int value) =>
         BinaryPrimitives.WriteInt32BigEndian(Take(sizeof(int)), value);
 
-    internal void WriteInt64(long value) =>
+    public void WriteInt64(long value) =>
         BinaryPrimitives.WriteInt64BigEndian(Take(sizeof(long)), value);
 
-    internal void WriteBoolean(bool value) => Take(1)[0] = value ? (byte)1 : (byte)0;
+    public void WriteBoolean(bool value) => Take(1)[0] = value ? (byte)1 : (byte)0;
 
-    internal void WriteString(string? value)
+    public void WriteString(string? value)
     {
         if (value is null)
         {
@@ -49,16 +49,16 @@ internal ref struct JuteWriter
         StrictUtf8.GetBytes(value, Take(byteCount));
     }
 
-    internal void WriteBuffer(ReadOnlySpan<byte> value)
+    public void WriteBuffer(ReadOnlySpan<byte> value)
     {
         EnsureCapacity(checked(sizeof(int) + value.Length));
         WriteInt32(value.Length);
         value.CopyTo(Take(value.Length));
     }
 
-    internal void WriteNullBuffer() => WriteInt32(-1);
+    public void WriteNullBuffer() => WriteInt32(-1);
 
-    internal void WriteStringVector(IReadOnlyList<string?>? values, bool allowNull = false)
+    public void WriteStringVector(IReadOnlyList<string?>? values, bool allowNull = false)
     {
         if (values is null)
         {
@@ -76,7 +76,7 @@ internal ref struct JuteWriter
             WriteString(value);
     }
 
-    internal void WriteStat(WireStat stat)
+    public void WriteStat(WireStat stat)
     {
         EnsureCapacity(WireStat.EncodedLength);
         WriteInt64(stat.Czxid);

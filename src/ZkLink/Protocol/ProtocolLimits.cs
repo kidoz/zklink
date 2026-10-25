@@ -9,7 +9,8 @@ internal sealed class ProtocolLimits
 
     internal ProtocolLimits(
         int maxFrameBytes = DefaultMaxFrameBytes,
-        int maxCollectionElements = 100_000
+        int maxCollectionElements = 100_000,
+        int maxDataBytes = 1_000_000
     )
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maxFrameBytes, 1);
@@ -21,8 +22,12 @@ internal sealed class ProtocolLimits
         );
         MaxFrameBytes = maxFrameBytes;
         MaxCollectionElements = maxCollectionElements;
+        ArgumentOutOfRangeException.ThrowIfNegative(maxDataBytes);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(maxDataBytes, AbsoluteMaxFrameBytes);
+        MaxDataBytes = maxDataBytes;
     }
 
     internal int MaxFrameBytes { get; }
     internal int MaxCollectionElements { get; }
+    internal int MaxDataBytes { get; }
 }
