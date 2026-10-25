@@ -6,7 +6,7 @@ using ZkLink.Transport;
 namespace ZkLink;
 
 /// <summary>One explicitly owned ZooKeeper session with bounded asynchronous I/O and no operation replay.</summary>
-public sealed class ZooKeeperClient : IAsyncDisposable
+public sealed partial class ZooKeeperClient : IAsyncDisposable
 {
     private readonly SessionManager _session;
 

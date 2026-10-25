@@ -101,8 +101,16 @@ ZkLink.ZooKeeperBackpressureException
 ZkLink.ZooKeeperBackpressureException.ZooKeeperBackpressureException(ZkLink.ZooKeeperRequestInfo! request) -> void
 ZkLink.ZooKeeperClient
 ZkLink.ZooKeeperClient.CloseAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+ZkLink.ZooKeeperClient.CreateAsync(string! path, System.ReadOnlyMemory<byte>? data, ZkLink.CreateOptions! options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<ZkLink.CreateResult!>!
+ZkLink.ZooKeeperClient.DeleteAsync(string! path, ZkLink.ZNodeVersion version, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 ZkLink.ZooKeeperClient.DisposeAsync() -> System.Threading.Tasks.ValueTask
+ZkLink.ZooKeeperClient.ExistsAsync(string! path, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<ZkLink.ZNodeStat?>!
+ZkLink.ZooKeeperClient.GetAclAsync(string! path, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<ZkLink.ZNodeAcl!>!
+ZkLink.ZooKeeperClient.GetChildrenAsync(string! path, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<ZkLink.ZNodeChildren!>!
+ZkLink.ZooKeeperClient.GetDataAsync(string! path, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<ZkLink.ZNodeData!>!
 ZkLink.ZooKeeperClient.Session.get -> ZkLink.ZooKeeperSessionSnapshot!
+ZkLink.ZooKeeperClient.SetAclAsync(string! path, System.Collections.Generic.IReadOnlyList<ZkLink.ZooKeeperAcl!>! acl, ZkLink.ZNodeVersion aclVersion, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<ZkLink.ZNodeStat>!
+ZkLink.ZooKeeperClient.SetDataAsync(string! path, System.ReadOnlyMemory<byte>? data, ZkLink.ZNodeVersion version, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<ZkLink.ZNodeStat>!
 ZkLink.ZooKeeperClient.SubscribeStateChanges() -> ZkLink.ZooKeeperStateSubscription!
 ZkLink.ZooKeeperClient.SyncAsync(string! path, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 ZkLink.ZooKeeperClient.UpdateEndpointsAsync(System.Collections.Generic.IReadOnlyList<ZkLink.ZooKeeperEndpoint!>! endpoints, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
