@@ -1,10 +1,10 @@
 # Protocol boundaries and data ownership
 
 ZkLink aims to implement the ZooKeeper client TCP protocol in managed C#.
-Currently, the code supplies internal serialization and framing plus public
-supporting contracts. Transport, sessions, request scheduling, and active watches
-remain planned. The existing boundaries allow their data contracts to be checked
-before a client starts making distributed requests.
+The client owns one explicit session and at most one active transport, with
+a serialized writer and ordered reader. Session management, bounded request
+scheduling and TCP/TLS are implemented; node CRUD and active watches remain
+planned.
 
 ## Wire records and public results serve different lifetimes
 
@@ -36,9 +36,26 @@ while exposing the same request evidence as ordinary failures.
 
 These types deliberately provide no generic retryability flag. An application
 decision depends on the operation and its outcome evidence. A repeated uncertain
-write can have a different effect from the original request. Actual send,
-recovery, and cancellation behavior still needs a transport and session
-implementation; constructing an exception does not verify those behaviors.
+write can have a different effect from the original request. The scheduler enforces these outcomes during send,
+cancellation, late replies and disconnection. Virtual-time and controlled-stream
+tests check those boundaries.
+
+## Session ownership controls recovery
+
+The session manager owns credentials, endpoint selection, liveness and connection
+generations. The scheduler owns queued packets, positive request IDs and pending
+reply order. A shared gate makes readiness, admission and state subscription
+changes atomic. Socket I/O and user continuations run outside that gate.
+
+Disconnect revokes admission before notifying callers. The old transport is
+closed before reconnecting with the same credentials; sent application requests
+are never replayed. Canceled sent requests retain ordered bookkeeping until a
+reply or transport cleanup releases them. The writer retains its packet until
+write completion even if a reply arrives first.
+
+Terminal loss clears owned secrets and never creates a replacement session.
+Applications choose a new client explicitly. The [connection reference](../reference/connections.md)
+describes timeouts, state streams, security and close acknowledgment.
 
 ## Metadata is separate from default diagnostics
 

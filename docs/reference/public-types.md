@@ -1,12 +1,26 @@
 # Supporting public types
 
 All types below are in namespace `ZkLink`. They are implemented supporting
-contracts and have not shipped in a package. There is no client that sends
-requests or produces these results from a server yet.
+contracts and have not shipped in a package. The current client exposes connection/session methods and `SyncAsync`; node
+result types and watch-removal values await their operation APIs.
 
 Exact signatures and nullable annotations are in the
 [unshipped API baseline](../../src/ZkLink/PublicAPI.Unshipped.txt). Source links
 below provide constructor validation and XML documentation.
+
+## Connection and session types
+
+`ZooKeeperClient`, `ZooKeeperClientOptions`, `ZooKeeperTlsOptions`,
+`ZooKeeperAuthentication`, `ZooKeeperCompatibilityProfile`,
+`ZooKeeperSessionSnapshot`, `ZooKeeperSessionState`, `ZooKeeperCloseStatus` and
+`ZooKeeperStateSubscription` form the current connection API. See the
+[connection reference](connections.md) for their behavior and defaults.
+
+`ZooKeeperConnectionException` reports a safe `ZooKeeperConnectionFailure`,
+optional endpoint and server code during establishment. `ZooKeeperSessionException`
+reports session state and optional server code. `ZooKeeperEventOverflowException`
+identifies a terminal state-event gap. These describe connection/session failures
+without inventing an application request.
 
 ## Endpoints and create settings
 

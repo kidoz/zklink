@@ -35,7 +35,7 @@ For model, endpoint, and exception changes:
 just test tests/ZkLink.Tests
 ```
 
-For codecs and stream framing:
+For protocol, session, scheduler and transport changes:
 
 ```sh
 just test tests/ZkLink.Protocol.Tests
@@ -44,9 +44,9 @@ just test tests/ZkLink.Protocol.Tests
 Both suites are server-free. Use `--project` with `dotnet test`; this repository
 selects Microsoft.Testing.Platform in [global.json](../../global.json).
 
-## Compare primitive bytes with Apache Java
+## Compare protocol bytes with Apache Java
 
-On macOS or Linux, install JDK 17 or later, curl, and Python 3 in addition to the
+On macOS or Linux, install JDK 25 and Python 3 in addition to the
 pinned .NET SDK. Then run:
 
 ```sh
@@ -54,13 +54,17 @@ bash dev/test-jute-oracle.sh
 ```
 
 Require the final Java generation and C#-to-Java verification success message.
-The script checks the downloaded jar's hash and build commit, compares generated
-Java bytes with the checked-in fixture, and verifies C# bytes with Java. Inspect
+The Gradle wrapper verifies its distribution and dependency checksums, then
+generates primitive/opcode/path fixtures and verifies C# requests with Apache
+classes. The script compares generated fixtures with checked-in bytes. Inspect
 `artifacts/jute-oracle/` if it fails. It does not replace the checked-in fixture;
 investigate byte differences before making an intentional fixture update.
 
 See the [oracle documentation](../../tests/ZkLink.JavaOracle/README.md) for the
 exact records and provenance, and [verification scope](../explanation/verification.md)
 for the limits of these checks.
+
+For real connection/auth/sync/close checks on all nodes of both pinned versions,
+run `just zk-driver-matrix`. Live TLS/mTLS and operation fault tests remain open.
 
 [How-to guides](README.md) · [Documentation home](../README.md)

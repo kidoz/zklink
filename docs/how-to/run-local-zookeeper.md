@@ -2,8 +2,8 @@
 
 Use the pinned Compose fixture to obtain a disposable three-node ensemble.
 Install Docker with Compose and `just`, start Docker, and run commands from the
-repository root. The fixture uses Java readiness probes; ZkLink does not yet
-connect to it.
+repository root. The fixture uses Java readiness probes. The
+[connection sample](../tutorials/connect-a-session.md) connects with ZkLink.
 
 ## Start and inspect an ensemble
 
@@ -63,6 +63,11 @@ temporary directory it prints, and attempts cleanup on success or failure. If
 cleanup fails, inspect the printed project's cleanup log and remove that project's
 containers and volumes using its recorded configuration. The command fails if a
 required prerequisite or check fails.
+
+To additionally run the managed driver's new-session, digest-authentication,
+sync and acknowledged-close checks on every node, use `just zk-driver-matrix`.
+It requires the pinned .NET SDK and OpenSSL, and retains per-node driver output.
+This does not qualify live TLS, CRUD, watches or recovery under faults.
 
 ## Resolve common startup problems
 

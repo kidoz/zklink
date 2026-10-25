@@ -6,14 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ZkLink is in initial development. No version has been released, so the entries
-below describe work in progress rather than supported behavior. There is no
-usable public client, NuGet package, TLS or authentication support, watch
-implementation, Native AOT validation or performance data yet. See
+below describe work in progress rather than supported behavior. Node CRUD, public transactions, watch
+delivery, a NuGet package, Native AOT validation and runtime performance data
+remain unavailable. See
 [README.md](README.md) for the current status and verified scope.
 
 ## [Unreleased]
 
 ### Added
+
+- Connectable client with validated options, TCP/TLS, optional custom trust roots
+  and client certificates, digest authentication and same-session reconnect.
+- Immutable session snapshots and atomic state subscriptions with bounded buffering.
+- Request scheduling with count/byte limits, ordered replies, cancellation and
+  timeout outcomes, late-reply bookkeeping and no automatic application replay.
+- Negotiated-timeout heartbeats, endpoint updates and acknowledged asynchronous
+  close with cleanup on cancellation or failure.
+- Public `SyncAsync`, a runnable connection sample and managed connection smoke
+  checks against every node of ZooKeeper 3.8.7 and 3.9.6.
+- Virtual-time lifecycle tests and loopback TLS/mTLS certificate checks. Live
+  secure-server and broader recovery qualification remain open.
 
 - Initial .NET 10 solution (`src/ZkLink`) with C# 14, nullable reference types,
   warnings as errors, deterministic builds, central package management, locked

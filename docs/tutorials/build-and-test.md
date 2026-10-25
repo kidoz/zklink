@@ -61,12 +61,16 @@ just test tests/ZkLink.Protocol.Tests
 
 Expect another successful test summary. This suite checks Jute encoding against
 checked-in Java fixtures and exercises fragmented frames, malformed input, and
-stream failures. It uses local fixtures and test doubles.
+stream failures, virtual-time session recovery and cancellation, and loopback
+TLS/mTLS. It uses local fixtures and test doubles.
 
 You have now built the library and exercised the behavior implemented in this
 checkout. For repeatable checks after a change, use
 [Run the development checks](../how-to/run-development-checks.md). To understand
 what these results establish, read
 [What the verification layers prove](../explanation/verification.md).
+
+Continue with [Connect a session](connect-a-session.md) to use the compiled
+client against the local ZooKeeper ensemble.
 
 [Tutorials](README.md) · [Documentation home](../README.md)

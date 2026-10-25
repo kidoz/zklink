@@ -9,13 +9,14 @@ imply working behavior elsewhere.
 
 The public-contract suite checks ownership, validation, and failure metadata.
 The protocol suite checks serialization, malformed input, frame boundaries,
-fragmentation, and stream failures. Both run without a server, making local
+fragmentation, and stream failures. Both run without a ZooKeeper installation, making local
 failures repeatable and independent of container readiness.
 
-These tests cannot establish handshakes, reconnect behavior, request ordering,
-or watch delivery. Those systems are not implemented yet. Similarly, a watch
-removal result can preserve its status correctly without any watch having been
-registered or removed.
+Virtual-time peers also check handshake/session identity, negotiated liveness,
+cancellation outcomes, ordered late replies, bounded admission and close cleanup.
+Loopback TCP/TLS tests exercise sockets and certificate validation with ephemeral
+certificates. They do not establish recovery against a real quorum or live ACL
+and watch semantics. Watch-removal values remain supporting contracts only.
 
 ## Java fixtures provide an independent byte comparison
 
@@ -24,11 +25,10 @@ The optional Java oracle compares C# primitive and record bytes with Apache's
 serializer and asks Java to decode the C# output. The downloaded artifact is
 pinned by checksum and source build commit.
 
-The fixture covers selected boundaries, null and empty values, non-surrogate
-BMP strings, Stat, and headers. It does not cover handshakes, opcode dispatch,
-multi records, or live operations. Apache's writer and the strict C# UTF-8 codec
-also handle surrogate code units differently; this fixture makes no
-supplementary-character interoperability claim. The
+The fixture covers primitive boundaries, all implemented request/reply shapes,
+handshakes, multi records, and Apache path validation for every UTF-16 code unit.
+Java verifies emitted C# requests semantically. This does not establish real
+operation commitment or supplementary-character interoperability. The
 [oracle inventory](../../tests/ZkLink.JavaOracle/README.md) records its exact scope.
 
 ## Fixture health establishes a usable test environment
@@ -39,9 +39,14 @@ node. That is stronger readiness evidence than an open TCP port.
 
 The two-version matrix additionally checks the exact server version on every
 node, collects logs, and cleans up isolated projects. This makes it useful for
-checking the environment before driver integration tests exist. A successful
+checking the server environment. A successful
 run establishes fixture behavior; driver compatibility still needs ZkLink
 requests and assertions against both pinned versions.
+
+`just zk-driver-matrix` runs the managed sample against each node: a new session,
+digest authentication, sync and acknowledged close. It has passed on both pinned
+versions. Live recovery, CRUD, ACL enforcement, watch delivery and TLS/mTLS
+ZooKeeper fixtures remain separate unverified work.
 
 ## Release claims need consumer evidence
 

@@ -28,12 +28,13 @@ notation; omit the brackets when invoking a command.
 | `just format-check` | Restore tools and check formatting |
 | `just check` | Check formatting and build; does not run tests |
 | `just test <project>` | Run a selected test project in Release mode |
-| `bash dev/test-jute-oracle.sh` | Compare Java and C# primitive/record bytes; macOS/Linux, JDK 17+, curl, Python 3 |
+| `bash dev/test-jute-oracle.sh` | Compare all implemented protocol/path fixtures using the Gradle wrapper; macOS/Linux, JDK 25, Python 3 |
 | `just zk-check [version]` | Validate Compose configuration |
 | `just zk-up [version]` | Start three nodes and wait up to 90 seconds for readiness |
 | `just zk-status [version]` | Show health and host ports |
 | `just zk-logs [version]` | Print server logs |
 | `just zk-down [version]` | Remove the selected ensemble and its volumes |
+| `just zk-driver-matrix` | Run the fixture matrix plus managed session/auth/sync/close on each node; requires .NET and OpenSSL |
 | `just zk-matrix` | Smoke-test both pinned versions with isolated projects, retained logs, and cleanup; requires Bash |
 
 ZooKeeper recipes default to `3.9.6`; `3.8.7` is the other checked-in choice.
@@ -44,11 +45,11 @@ Definitions are in the [justfile](../../justfile).
 | Project | Scope | External prerequisites |
 | --- | --- | --- |
 | [ZkLink.Tests](../../tests/ZkLink.Tests/ZkLink.Tests.csproj) | Endpoints, model ownership, create options, failure contracts | Pinned .NET SDK |
-| [ZkLink.Protocol.Tests](../../tests/ZkLink.Protocol.Tests/ZkLink.Protocol.Tests.csproj) | Primitive/record fixtures, malformed input, framing and stream failures | Pinned .NET SDK |
-| [ZkLink.JavaOracle](../../tests/ZkLink.JavaOracle/README.md) | Optional Apache Java fixture generation and decoding of C# bytes | JDK 17+, curl, Python 3, pinned .NET SDK, network access |
+| [ZkLink.Protocol.Tests](../../tests/ZkLink.Protocol.Tests/ZkLink.Protocol.Tests.csproj) | Protocol/path fixtures, malformed input, virtual-time sessions/requests and loopback TLS/mTLS | Pinned .NET SDK |
+| [ZkLink.JavaOracle](../../tests/ZkLink.JavaOracle/README.md) | Optional Apache Java fixture generation and decoding of C# bytes | Gradle wrapper, JDK 25, Python 3, pinned .NET SDK, network access |
 
 The .NET suites need neither a server nor Java. No driver integration test
-project exists yet.
+project exists yet; `just zk-driver-matrix` runs the connection sample against real servers.
 
 ## ZooKeeper fixture settings
 
@@ -78,6 +79,7 @@ startup and server logs, exact-version output, status, and cleanup logs.
 | --- | --- |
 | `src/ZkLink/` | Library, XML API documentation, and API baselines |
 | `tests/` | Server-free .NET suites and optional Java oracle |
+| `samples/ZkLink.Samples.Basic/` | Connect, optional digest auth, sync and acknowledged close |
 | `dev/` | Versioned server settings, health checks, and verification scripts |
 | `docs/` | Tutorials, how-to guides, reference, and explanation |
 | `.github/workflows/` | Build and server-free test workflow |

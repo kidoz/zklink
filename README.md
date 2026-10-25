@@ -4,20 +4,20 @@
 [![.NET SDK](https://img.shields.io/badge/.NET%20SDK-10.0.402-512BD4)](https://github.com/kidoz/zklink/blob/main/global.json)
 [![License](https://img.shields.io/badge/license-TBD-lightgrey)](https://github.com/kidoz/zklink/blob/main/README.md#current-repository-state)
 
-ZkLink is a proposed managed .NET client for Apache ZooKeeper: a first-class C# implementation of the ZooKeeper client TCP protocol, targeting .NET 10. Native AOT compatibility is a planned, separately tested requirement, not a current capability.
+ZkLink is a managed .NET client for Apache ZooKeeper: a first-class C# implementation of the ZooKeeper client TCP protocol, targeting .NET 10. Native AOT compatibility is a planned, separately tested requirement, not a current capability.
 
-**Status: under development.** Internal protocol codecs, handshake records, transactions, connection-string/path/chroot handling, immutable result models and request-failure contracts are implemented and tested. There is no usable client yet; session management, node-operation APIs, watch delivery and secure transport remain unimplemented.
+**Status: under development.** Internal protocol codecs, handshake records, transactions, connection-string/path/chroot handling, immutable result models and request-failure contracts are implemented and tested. A connectable client now provides TCP/TLS, digest authentication, session recovery, state subscriptions, bounded requests, `SyncAsync` and acknowledged close. Node CRUD, public transactions and watch delivery remain unimplemented.
 
 ## Current repository state
 
-- **Solution:** `ZkLink.slnx` with `src/ZkLink`, `tests/ZkLink.Tests` and `tests/ZkLink.Protocol.Tests`.
+- **Solution:** `ZkLink.slnx` with `src/ZkLink`, two .NET test projects and a runnable connection sample.
 - **Target:** `net10.0`, C# 14, nullable reference types, and warnings as errors.
-- **Code:** checked protocol encoding/decoding for node, ACL, transaction and control messages; bounded asynchronous framing; new/resume handshake records; connection-string parsing and namespace translation. Public supporting types include immutable results, create options and failure/removal contracts. No running client session is implemented yet.
-- **Tests:** xUnit suites cover Apache Java fixtures for all implemented opcodes, transaction success/error shapes, every reply split and truncation, all UTF-16 path code units, chroot boundaries and supporting public contracts. A bounded scripted stream and loopback fake server exercise delayed delivery, partial writes, dropped replies and handshake exchanges. Actual ZooKeeper operation behavior, session recovery, authorization and watch delivery remain unverified.
+- **Code:** checked protocol encoding/decoding for node, ACL, transaction and control messages; bounded asynchronous framing; new/resume handshake records; connection-string parsing and namespace translation. Public supporting types include immutable results, create options and failure/removal contracts. One explicit session per client, negotiated-timeout heartbeats, endpoint rotation, same-session reconnect, cancellation outcomes and close cleanup are implemented. Sent application requests are never replayed automatically.
+- **Tests:** xUnit suites cover Apache Java fixtures for all implemented opcodes, transaction success/error shapes, every reply split and truncation, all UTF-16 path code units, chroot boundaries and supporting public contracts. A bounded scripted stream and loopback fake server exercise delayed delivery, partial writes, dropped replies and handshake exchanges. Virtual-time tests exercise session and request lifecycles. Loopback TLS tests check chain/name validation, certificate expiry and mutual authentication. The managed connection sample has passed digest auth, sync and acknowledged close on every node of both pinned versions. CRUD, live fault recovery, ACL authorization and watch delivery remain unverified.
 - **Build:** SDK 10.0.402 is pinned, with central dependency versions and lock files; core has no third-party runtime dependencies. Public API changes are checked against nullable baselines. The [build workflow](.github/workflows/build.yml) defines Linux/Windows/macOS checks and separate Gradle-based Apache Java verification. Only local macOS arm64 execution has been verified; remote runs and Native AOT remain unverified.
 - **Distribution:** no package has been released. License selection, package metadata and release qualification remain open. See the [dependency inventory](THIRD-PARTY-NOTICES.md).
 
-The library lives in `src/`; `tests/` contains public-contract tests, protocol tests and an optional Java oracle. Samples and benchmarks are not yet available.
+The library lives in `src/`; `tests/` contains public-contract tests, protocol tests and an optional Java oracle. The [basic connection sample](samples/ZkLink.Samples.Basic) is runnable; benchmarks are not yet available.
 
 ## Development commands
 
@@ -39,6 +39,7 @@ Install [just](https://just.systems/) and .NET SDK **10.0.402**. Docker with Com
 | `just zk-logs [version]` | Print server logs |
 | `just zk-down [version]` | Remove the selected ensemble and its data volumes |
 | `just zk-matrix` | Smoke-test both pinned server versions and clean up |
+| `just zk-driver-matrix` | Also connect/authenticate/sync/close using ZkLink on every node |
 
 CSharpier **1.3.0** is pinned in [dotnet-tools.json](dotnet-tools.json). The format shortcuts restore the local tool automatically. Direct equivalents are `dotnet tool restore`, `dotnet csharpier format .`, and `dotnet csharpier check .`.
 
@@ -55,7 +56,7 @@ Start with the [ZkLink documentation](docs/README.md), organized using [Diátaxi
 
 ## Server compatibility target
 
-The intended server targets are **ZooKeeper 3.8.7 and 3.9.6**. These versions were selected from the [Apache release page](https://zookeeper.apache.org/releases/) in the **2026-10-25** research snapshot. Both must pass driver integration and release checks before support is advertised. Driver interoperability remains unverified.
+The intended server targets are **ZooKeeper 3.8.7 and 3.9.6**. These versions were selected from the [Apache release page](https://zookeeper.apache.org/releases/) in the **2026-10-25** research snapshot. Both must pass driver integration and release checks before support is advertised. Connection, digest auth, sync and close have been smoke-tested on both versions; full driver compatibility remains unqualified.
 
 | Server | Role | Pinned Compose settings | Default host ports |
 | --- | --- | --- | --- |
@@ -69,21 +70,21 @@ The intended server targets are **ZooKeeper 3.8.7 and 3.9.6**. These versions we
 ```sh
 just zk-up
 just zk-status
-# Run integration tests here once the driver and test projects exist.
+dotnet run --project samples/ZkLink.Samples.Basic -c Release -- 127.0.0.1:2181 --plaintext
 just zk-logs > /tmp/zklink-zookeeper.log
 just zk-down
 ```
 
 For 3.8.7, use `just zk-up 3.8.7`, `just zk-status 3.8.7`, `just zk-logs 3.8.7`, and `just zk-down 3.8.7`. The direct Compose equivalent uses `--env-file dev/zookeeper-3.8.7.env` on each command. Always select the same version for startup, logs, and cleanup.
 
-Connect to `127.0.0.1:2181,127.0.0.1:2182,127.0.0.1:2183` for 3.9.6 or `127.0.0.1:22181,127.0.0.1:22182,127.0.0.1:22183` for 3.8.7. Each container becomes healthy after an authenticated create/read/delete probe with fresh credentials and a disposable ephemeral node. Both fixtures use plaintext; ZkLink consumers must explicitly disable TLS for them. TLS/mTLS, authentication-required fixtures, and driver compatibility tests remain planned.
+Connect to `127.0.0.1:2181,127.0.0.1:2182,127.0.0.1:2183` for 3.9.6 or `127.0.0.1:22181,127.0.0.1:22182,127.0.0.1:22183` for 3.8.7. Each container becomes healthy after an authenticated create/read/delete probe with fresh credentials and a disposable ephemeral node. Both fixtures use plaintext; ZkLink consumers must explicitly disable TLS for them. Live TLS/mTLS and authentication-required fixtures, broader operation tests and fault recovery qualification remain planned.
 
 `just zk-matrix` runs both versions sequentially with unique project names and dynamically assigned loopback ports. It checks the exact server version and authenticated readiness on all three nodes, records configuration, server logs, version output, and container status in a printed temporary artifact directory, and removes its containers and volumes on success or failure. It fails if Docker, either image, readiness, version verification, or cleanup fails. The runner uses the checked-in image pins regardless of an inherited `ZOOKEEPER_IMAGE` override.
 
 For additional concurrent manual runs, set a unique `COMPOSE_PROJECT_NAME` and unused `ZOOKEEPER_PORT_1`, `ZOOKEEPER_PORT_2`, and `ZOOKEEPER_PORT_3`. Preserve logs before cleanup on failure. `ZOOKEEPER_IMAGE` remains available for explicit image overrides outside the matrix runner. Update image pins and the support matrix together when qualifying new patches.
 
-Fixture validation on **2026-10-25**: `just zk-matrix` passed for **both 3.8.7 and 3.9.6**, including three-node startup, exact-version verification, authenticated create/read/delete, and cleanup. The earlier quorum-loss rejection check covered 3.9.6 only. These checks use the Java client supplied by each image; ZkLink driver tests remain unimplemented.
+Fixture validation on **2026-10-25**: `just zk-matrix` passed for **both 3.8.7 and 3.9.6**, including three-node startup, exact-version verification, authenticated create/read/delete, and cleanup. The earlier quorum-loss rejection check covered 3.9.6 only. `just zk-driver-matrix` also passed new session, digest authentication, sync and acknowledged close through ZkLink on all six nodes. These are plaintext connection smoke checks, not full operation/security/recovery qualification.
 
 ## Not yet available
 
-There is no connectable client, NuGet package, TLS or authentication support, watch implementation, Native AOT validation, or performance data. Supporting public model and exception types do not establish driver interoperability.
+Node CRUD, public transactions, watch delivery, a NuGet package, Native AOT validation and runtime performance data are not available. TLS/mTLS has local loopback evidence only; live secure ZooKeeper and cross-platform security qualification remain open.
