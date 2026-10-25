@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/ZkLink/ZkLink.csproj" />
+  <Project Path="tests/ZkLink.Protocol.Tests/ZkLink.Protocol.Tests.csproj" />
+  <Project Path="tests/ZkLink.Tests/ZkLink.Tests.csproj" />
+</Solution>

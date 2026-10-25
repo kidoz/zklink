@@ -1,0 +1,11 @@
+[Exceptions/*.cs]
+# Failure constructors require evidence metadata. Empty/message-only constructors would discard it.
+dotnet_diagnostic.CA1032.severity = none
+
+[Exceptions/ZooKeeperErrorCode.cs]
+# This enum contains failure codes only. Success (zero) is deliberately excluded.
+dotnet_diagnostic.CA1008.severity = none
+
+[Types/ZooKeeperOperation.cs]
+# Wire opcode zero is a server notification, never an application request.
+dotnet_diagnostic.CA1008.severity = none
