@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <PackageReference Include="xunit.v3.mtp-v2" />
+    <PackageReference Include="NSubstitute" />
+    <ProjectReference Include="../../src/ZkLink/ZkLink.csproj" />
+    <None Include="Fixtures/*.hex" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
