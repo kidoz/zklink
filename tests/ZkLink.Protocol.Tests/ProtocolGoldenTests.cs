@@ -20,7 +20,7 @@ public sealed class ProtocolGoldenTests
         Assert.Equal(ProtocolFixtures.All.Length, entries.Length);
         foreach (var entry in entries)
         {
-            ProtocolFixture fixture = ProtocolFixtures.All.Single(item =>
+            var fixture = ProtocolFixtures.All.Single(item =>
                 item.Name == entry.GetProperty("name").GetString()
             );
             Assert.Equal(fixture.Xid, entry.GetProperty("xid").GetInt32());
@@ -36,8 +36,8 @@ public sealed class ProtocolGoldenTests
     [Trait("Acceptance", "T04")]
     public void EveryRequestMatchesApacheJavaAndEveryReplyDecodes(string name)
     {
-        ProtocolFixture fixture = ProtocolFixtures.All.Single(item => item.Name == name);
-        int size = RequestCodec.Measure(fixture.Xid, fixture.Request, ProtocolFixtures.Limits);
+        var fixture = ProtocolFixtures.All.Single(item => item.Name == name);
+        var size = RequestCodec.Measure(fixture.Xid, fixture.Request, ProtocolFixtures.Limits);
         var encoded = new byte[size];
         Assert.Equal(
             size,
@@ -45,7 +45,7 @@ public sealed class ProtocolGoldenTests
         );
         Assert.Equal(ProtocolFixtures.Bytes(name + "-request"), encoded);
         ProtocolFixtures.Emit(name + "-request", encoded);
-        WireReply reply = ReplyCodec.Decode(
+        var reply = ReplyCodec.Decode(
             ProtocolFixtures.Bytes(name + "-reply"),
             fixture.Xid,
             fixture.Request,
@@ -53,7 +53,7 @@ public sealed class ProtocolGoldenTests
         );
         Assert.Equal(new ReplyHeader(fixture.Xid, 101, 0), reply.Header);
         ProtocolFixtures.AssertResult(fixture.Result, reply.Result);
-        WireReply error = ReplyCodec.Decode(
+        var error = ReplyCodec.Decode(
             ProtocolFixtures.Bytes(name + "-error"),
             fixture.Xid,
             fixture.Request,
@@ -68,7 +68,7 @@ public sealed class ProtocolGoldenTests
     public void NewAndResumeHandshakeMatchApacheJava()
     {
         var storage = new byte[128];
-        int length = HandshakeCodec.EncodeNew(storage, 30000, ProtocolFixtures.Limits);
+        var length = HandshakeCodec.EncodeNew(storage, 30000, ProtocolFixtures.Limits);
         Assert.Equal(ProtocolFixtures.Bytes("connect-new"), storage[..length]);
         ProtocolFixtures.Emit("connect-new", storage.AsSpan(0, length));
         length = HandshakeCodec.Encode(
@@ -81,7 +81,7 @@ public sealed class ProtocolGoldenTests
         );
         Assert.Equal(ProtocolFixtures.Bytes("connect-resume"), storage[..length]);
         ProtocolFixtures.Emit("connect-resume", storage.AsSpan(0, length));
-        using ConnectResponse response = HandshakeCodec.Decode(
+        using var response = HandshakeCodec.Decode(
             ProtocolFixtures.Bytes("connect-reply"),
             ProtocolFixtures.Limits
         );
@@ -89,7 +89,7 @@ public sealed class ProtocolGoldenTests
         Assert.Equal(20000, response.TimeoutMilliseconds);
         Assert.Equal(123, response.SessionId);
         Assert.Equal(new byte[16], response.Password.ToArray());
-        using ConnectResponse expired = HandshakeCodec.Decode(
+        using var expired = HandshakeCodec.Decode(
             ProtocolFixtures.Bytes("connect-expired"),
             ProtocolFixtures.Limits
         );
@@ -100,7 +100,7 @@ public sealed class ProtocolGoldenTests
     [Trait("Acceptance", "T04")]
     public void NotificationPreservesTypeStatePathAndSeparateZxid()
     {
-        WireNotification notification = ReplyCodec.DecodeNotification(
+        var notification = ReplyCodec.DecodeNotification(
             ProtocolFixtures.Bytes("notification"),
             ProtocolFixtures.Limits
         );

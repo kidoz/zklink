@@ -51,7 +51,7 @@ public sealed class JuteValidationTests
     [Trait("Acceptance", "T03")]
     public void MalformedUtf8IsRejected(string hex)
     {
-        byte[] bytes = Convert.FromHexString(hex);
+        var bytes = Convert.FromHexString(hex);
         Assert.Throws<InvalidDataException>(() =>
         {
             var reader = new JuteReader(bytes, Limits);
@@ -81,7 +81,7 @@ public sealed class JuteValidationTests
     [Trait("Acceptance", "T03")]
     public void ConfiguredVectorLimitIsEnforcedEvenWithEnoughBytes()
     {
-        byte[] bytes = Convert.FromHexString("000000020000000000000000");
+        var bytes = Convert.FromHexString("000000020000000000000000");
         Assert.Throws<InvalidDataException>(() =>
         {
             var reader = new JuteReader(bytes, new ProtocolLimits(maxCollectionElements: 1));
@@ -93,7 +93,7 @@ public sealed class JuteValidationTests
     [Trait("Acceptance", "T03")]
     public void RejectEveryTruncatedStatAndUnexpectedTail()
     {
-        for (int length = 0; length < WireStat.EncodedLength; length++)
+        for (var length = 0; length < WireStat.EncodedLength; length++)
         {
             var bytes = new byte[length];
             Assert.Throws<InvalidDataException>(() =>
@@ -116,7 +116,7 @@ public sealed class JuteValidationTests
     {
         byte[] source = [0, 0, 0, 2, 12, 34];
         var reader = new JuteReader(source, Limits);
-        byte[] result = Assert.IsType<byte[]>(reader.ReadBuffer());
+        var result = Assert.IsType<byte[]>(reader.ReadBuffer());
         source[4] = 255;
         Assert.Equal(new byte[] { 12, 34 }, result);
     }
@@ -125,7 +125,7 @@ public sealed class JuteValidationTests
     [Trait("Acceptance", "T03")]
     public void WriterRejectsInvalidUnicodeAndExcessiveRecords()
     {
-        byte[] bytes = new byte[16];
+        var bytes = new byte[16];
         Assert.Throws<InvalidDataException>(() =>
         {
             var writer = new JuteWriter(bytes, Limits);
@@ -153,7 +153,7 @@ public sealed class JuteValidationTests
     [Trait("Acceptance", "T03")]
     public void ReaderAndWriterRespectExactFrameBoundary()
     {
-        byte[] bytes = new byte[4];
+        var bytes = new byte[4];
         var limits = new ProtocolLimits(maxFrameBytes: 4);
         var writer = new JuteWriter(bytes, limits);
         writer.WriteInt32(int.MaxValue);

@@ -4,60 +4,72 @@ namespace ZkLink.Protocol.Tests.Peers;
 internal sealed class ScriptedPeerStream : Stream
 {
     private const int MaxBytes = 4 * 1024 * 1024;
-    private readonly Queue<byte[]> incoming = new();
-    private readonly MemoryStream outgoing = new();
-    private readonly object gate = new();
-    private TaskCompletionSource ready = NewSignal();
-    private int offset;
-    private int bufferedBytes;
-    private bool completed;
-    private bool disposed;
+    private readonly Queue<byte[]> _incoming = new();
+    private readonly MemoryStream _outgoing = new();
+    private readonly object _gate = new();
+    private TaskCompletionSource _ready = NewSignal();
+    private int _offset;
+    private int _bufferedBytes;
+    private bool _completed;
+    private bool _disposed;
 
     internal int? FailWriteAfterBytes { get; init; }
-    internal byte[] WrittenBytes => outgoing.ToArray();
+    internal byte[] WrittenBytes => _outgoing.ToArray();
     internal int PendingBytes
     {
         get
         {
-            lock (gate)
-                return bufferedBytes;
+            lock (_gate)
+            {
+                return _bufferedBytes;
+            }
         }
     }
 
     internal void Enqueue(params byte[][] chunks)
     {
-        lock (gate)
+        lock (_gate)
         {
-            ObjectDisposedException.ThrowIf(disposed, this);
-            if (completed)
-                throw new InvalidOperationException("Peer input is complete.");
-            int additionalBytes = 0;
-            foreach (byte[] chunk in chunks)
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_completed)
             {
-                if (chunk.Length > MaxBytes - bufferedBytes - additionalBytes)
+                throw new InvalidOperationException("Peer input is complete.");
+            }
+            var additionalBytes = 0;
+            foreach (var chunk in chunks)
+            {
+                if (chunk.Length > MaxBytes - _bufferedBytes - additionalBytes)
+                {
                     throw new InvalidOperationException("Peer input budget exceeded.");
+                }
                 additionalBytes += chunk.Length;
             }
-            foreach (byte[] chunk in chunks)
+            foreach (var chunk in chunks)
             {
-                if (chunk.Length > MaxBytes - bufferedBytes)
+                if (chunk.Length > MaxBytes - _bufferedBytes)
+                {
                     throw new InvalidOperationException("Peer input budget exceeded.");
+                }
                 if (chunk.Length == 0)
+                {
                     continue;
-                incoming.Enqueue((byte[])chunk.Clone());
-                bufferedBytes += chunk.Length;
+                }
+                _incoming.Enqueue((byte[])chunk.Clone());
+                _bufferedBytes += chunk.Length;
             }
-            if (incoming.Count > 0)
-                ready.TrySetResult();
+            if (_incoming.Count > 0)
+            {
+                _ready.TrySetResult();
+            }
         }
     }
 
     internal void CompleteInput()
     {
-        lock (gate)
+        lock (_gate)
         {
-            completed = true;
-            ready.TrySetResult();
+            _completed = true;
+            _ready.TrySetResult();
         }
     }
 
@@ -67,32 +79,38 @@ internal sealed class ScriptedPeerStream : Stream
     )
     {
         if (buffer.IsEmpty)
+        {
             return 0;
+        }
         while (true)
         {
             Task wait;
-            lock (gate)
+            lock (_gate)
             {
-                ObjectDisposedException.ThrowIf(disposed, this);
+                ObjectDisposedException.ThrowIf(_disposed, this);
                 cancellationToken.ThrowIfCancellationRequested();
-                if (incoming.TryPeek(out byte[]? chunk))
+                if (_incoming.TryPeek(out var chunk))
                 {
-                    int count = Math.Min(buffer.Length, chunk.Length - offset);
-                    chunk.AsMemory(offset, count).CopyTo(buffer);
-                    offset += count;
-                    bufferedBytes -= count;
-                    if (offset == chunk.Length)
+                    var count = Math.Min(buffer.Length, chunk.Length - _offset);
+                    chunk.AsMemory(_offset, count).CopyTo(buffer);
+                    _offset += count;
+                    _bufferedBytes -= count;
+                    if (_offset == chunk.Length)
                     {
-                        incoming.Dequeue();
-                        offset = 0;
+                        _incoming.Dequeue();
+                        _offset = 0;
                     }
-                    if (incoming.Count == 0 && !completed)
-                        ready = NewSignal();
+                    if (_incoming.Count == 0 && !_completed)
+                    {
+                        _ready = NewSignal();
+                    }
                     return count;
                 }
-                if (completed)
+                if (_completed)
+                {
                     return 0;
-                wait = ready.Task;
+                }
+                wait = _ready.Task;
             }
             await wait.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -103,14 +121,18 @@ internal sealed class ScriptedPeerStream : Stream
         CancellationToken cancellationToken = default
     )
     {
-        ObjectDisposedException.ThrowIf(disposed, this);
+        ObjectDisposedException.ThrowIf(_disposed, this);
         cancellationToken.ThrowIfCancellationRequested();
-        int count = buffer.Length;
+        var count = buffer.Length;
         if (FailWriteAfterBytes is { } limit)
-            count = (int)Math.Min(count, Math.Max(0, limit - outgoing.Length));
-        if (count > MaxBytes - outgoing.Length)
+        {
+            count = (int)Math.Min(count, Math.Max(0, limit - _outgoing.Length));
+        }
+        if (count > MaxBytes - _outgoing.Length)
+        {
             throw new IOException("Peer output budget exceeded.");
-        outgoing.Write(buffer.Span[..count]);
+        }
+        _outgoing.Write(buffer.Span[..count]);
         return count == buffer.Length
             ? ValueTask.CompletedTask
             : ValueTask.FromException(new IOException("Injected partial write failure."));
@@ -123,14 +145,14 @@ internal sealed class ScriptedPeerStream : Stream
     {
         if (disposing)
         {
-            lock (gate)
+            lock (_gate)
             {
-                disposed = true;
-                incoming.Clear();
-                bufferedBytes = 0;
-                ready.TrySetResult();
+                _disposed = true;
+                _incoming.Clear();
+                _bufferedBytes = 0;
+                _ready.TrySetResult();
             }
-            outgoing.Dispose();
+            _outgoing.Dispose();
         }
         base.Dispose(disposing);
     }

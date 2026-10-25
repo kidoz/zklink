@@ -33,14 +33,20 @@ public sealed class JuteGoldenTests
     public void DecodeApacheJavaRecords()
     {
         var reader = new JuteReader(GoldenBytes(), Limits);
-        foreach (int value in Ints)
+        foreach (var value in Ints)
+        {
             Assert.Equal(value, reader.ReadInt32());
-        foreach (long value in Longs)
+        }
+        foreach (var value in Longs)
+        {
             Assert.Equal(value, reader.ReadInt64());
+        }
         Assert.False(reader.ReadBoolean());
         Assert.True(reader.ReadBoolean());
-        foreach (string? value in Strings)
+        foreach (var value in Strings)
+        {
             Assert.Equal(value, reader.ReadString());
+        }
         Assert.Null(reader.ReadBuffer());
         Assert.Empty(Assert.IsType<byte[]>(reader.ReadBuffer()));
         Assert.Equal(new byte[] { 0, 255, 128 }, reader.ReadBuffer());
@@ -56,17 +62,23 @@ public sealed class JuteGoldenTests
     [Trait("Acceptance", "T01")]
     public void EncodeMatchesApacheJavaRecords()
     {
-        byte[] golden = GoldenBytes();
+        var golden = GoldenBytes();
         var bytes = new byte[golden.Length];
         var writer = new JuteWriter(bytes, Limits);
-        foreach (int value in Ints)
+        foreach (var value in Ints)
+        {
             writer.WriteInt32(value);
-        foreach (long value in Longs)
+        }
+        foreach (var value in Longs)
+        {
             writer.WriteInt64(value);
+        }
         writer.WriteBoolean(false);
         writer.WriteBoolean(true);
-        foreach (string? value in Strings)
+        foreach (var value in Strings)
+        {
             writer.WriteString(value);
+        }
         writer.WriteNullBuffer();
         writer.WriteBuffer([]);
         writer.WriteBuffer([0, 255, 128]);
@@ -79,7 +91,7 @@ public sealed class JuteGoldenTests
         Assert.Equal(golden, bytes);
 
         // The optional oracle runner asks Java to deserialize these C# bytes.
-        string? output = Environment.GetEnvironmentVariable("ZKLINK_ORACLE_OUTPUT");
+        var output = Environment.GetEnvironmentVariable("ZKLINK_ORACLE_OUTPUT");
         if (output is not null)
         {
             Directory.CreateDirectory(output);

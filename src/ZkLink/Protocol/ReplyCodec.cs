@@ -13,10 +13,12 @@ internal static class ReplyCodec
     {
         _ = RequestCodec.Measure(expectedXid, request, limits);
         var reader = new JuteReader(payload, limits);
-        ReplyHeader header = reader.ReadReplyHeader();
+        var header = reader.ReadReplyHeader();
         if (header.Xid != expectedXid)
+        {
             throw new InvalidDataException("Reply xid does not match the expected request.");
-        WireResult result =
+        }
+        var result =
             header.Error != 0 ? new ErrorResult(header.Error)
             : request is MultiRequest multi ? ReadMulti(ref reader, multi, limits)
             : ReadBody(ref reader, request.Opcode, limits);
@@ -30,16 +32,22 @@ internal static class ReplyCodec
     )
     {
         var reader = new JuteReader(payload, limits);
-        ReplyHeader header = reader.ReadReplyHeader();
+        var header = reader.ReadReplyHeader();
         if (header.Xid != -1 || header.Error != 0)
+        {
             throw new InvalidDataException("Invalid notification header.");
-        int type = reader.ReadInt32();
-        int state = reader.ReadInt32();
-        string? path = reader.ReadString();
+        }
+        var type = reader.ReadInt32();
+        var state = reader.ReadInt32();
+        var path = reader.ReadString();
         if (path is not null)
+        {
             ValidateServerPath(path);
+        }
         if (type != -1 && path is null)
+        {
             throw new InvalidDataException("Node notification requires a path.");
+        }
         reader.EnsureEnd();
         return new WireNotification(type, state, path, header.Zxid < 0 ? null : header.Zxid);
     }
@@ -63,9 +71,11 @@ internal static class ReplyCodec
 
     private static CountResult ReadCount(ref JuteReader reader)
     {
-        int count = reader.ReadInt32();
+        var count = reader.ReadInt32();
         if (count < 0)
+        {
             throw new InvalidDataException("Negative descendant count.");
+        }
         return new CountResult(count);
     }
 
@@ -75,50 +85,62 @@ internal static class ReplyCodec
         ProtocolLimits limits
     )
     {
-        int count = request.Members.Count;
+        var count = request.Members.Count;
         if (
             count > limits.MaxCollectionElements
             || reader.Remaining < 9
             || count > (reader.Remaining - 9) / 9
         )
-            throw new InvalidDataException("Invalid or excessive expected multi count.");
-        var results = new WireMultiMember[count];
-        for (int i = 0; i < count; i++)
         {
-            int type = reader.ReadInt32();
-            bool done = reader.ReadBoolean();
-            int error = reader.ReadInt32();
+            throw new InvalidDataException("Invalid or excessive expected multi count.");
+        }
+        var results = new WireMultiMember[count];
+        for (var i = 0; i < count; i++)
+        {
+            var type = reader.ReadInt32();
+            var done = reader.ReadBoolean();
+            var error = reader.ReadInt32();
             if (done)
+            {
                 throw new InvalidDataException("Premature multi terminator.");
+            }
             if (type == -1)
             {
-                int bodyError = reader.ReadInt32();
+                var bodyError = reader.ReadInt32();
                 if (bodyError != error)
+                {
                     throw new InvalidDataException("Inconsistent multi error fields.");
+                }
                 results[i] = new WireMultiMember(type, bodyError, new ErrorResult(bodyError));
                 continue;
             }
-            int expected = request.Members[i].Opcode is 19 or 21 ? 15 : request.Members[i].Opcode;
+            var expected = request.Members[i].Opcode is 19 or 21 ? 15 : request.Members[i].Opcode;
             if (type != expected || error != 0 || type is not (1 or 2 or 4 or 5 or 8 or 13 or 15))
+            {
                 throw new InvalidDataException("Unexpected multi result shape.");
+            }
             results[i] = new WireMultiMember(type, 0, ReadBody(ref reader, type, limits));
         }
         if (reader.ReadInt32() != -1 || !reader.ReadBoolean() || reader.ReadInt32() != -1)
+        {
             throw new InvalidDataException("Invalid multi terminator or extra member.");
+        }
         return new MultiResult(results);
     }
 
     private static WireAcl[] ReadAcl(ref JuteReader reader)
     {
-        int count = reader.ReadVectorCount(12);
+        var count = reader.ReadVectorCount(12);
         var result = new WireAcl[count];
-        for (int i = 0; i < count; i++)
+        for (var i = 0; i < count; i++)
         {
-            int permissions = reader.ReadInt32();
-            string scheme = Required(reader.ReadString());
-            string id = Required(reader.ReadString());
+            var permissions = reader.ReadInt32();
+            var scheme = Required(reader.ReadString());
+            var id = Required(reader.ReadString());
             if (permissions is < 0 or > 31 || scheme.Length == 0)
+            {
                 throw new InvalidDataException("Invalid ACL record.");
+            }
             result[i] = new WireAcl(permissions, scheme, id);
         }
         return result;
@@ -126,14 +148,16 @@ internal static class ReplyCodec
 
     private static IdentityResult ReadIdentities(ref JuteReader reader)
     {
-        int count = reader.ReadVectorCount(8);
+        var count = reader.ReadVectorCount(8);
         var values = new ZooKeeperClientIdentity[count];
-        for (int i = 0; i < count; i++)
+        for (var i = 0; i < count; i++)
         {
-            string scheme = Required(reader.ReadString());
-            string user = Required(reader.ReadString());
+            var scheme = Required(reader.ReadString());
+            var user = Required(reader.ReadString());
             if (scheme.Length == 0)
+            {
                 throw new InvalidDataException("Empty identity scheme.");
+            }
             values[i] = new ZooKeeperClientIdentity(scheme, user);
         }
         return new IdentityResult(values);
@@ -141,24 +165,26 @@ internal static class ReplyCodec
 
     private static string[] ReadStrings(ref JuteReader reader)
     {
-        int count = reader.ReadVectorCount(4);
+        var count = reader.ReadVectorCount(4);
         var values = new string[count];
-        for (int i = 0; i < count; i++)
+        for (var i = 0; i < count; i++)
+        {
             values[i] = Required(reader.ReadString());
+        }
         return values;
     }
 
     private static string ReadPath(ref JuteReader reader)
     {
-        string path = Required(reader.ReadString());
+        var path = Required(reader.ReadString());
         ValidateServerPath(path);
         return path;
     }
 
     private static string[] ReadChildren(ref JuteReader reader)
     {
-        string[] values = ReadStrings(ref reader);
-        foreach (string value in values)
+        var values = ReadStrings(ref reader);
+        foreach (var value in values)
         {
             try
             {
@@ -174,9 +200,11 @@ internal static class ReplyCodec
 
     private static string[] ReadPaths(ref JuteReader reader)
     {
-        string[] values = ReadStrings(ref reader);
-        foreach (string value in values)
+        var values = ReadStrings(ref reader);
+        foreach (var value in values)
+        {
             ValidateServerPath(value);
+        }
         return values;
     }
 

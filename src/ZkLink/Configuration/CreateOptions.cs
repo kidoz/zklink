@@ -14,11 +14,15 @@ public sealed class CreateOptions
     )
     {
         if (mode < CreateMode.Persistent || mode > CreateMode.PersistentSequentialWithTtl)
+        {
             throw new ArgumentOutOfRangeException(nameof(mode));
-        bool requiresTtl =
+        }
+        var requiresTtl =
             mode is CreateMode.PersistentWithTtl or CreateMode.PersistentSequentialWithTtl;
         if (requiresTtl != ttl.HasValue)
+        {
             throw new ArgumentException("TTL is required only for TTL create modes.", nameof(ttl));
+        }
         if (
             ttl is { } value
             && (
@@ -27,16 +31,20 @@ public sealed class CreateOptions
                 || value.Ticks / TimeSpan.TicksPerMillisecond > MaxTtlMilliseconds
             )
         )
+        {
             throw new ArgumentOutOfRangeException(
                 nameof(ttl),
                 "TTL must be positive whole milliseconds within the supported bound."
             );
+        }
         ArgumentNullException.ThrowIfNull(acl);
         if (acl.Count == 0)
+        {
             throw new ArgumentException(
                 "Create requires at least one explicit ACL entry.",
                 nameof(acl)
             );
+        }
         Acl = Snapshot.List(acl);
         Mode = mode;
         Ttl = ttl;

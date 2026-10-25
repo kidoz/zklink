@@ -7,7 +7,9 @@ public sealed class ZooKeeperAcl
     public ZooKeeperAcl(ZooKeeperPermissions permissions, string scheme, string id)
     {
         if ((permissions & ~ZooKeeperPermissions.All) != 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(permissions));
+        }
         ArgumentException.ThrowIfNullOrEmpty(scheme);
         ArgumentNullException.ThrowIfNull(id);
         Permissions = permissions;

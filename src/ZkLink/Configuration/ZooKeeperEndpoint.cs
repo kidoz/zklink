@@ -17,18 +17,22 @@ public sealed class ZooKeeperEndpoint
             || host.IndexOfAny(['/', '@', '?', '#', '[', ']']) >= 0
             || Uri.CheckHostName(host) == UriHostNameType.Unknown
         )
+        {
             throw new ArgumentException(
                 "Endpoint must be a host without credentials or URI components.",
                 nameof(host)
             );
+        }
         if (
             host.Contains(':', StringComparison.Ordinal)
             && (
-                !IPAddress.TryParse(host, out IPAddress? address)
+                !IPAddress.TryParse(host, out var address)
                 || address.AddressFamily != AddressFamily.InterNetworkV6
             )
         )
+        {
             throw new ArgumentException("Invalid endpoint host.", nameof(host));
+        }
         Host = host;
         Port = port;
     }

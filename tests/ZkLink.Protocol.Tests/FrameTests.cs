@@ -23,8 +23,8 @@ public sealed class FrameTests
     [Trait("Acceptance", "T02")]
     public async Task EveryPrefixHeaderAndBodySplitProducesIdenticalFrames()
     {
-        byte[] frame = Frame(Payload);
-        for (int split = 1; split < frame.Length; split++)
+        var frame = Frame(Payload);
+        for (var split = 1; split < frame.Length; split++)
         {
             using var stream = new FragmentedStream(frame, split);
             var reader = new FrameReader(stream, Limits);
@@ -37,13 +37,13 @@ public sealed class FrameTests
     [Trait("Acceptance", "T02")]
     public async Task ConcatenatedAndBytewiseFramesStaySeparateAndOwned()
     {
-        byte[] frame = Frame(Payload);
+        var frame = Frame(Payload);
         using var stream = new FragmentedStream([.. frame, .. frame], maxChunk: 1);
         var reader = new FrameReader(stream, Limits);
-        byte[] first = Assert.IsType<byte[]>(
+        var first = Assert.IsType<byte[]>(
             await reader.ReadAsync(TestContext.Current.CancellationToken)
         );
-        byte[] second = Assert.IsType<byte[]>(
+        var second = Assert.IsType<byte[]>(
             await reader.ReadAsync(TestContext.Current.CancellationToken)
         );
         first[0] = 255;
@@ -55,8 +55,8 @@ public sealed class FrameTests
     [Trait("Acceptance", "T03")]
     public async Task EveryMidFrameEofFails()
     {
-        byte[] frame = Frame(Payload);
-        for (int length = 1; length < frame.Length; length++)
+        var frame = Frame(Payload);
+        for (var length = 1; length < frame.Length; length++)
         {
             using var stream = new FragmentedStream(frame[..length], maxChunk: 1);
             var reader = new FrameReader(stream, Limits);
@@ -113,7 +113,7 @@ public sealed class FrameTests
     public async Task IoFailureIsPropagatedWithoutRetry()
     {
         using var stream = Substitute.For<Stream>();
-        int calls = 0;
+        var calls = 0;
 #pragma warning disable CA2012 // NSubstitute consumes this ValueTask call to configure the substitute.
         stream
             .WriteAsync(Arg.Any<ReadOnlyMemory<byte>>(), Arg.Any<CancellationToken>())
@@ -158,9 +158,11 @@ public sealed class FrameTests
             CancellationToken cancellationToken = default
         )
         {
-            int count = Math.Min(buffer.Length, maxChunk);
+            var count = Math.Min(buffer.Length, maxChunk);
             if (Position < split)
+            {
                 count = (int)Math.Min(count, split - Position);
+            }
             return base.ReadAsync(buffer[..count], cancellationToken);
         }
     }

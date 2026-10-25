@@ -8,7 +8,9 @@ public sealed class ZooKeeperWatchRemovalResult
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(registrationId, 1);
         if (!Enum.IsDefined(status))
+        {
             throw new ArgumentOutOfRangeException(nameof(status));
+        }
         RegistrationId = registrationId;
         Status = status;
     }

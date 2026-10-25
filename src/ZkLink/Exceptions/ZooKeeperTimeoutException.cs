@@ -8,6 +8,8 @@ public sealed class ZooKeeperTimeoutException : ZooKeeperException
         : base(request, outcome)
     {
         if (outcome == RequestOutcome.Rejected)
+        {
             throw new ArgumentOutOfRangeException(nameof(outcome));
+        }
     }
 }

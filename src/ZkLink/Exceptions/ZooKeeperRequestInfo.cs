@@ -12,9 +12,13 @@ public sealed class ZooKeeperRequestInfo
     )
     {
         if (!Enum.IsDefined(operation))
+        {
             throw new ArgumentOutOfRangeException(nameof(operation));
+        }
         if (requestId is <= 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(requestId));
+        }
         Operation = operation;
         RequestId = requestId;
         Endpoint = endpoint;

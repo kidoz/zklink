@@ -13,7 +13,7 @@ public sealed class ModelContractTests
         bytes[0] = 255;
         Assert.Equal(new byte[] { 1, 2, 3 }, snapshot.Data!.Value.ToArray());
         Assert.Null(new ZNodeData(null, default).Data);
-        ReadOnlyMemory<byte>? empty = new ZNodeData(ReadOnlyMemory<byte>.Empty, default).Data;
+        var empty = new ZNodeData(ReadOnlyMemory<byte>.Empty, default).Data;
         Assert.True(empty.HasValue);
         Assert.True(empty.Value.IsEmpty);
     }
@@ -93,7 +93,7 @@ public sealed class ModelContractTests
                 TimeSpan.FromMilliseconds(CreateOptions.MaxTtlMilliseconds + 1)
             )
         );
-        TimeSpan maximum = TimeSpan.FromTicks(
+        var maximum = TimeSpan.FromTicks(
             CreateOptions.MaxTtlMilliseconds * TimeSpan.TicksPerMillisecond
         );
         Assert.Equal(maximum, new CreateOptions(acl, mode, maximum).Ttl);
@@ -157,8 +157,10 @@ public sealed class ModelContractTests
             new ZooKeeperRequestInfo(ZooKeeperOperation.GetData, path: "/" + marker),
             new ZooKeeperMultiDiagnostic(0, 15, 0, "/" + marker),
         ];
-        foreach (object model in models)
+        foreach (var model in models)
+        {
             Assert.DoesNotContain(marker, model.ToString(), StringComparison.Ordinal);
+        }
     }
 
     private sealed class OversizedList<T> : IReadOnlyList<T>

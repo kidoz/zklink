@@ -14,20 +14,26 @@ public class ZooKeeperException : Exception, IZooKeeperRequestFailure
         ArgumentNullException.ThrowIfNull(request);
         ValidateOutcome(outcome);
         if (errorCode == 0)
+        {
             throw new ArgumentOutOfRangeException(
                 nameof(errorCode),
                 "Success is not a failure code."
             );
+        }
         if (outcome == RequestOutcome.Rejected && errorCode is null)
+        {
             throw new ArgumentException(
                 "Server rejection requires a server error code.",
                 nameof(errorCode)
             );
+        }
         if (outcome == RequestOutcome.NotSent && errorCode is not null)
+        {
             throw new ArgumentException(
                 "An unsent request cannot have a server result.",
                 nameof(errorCode)
             );
+        }
         Request = request;
         Outcome = outcome;
         ErrorCode = errorCode;
@@ -51,6 +57,8 @@ public class ZooKeeperException : Exception, IZooKeeperRequestFailure
     internal static void ValidateOutcome(RequestOutcome outcome)
     {
         if (!Enum.IsDefined(outcome))
+        {
             throw new ArgumentOutOfRangeException(nameof(outcome));
+        }
     }
 }

@@ -173,8 +173,10 @@ public sealed class FailureContractTests
             new ZooKeeperBackpressureException(request),
             new ZooKeeperOperationCanceledException(request, RequestOutcome.Unknown),
         ];
-        foreach (Exception failure in failures)
+        foreach (var failure in failures)
+        {
             Assert.DoesNotContain(marker, failure.ToString(), StringComparison.Ordinal);
+        }
     }
 
     [Theory]

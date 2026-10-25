@@ -23,15 +23,15 @@ public sealed class PeerTests
     [Trait("Acceptance", "T02")]
     public async Task EveryReplyShapeSurvivesEveryStreamSplit(string name)
     {
-        ProtocolFixture fixture = ProtocolFixtures.All.Single(item => item.Name == name);
-        byte[] frame = Frame(ProtocolFixtures.Bytes(name + "-reply"));
-        for (int split = 1; split < frame.Length; split++)
+        var fixture = ProtocolFixtures.All.Single(item => item.Name == name);
+        var frame = Frame(ProtocolFixtures.Bytes(name + "-reply"));
+        for (var split = 1; split < frame.Length; split++)
         {
             using var peer = new ScriptedPeerStream();
             peer.Enqueue(frame[..split], frame[split..]);
             peer.CompleteInput();
             var reader = new FrameReader(peer, ProtocolFixtures.Limits);
-            byte[] payload = Assert.IsType<byte[]>(
+            var payload = Assert.IsType<byte[]>(
                 await reader.ReadAsync(TestContext.Current.CancellationToken)
             );
             ProtocolFixtures.AssertResult(
@@ -55,10 +55,10 @@ public sealed class PeerTests
         ]);
         peer.CompleteInput();
         var reader = new FrameReader(peer, ProtocolFixtures.Limits);
-        byte[] first = Assert.IsType<byte[]>(
+        var first = Assert.IsType<byte[]>(
             await reader.ReadAsync(TestContext.Current.CancellationToken)
         );
-        byte[] second = Assert.IsType<byte[]>(
+        var second = Assert.IsType<byte[]>(
             await reader.ReadAsync(TestContext.Current.CancellationToken)
         );
         Assert.IsType<DataResult>(
@@ -73,20 +73,20 @@ public sealed class PeerTests
     {
         using var peer = new ScriptedPeerStream();
         var reader = new FrameReader(peer, ProtocolFixtures.Limits);
-        Task<byte[]?> delayed = reader.ReadAsync(TestContext.Current.CancellationToken);
+        var delayed = reader.ReadAsync(TestContext.Current.CancellationToken);
         Assert.False(delayed.IsCompleted);
         peer.Enqueue(Frame(ProtocolFixtures.Bytes("ping-reply")));
         Assert.NotNull(await delayed.ConfigureAwait(true));
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
             TestContext.Current.CancellationToken
         );
-        Task<byte[]?> cancelled = reader.ReadAsync(cancellation.Token);
+        var cancelled = reader.ReadAsync(cancellation.Token);
         await cancellation.CancelAsync();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cancelled);
 
         using var failingPeer = new ScriptedPeerStream { FailWriteAfterBytes = 7 };
         var writer = new FrameWriter(failingPeer, ProtocolFixtures.Limits);
-        byte[] request = ProtocolFixtures.Bytes("get-data-request");
+        var request = ProtocolFixtures.Bytes("get-data-request");
         await Assert.ThrowsAsync<IOException>(() =>
             writer.WriteAsync(request, TestContext.Current.CancellationToken)
         );
@@ -97,13 +97,13 @@ public sealed class PeerTests
     public async Task LoopbackPeerChecksRequestAndCanDropAPartialResponse()
     {
         var limits = ProtocolFixtures.Limits;
-        byte[] expected = ProtocolFixtures.Bytes("get-data-request");
+        var expected = ProtocolFixtures.Bytes("get-data-request");
         var server = new FakeZooKeeperServer(
             async (stream, token) =>
             {
                 var reader = new FrameReader(stream, limits);
                 Assert.Equal(expected, await reader.ReadAsync(token).ConfigureAwait(true));
-                byte[] frame = Frame(ProtocolFixtures.Bytes("get-data-reply"));
+                var frame = Frame(ProtocolFixtures.Bytes("get-data-reply"));
                 await stream.WriteAsync(frame.AsMemory(0, 7), token).ConfigureAwait(true);
                 // Normal socket disposal ends this deliberately incomplete frame.
             },
@@ -159,9 +159,9 @@ public sealed class PeerTests
         var reader = new FrameReader(client.GetStream(), limits);
         var writer = new FrameWriter(client.GetStream(), limits);
         var connectStorage = new byte[45];
-        int connectLength = HandshakeCodec.EncodeNew(connectStorage, 30000, limits);
+        var connectLength = HandshakeCodec.EncodeNew(connectStorage, 30000, limits);
         await writer.WriteAsync(connectStorage.AsMemory(0, connectLength), deadline.Token);
-        using ConnectResponse connected = HandshakeCodec.Decode(
+        using var connected = HandshakeCodec.Decode(
             Assert.IsType<byte[]>(await reader.ReadAsync(deadline.Token)),
             limits
         );

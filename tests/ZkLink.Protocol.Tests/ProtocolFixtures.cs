@@ -205,7 +205,7 @@ internal static class ProtocolFixtures
                 break;
             case (IdentityResult e, IdentityResult a):
                 Assert.Equal(e.Identities.Length, a.Identities.Length);
-                for (int i = 0; i < e.Identities.Length; i++)
+                for (var i = 0; i < e.Identities.Length; i++)
                 {
                     Assert.Equal(e.Identities[i].Scheme, a.Identities[i].Scheme);
                     Assert.Equal(e.Identities[i].User, a.Identities[i].User);
@@ -213,7 +213,7 @@ internal static class ProtocolFixtures
                 break;
             case (MultiResult e, MultiResult a):
                 Assert.Equal(e.Members.Length, a.Members.Length);
-                for (int i = 0; i < e.Members.Length; i++)
+                for (var i = 0; i < e.Members.Length; i++)
                 {
                     Assert.Equal(e.Members[i].Opcode, a.Members[i].Opcode);
                     Assert.Equal(e.Members[i].Error, a.Members[i].Error);
@@ -228,10 +228,12 @@ internal static class ProtocolFixtures
 
     internal static void Emit(string name, ReadOnlySpan<byte> bytes)
     {
-        string? root = Environment.GetEnvironmentVariable("ZKLINK_ORACLE_OUTPUT");
+        var root = Environment.GetEnvironmentVariable("ZKLINK_ORACLE_OUTPUT");
         if (root is null)
+        {
             return;
-        string directory = Path.Combine(root, "Protocol");
+        }
+        var directory = Path.Combine(root, "Protocol");
         Directory.CreateDirectory(directory);
         File.WriteAllText(Path.Combine(directory, name + ".hex"), Convert.ToHexString(bytes));
     }

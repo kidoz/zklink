@@ -20,7 +20,7 @@ public sealed class ConfigurationTests
         string? chroot
     )
     {
-        ParsedConnectionString parsed = ConnectionStringParser.Parse(connection);
+        var parsed = ConnectionStringParser.Parse(connection);
         Assert.Equal(count, parsed.Endpoints.Count);
         Assert.Equal(firstHost, parsed.Endpoints[0].Host);
         Assert.Equal(firstPort, parsed.Endpoints[0].Port);
@@ -69,16 +69,20 @@ public sealed class ConfigurationTests
     [Trait("Acceptance", "T05")]
     public void EveryUtf16CodeUnitMatchesApachePathUtils()
     {
-        byte[] expected = ProtocolFixtures.Bytes("path-code-units");
+        var expected = ProtocolFixtures.Bytes("path-code-units");
         Assert.Equal(8192, expected.Length);
-        for (int code = 0; code <= char.MaxValue; code++)
+        for (var code = 0; code <= char.MaxValue; code++)
         {
-            string path = "/a" + (char)code + "b";
-            bool valid = (expected[code / 8] & (1 << (code % 8))) != 0;
+            var path = "/a" + (char)code + "b";
+            var valid = (expected[code / 8] & (1 << (code % 8))) != 0;
             if (valid)
+            {
                 ZNodePath.Validate(path);
+            }
             else
+            {
                 Assert.ThrowsAny<ArgumentException>(() => ZNodePath.Validate(path));
+            }
         }
     }
 
@@ -126,10 +130,10 @@ public sealed class ConfigurationTests
     public void EveryNamespacedRequestAndMultiMemberIsTranslatedOnce()
     {
         var paths = new ChrootPath("/app");
-        foreach (ProtocolFixture fixture in ProtocolFixtures.All)
+        foreach (var fixture in ProtocolFixtures.All)
         {
-            WireRequest actual = NamespaceTranslator.ToServer(fixture.Request, paths);
-            string? path = actual switch
+            var actual = NamespaceTranslator.ToServer(fixture.Request, paths);
+            var path = actual switch
             {
                 PathRequest p => p.Path,
                 ReadRequest p => p.Path,
@@ -141,12 +145,16 @@ public sealed class ConfigurationTests
                 _ => null,
             };
             if (path is not null)
+            {
                 Assert.Equal(
                     fixture.Name == "create-sequential-prefix" ? "/app/node/" : "/app/node",
                     path
                 );
+            }
             if (actual is MultiRequest multi)
-                foreach (WireRequest member in multi.Members)
+            {
+                foreach (var member in multi.Members)
+                {
                     Assert.Equal(
                         "/app/node",
                         member switch
@@ -158,6 +166,8 @@ public sealed class ConfigurationTests
                             _ => throw new InvalidOperationException(),
                         }
                     );
+                }
+            }
             if (actual is RestoreRequest restore)
             {
                 Assert.Equal("/app/data", restore.Data[0]);
@@ -205,7 +215,7 @@ public sealed class ConfigurationTests
         Assert.Equal(3, filtered.Values.Length);
         Assert.Equal("/", filtered.Values[0]);
         Assert.Equal("/node2", filtered.Values[2]);
-        WireNotification notification = NamespaceTranslator.ToClient(
+        var notification = NamespaceTranslator.ToClient(
             new WireNotification(3, 3, "/app/node", 12),
             paths
         );

@@ -19,10 +19,12 @@ public sealed class ZooKeeperMultiException : ZooKeeperException
         : base(request, RequestOutcome.Rejected, diagnostics[failedMemberIndex].ErrorCode)
     {
         if (request.Operation != ZooKeeperOperation.Multi)
+        {
             throw new ArgumentException(
                 "Write multi failure requires a Multi request.",
                 nameof(request)
             );
+        }
         Diagnostics = diagnostics;
         FailedMemberIndex = failedMemberIndex;
     }
@@ -41,17 +43,23 @@ public sealed class ZooKeeperMultiException : ZooKeeperException
         var copy = Snapshot.List(diagnostics);
         ArgumentOutOfRangeException.ThrowIfNegative(failedMemberIndex);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(failedMemberIndex, copy.Count);
-        for (int i = 0; i < copy.Count; i++)
+        for (var i = 0; i < copy.Count; i++)
+        {
             if (copy[i].Index != i)
+            {
                 throw new ArgumentException(
                     "Diagnostics must match input order without missing indices.",
                     nameof(diagnostics)
                 );
+            }
+        }
         if (copy[failedMemberIndex].ErrorCode == 0)
+        {
             throw new ArgumentException(
                 "The failing member must have a nonzero server error.",
                 nameof(diagnostics)
             );
+        }
         return copy;
     }
 }

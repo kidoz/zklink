@@ -28,9 +28,13 @@ internal static class HandshakeCodec
     )
     {
         if (timeoutMilliseconds <= 0 || lastZxid < 0 || password.Length != PasswordLength)
+        {
             throw new InvalidDataException("Invalid handshake parameters.");
+        }
         if (sessionId == 0 && (lastZxid != 0 || password.ContainsAnyExcept((byte)0)))
+        {
             throw new InvalidDataException("A new session requires a zero watermark and password.");
+        }
         var writer = new JuteWriter(destination, limits);
         writer.WriteInt32(0);
         writer.WriteInt64(lastZxid);
@@ -56,28 +60,36 @@ internal static class HandshakeCodec
     {
         var reader = new JuteReader(payload, limits);
         if (reader.ReadInt32() != 0)
+        {
             throw new InvalidDataException("Unsupported handshake protocol version.");
-        int timeout = reader.ReadInt32();
-        long sessionId = reader.ReadInt64();
-        byte[]? password = reader.ReadBuffer(PasswordLength);
+        }
+        var timeout = reader.ReadInt32();
+        var sessionId = reader.ReadInt64();
+        var password = reader.ReadBuffer(PasswordLength);
         try
         {
             // Only this exact historical boundary may omit readOnly.
-            bool readOnly = reader.Remaining != 0 && reader.ReadBoolean();
+            var readOnly = reader.Remaining != 0 && reader.ReadBoolean();
             reader.EnsureEnd();
             if (readOnly)
+            {
                 throw new InvalidDataException("Read-only sessions are unsupported.");
+            }
             if (
                 timeout > 0
                 && (password is null || password.Length != PasswordLength || sessionId == 0)
             )
+            {
                 throw new InvalidDataException("Invalid accepted-session credentials.");
+            }
             return new ConnectResponse(timeout, sessionId, password ?? []);
         }
         catch
         {
             if (password is not null)
+            {
                 CryptographicOperations.ZeroMemory(password);
+            }
             throw;
         }
     }

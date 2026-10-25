@@ -13,32 +13,36 @@ public sealed class AllocationBaselineTests(ITestOutputHelper output)
     public void RecordSmallGetDataCodecAllocationsWithoutTimingGate()
     {
         const int iterations = 10_000;
-        WireRequest request = ProtocolFixtures.Reads[0];
-        ProtocolLimits limits = ProtocolFixtures.Limits;
+        var request = ProtocolFixtures.Reads[0];
+        var limits = ProtocolFixtures.Limits;
         var destination = new byte[RequestCodec.Measure(1, request, limits)];
-        byte[] replyBytes = ProtocolFixtures.Bytes("get-data-reply");
+        var replyBytes = ProtocolFixtures.Bytes("get-data-reply");
         WireReply? last = null;
-        for (int i = 0; i < 1000; i++)
+        for (var i = 0; i < 1000; i++)
         {
             RequestCodec.Encode(destination, 1, request, limits);
             last = ReplyCodec.Decode(replyBytes, 1, request, limits);
         }
-        long before = GC.GetAllocatedBytesForCurrentThread();
-        for (int i = 0; i < iterations; i++)
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < iterations; i++)
+        {
             RequestCodec.Encode(destination, 1, request, limits);
-        long encoding = GC.GetAllocatedBytesForCurrentThread() - before;
+        }
+        var encoding = GC.GetAllocatedBytesForCurrentThread() - before;
         before = GC.GetAllocatedBytesForCurrentThread();
-        for (int i = 0; i < iterations; i++)
+        for (var i = 0; i < iterations; i++)
+        {
             last = ReplyCodec.Decode(replyBytes, 1, request, limits);
-        long decoding = GC.GetAllocatedBytesForCurrentThread() - before;
+        }
+        var decoding = GC.GetAllocatedBytesForCurrentThread() - before;
         GC.KeepAlive(last);
-        double encodedPerOperation = encoding / (double)iterations;
-        double decodedPerOperation = decoding / (double)iterations;
+        var encodedPerOperation = encoding / (double)iterations;
+        var decodedPerOperation = decoding / (double)iterations;
         output.WriteLine(
             $"get-data encode: {encodedPerOperation} bytes/op; decode: {decodedPerOperation} bytes/op; iterations: {iterations}"
         );
 
-        string? path = Environment.GetEnvironmentVariable("ZKLINK_ALLOCATION_OUTPUT");
+        var path = Environment.GetEnvironmentVariable("ZKLINK_ALLOCATION_OUTPUT");
         if (path is not null)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);

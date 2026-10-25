@@ -16,7 +16,9 @@ public sealed class ZooKeeperOperationCanceledException
         ArgumentNullException.ThrowIfNull(request);
         ZooKeeperException.ValidateOutcome(outcome);
         if (outcome == RequestOutcome.Rejected)
+        {
             throw new ArgumentOutOfRangeException(nameof(outcome));
+        }
         Request = request;
         Outcome = outcome;
     }

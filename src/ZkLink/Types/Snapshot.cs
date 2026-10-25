@@ -8,7 +8,9 @@ internal static class Snapshot
     internal static ReadOnlyMemory<byte>? Data(ReadOnlyMemory<byte>? source)
     {
         if (source is not { } bytes)
+        {
             return null;
+        }
         ArgumentOutOfRangeException.ThrowIfGreaterThan(
             bytes.Length,
             ProtocolLimits.AbsoluteMaxFrameBytes
@@ -20,19 +22,21 @@ internal static class Snapshot
         where T : class
     {
         ArgumentNullException.ThrowIfNull(source);
-        int count = source.Count;
+        var count = source.Count;
         ArgumentOutOfRangeException.ThrowIfGreaterThan(
             count,
             ProtocolLimits.AbsoluteMaxCollectionElements
         );
         var copy = new T[count];
-        for (int i = 0; i < count; i++)
+        for (var i = 0; i < count; i++)
+        {
             copy[i] =
                 source[i]
                 ?? throw new ArgumentException(
                     "Collection entries cannot be null.",
                     nameof(source)
                 );
+        }
         return Array.AsReadOnly(copy);
     }
 }

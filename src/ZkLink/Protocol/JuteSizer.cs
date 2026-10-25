@@ -28,7 +28,9 @@ internal struct JuteSizer(ProtocolLimits limits) : IJuteOutput
             return;
         }
         if (value.Length > limits.MaxFrameBytes - WrittenCount)
+        {
             throw new InvalidDataException("Encoded string exceeds frame bounds.");
+        }
         try
         {
             Add(checked(4 + StrictUtf8.GetByteCount(value)));
@@ -44,21 +46,29 @@ internal struct JuteSizer(ProtocolLimits limits) : IJuteOutput
         if (values is null)
         {
             if (!allowNull)
+            {
                 throw new ArgumentNullException(nameof(values));
+            }
             Add(4);
             return;
         }
         if (values.Count > limits.MaxCollectionElements)
+        {
             throw new InvalidDataException("Vector exceeds configured bounds.");
+        }
         Add(4);
-        foreach (string? value in values)
+        foreach (var value in values)
+        {
             WriteString(value);
+        }
     }
 
     private void Add(int length)
     {
         if (length < 0 || length > limits.MaxFrameBytes - WrittenCount)
+        {
             throw new InvalidDataException("Encoded record exceeds frame bounds.");
+        }
         WrittenCount += length;
     }
 }

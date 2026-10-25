@@ -12,10 +12,12 @@ public sealed class ZooKeeperCloseException : ZooKeeperException
         : base(request, outcome, errorCode)
     {
         if (request.Operation != ZooKeeperOperation.CloseSession)
+        {
             throw new ArgumentException(
                 "Close failure requires a CloseSession request.",
                 nameof(request)
             );
+        }
     }
 
     /// <summary>Gets false; local cleanup never proves that ephemerals were deleted.</summary>
