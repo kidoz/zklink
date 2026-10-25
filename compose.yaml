@@ -1,0 +1,51 @@
+# Latest Apache release verified on 2026-10-25; pin the multi-platform image for reproducible tests.
+# Version-specific matrix settings: docker compose --env-file dev/zookeeper-3.8.7.env up -d --wait
+x-zookeeper: &zookeeper
+  image: ${ZOOKEEPER_IMAGE:-zookeeper:3.9.6@sha256:5bad433c71701a1d788b4df86c921d91bfb65c23a1443bcb18a80f40373ae9d9}
+  restart: "no"
+  environment: &zookeeper-environment
+    ZOO_SERVERS: >-
+      server.1=zoo1:2888:3888;2181
+      server.2=zoo2:2888:3888;2181
+      server.3=zoo3:2888:3888;2181
+    ZOO_STANDALONE_ENABLED: "false"
+    ZOO_ADMINSERVER_ENABLED: "false"
+    ZOO_INIT_LIMIT: "10"
+    ZOO_SYNC_LIMIT: "5"
+  volumes:
+    - ./dev/zookeeper-healthcheck.sh:/opt/zklink/zookeeper-healthcheck.sh:ro
+  healthcheck:
+    test: ["CMD", "bash", "/opt/zklink/zookeeper-healthcheck.sh"]
+    interval: 10s
+    timeout: 15s
+    start_period: 15s
+    retries: 6
+  stop_grace_period: 10s
+
+services:
+  zoo1:
+    <<: *zookeeper
+    hostname: zoo1
+    environment:
+      <<: *zookeeper-environment
+      ZOO_MY_ID: "1"
+    ports:
+      - "127.0.0.1:${ZOOKEEPER_PORT_1:-2181}:2181"
+
+  zoo2:
+    <<: *zookeeper
+    hostname: zoo2
+    environment:
+      <<: *zookeeper-environment
+      ZOO_MY_ID: "2"
+    ports:
+      - "127.0.0.1:${ZOOKEEPER_PORT_2:-2182}:2181"
+
+  zoo3:
+    <<: *zookeeper
+    hostname: zoo3
+    environment:
+      <<: *zookeeper-environment
+      ZOO_MY_ID: "3"
+    ports:
+      - "127.0.0.1:${ZOOKEEPER_PORT_3:-2183}:2181"
