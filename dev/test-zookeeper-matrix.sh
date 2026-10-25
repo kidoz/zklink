@@ -2,6 +2,18 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
+driver=false
+if [[ $# -eq 1 && "$1" == "--driver" ]]; then
+  driver=true
+elif [[ $# -ne 0 ]]; then
+  echo "Usage: $0 [--driver]" >&2
+  exit 2
+fi
+if [[ "${driver}" == true ]]; then
+  dotnet restore samples/ZkLink.Samples.Basic --locked-mode
+  dotnet build samples/ZkLink.Samples.Basic -c Release --no-restore
+fi
+
 docker compose version >/dev/null
 docker info >/dev/null
 artifacts=$(mktemp -d "${TMPDIR:-/tmp}/zklink-zookeeper-matrix.XXXXXX")
@@ -52,10 +64,19 @@ for version in 3.8.7 3.9.6; do
       exit 1
     fi
     compose exec -T "${service}" bash /opt/zklink/zookeeper-healthcheck.sh
+    if [[ "${driver}" == true ]]; then
+      endpoint=$(compose port "${service}" 2181)
+      ZKLINK_USER="zklink-connection-smoke" ZKLINK_PASSWORD="$(openssl rand -hex 16)" \
+        dotnet run --project samples/ZkLink.Samples.Basic -c Release --no-build -- \
+        "${endpoint}" --plaintext >"${artifacts}/${version}-${service}-driver.txt" 2>&1
+    fi
   done
   compose ps --format json >"${artifacts}/${version}-status.json"
   compose logs --no-color >"${artifacts}/${version}-server.log" 2>&1
   compose down --volumes >"${artifacts}/${version}-cleanup.log" 2>&1
   project=""
   echo "ZooKeeper ${version}: PASS (three nodes, exact server version, authenticated create/read/delete, cleanup)"
+  if [[ "${driver}" == true ]]; then
+    echo "ZkLink ${version}: PASS (new session, digest auth, sync, acknowledged close on every node)"
+  fi
 done

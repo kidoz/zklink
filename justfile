@@ -54,3 +54,7 @@ zk-down version="3.9.6":
 # Smoke-test both pinned ZooKeeper versions with isolated projects, logs, and cleanup.
 zk-matrix:
     bash dev/test-zookeeper-matrix.sh
+
+# Connect with the managed driver, authenticate, sync and close on every pinned server node.
+zk-driver-matrix:
+    bash dev/test-zookeeper-matrix.sh --driver
