@@ -1,4 +1,4 @@
-name: Build and server-free tests
+name: Build and verification
 
 on:
   push:
@@ -41,6 +41,31 @@ jobs:
         run: dotnet test --project tests/ZkLink.Tests -c Release --no-build --no-restore
       - name: Test protocol
         run: dotnet test --project tests/ZkLink.Protocol.Tests -c Release --no-build --no-restore
+
+  operations:
+    name: Live node and ACL operations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install pinned SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      - name: Verify both pinned server versions
+        env:
+          ZKLINK_MATRIX_ARTIFACT_ROOT: ${{ github.workspace }}/artifacts/live-tests
+        run: bash dev/test-zookeeper-matrix.sh --operations
+      - name: Retain server and test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: node-operations-matrix
+          path: artifacts/live-tests
+          if-no-files-found: error
 
   java-oracle:
     name: Apache Java protocol verification
