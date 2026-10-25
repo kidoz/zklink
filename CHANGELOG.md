@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ZkLink is in initial development. No version has been released, so the entries
-below describe work in progress rather than supported behavior. Node CRUD, public transactions, watch
+below describe work in progress rather than supported behavior. TTL creation, public transactions, watch
 delivery, a NuGet package, Native AOT validation and runtime performance data
 remain unavailable. See
 [README.md](README.md) for the current status and verified scope.
@@ -14,6 +14,15 @@ remain unavailable. See
 ## [Unreleased]
 
 ### Added
+
+- Public node operations: exists, data, children, create, set-data and delete,
+  plus ACL reads/replacement with separate data and ACL version conditions.
+- Persistent, ephemeral, sequential and container creation, with explicit ACLs,
+  returned path/stat and chroot translation; TTL creation fails locally for now.
+- Live xUnit node/ACL tests on ZooKeeper 3.8.7 and 3.9.6, including null/empty and
+  large data, conflicts, authorization and ephemeral removal after close.
+- `just zk-operations-matrix`, a separate live CI job with retained logs, and a
+  runnable CRUD example through the basic sample's `--nodes` option.
 
 - Connectable client with validated options, TCP/TLS, optional custom trust roots
   and client certificates, digest authentication and same-session reconnect.

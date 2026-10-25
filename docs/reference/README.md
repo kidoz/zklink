@@ -8,6 +8,8 @@ Look up the repository's current code, tooling, and verification scope.
   settings, and repository layout.
 - [Connection and session reference](connections.md) — configuration, state,
   cancellation, recovery and close behavior.
+- [Node and ACL operations](nodes.md) — methods, create modes, versions, errors
+  and verified live behavior.
 - [Supporting public types](public-types.md) — models, options, failure metadata,
   and watch-removal values currently defined in namespace `ZkLink`.
 

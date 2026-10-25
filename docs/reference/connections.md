@@ -1,10 +1,12 @@
 # Connection and session reference
 
-The current `ZooKeeperClient` exposes `ConnectAsync`, `Session`,
+The connection methods on `ZooKeeperClient` are `ConnectAsync`, `Session`,
 `SubscribeStateChanges`, `WaitForConnectionAsync`, `UpdateEndpointsAsync`,
 `SyncAsync`, `CloseAsync` and `DisposeAsync`. Network methods return `Task` and
 accept a final `CancellationToken`. Exact declarations are in the
 [API baseline](../../src/ZkLink/PublicAPI.Unshipped.txt).
+
+Node CRUD, children/stat and ACL methods are described in the [node reference](nodes.md).
 
 ## Configuration
 

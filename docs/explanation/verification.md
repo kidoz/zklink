@@ -45,8 +45,10 @@ requests and assertions against both pinned versions.
 
 `just zk-driver-matrix` runs the managed sample against each node: a new session,
 digest authentication, sync and acknowledged close. It has passed on both pinned
-versions. Live recovery, CRUD, ACL enforcement, watch delivery and TLS/mTLS
-ZooKeeper fixtures remain separate unverified work.
+versions. `just zk-operations-matrix` also runs the live .NET node/ACL suite and
+CRUD sample. It checks version conflicts, null/empty/large data, create modes,
+chroot, ACL enforcement and acknowledged-close ephemeral deletion. Broader live
+recovery, watch delivery and TLS/mTLS ZooKeeper fixtures remain unverified.
 
 ## Release claims need consumer evidence
 

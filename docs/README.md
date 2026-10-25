@@ -2,8 +2,8 @@
 
 ZkLink is a managed C# client for Apache ZooKeeper under development, targeting
 .NET 10. You can build the library, connect a session, authenticate, sync a path and
-close with acknowledgment. Node CRUD, public transactions and active watches
-remain unimplemented, and no NuGet package is available.
+close with acknowledgment, and use node/ACL operations. Public transactions and
+active watches remain unimplemented, and no NuGet package is available.
 
 The documentation follows [Diátaxis](https://diataxis.fr/), with four sections
 organized around what you need to do.
@@ -18,7 +18,8 @@ organized around what you need to do.
 New to the repository? Start with [Build and test ZkLink](tutorials/build-and-test.md).
 Evaluating it for an application? Check [Current capabilities](reference/current-capabilities.md)
 before planning an integration. To exercise the client, follow
-[Connect a session](tutorials/connect-a-session.md).
+[Connect a session](tutorials/connect-a-session.md), then
+[Create, read, update and delete a node](tutorials/use-node-operations.md).
 
 ## Writing documentation
 

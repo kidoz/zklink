@@ -65,6 +65,9 @@ exact records and provenance, and [verification scope](../explanation/verificati
 for the limits of these checks.
 
 For real connection/auth/sync/close checks on all nodes of both pinned versions,
-run `just zk-driver-matrix`. Live TLS/mTLS and operation fault tests remain open.
+run `just zk-driver-matrix`. For node/ACL verification and the CRUD example on
+both versions, run `just zk-operations-matrix`. Required live configuration and
+prerequisites fail explicitly when absent. Live TLS/mTLS and broader operation
+fault tests remain open.
 
 [How-to guides](README.md) · [Documentation home](../README.md)

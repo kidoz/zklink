@@ -1,19 +1,19 @@
 # Current capabilities
 
-This describes the checkout as of **2026-10-25**. No package has been released,
-and node CRUD, public transactions and watch delivery remain unavailable.
+This describes the checkout as of **2026-10-26**. No package has been released,
+and TTL creation, public transactions and watch delivery remain unavailable.
 
 ## Code and verification
 
 | Area | Available now | Remaining scope |
 | --- | --- | --- |
 | Build | .NET 10, C# 14, deterministic builds, locked dependencies, warnings as errors | Release package metadata, license selection, package qualification |
-| Protocol | Internal codecs for all 27 implemented opcodes, handshake/multi/framing, path/chroot translation and Gradle-managed Java fixtures | Public node/transaction APIs and live operation semantics |
-| Public types | Immutable snapshots, endpoints, create options, ACLs, versions, request failures, watch-removal results; contract tests | Node operation and active-watch contracts |
-| Sessions and operations | Connect/authenticate/sync, snapshots/subscriptions, heartbeat, same-session recovery, cancellation and acknowledged close | Node CRUD, public transactions, watches and live recovery under faults |
+| Protocol | Internal codecs for all 27 implemented opcodes, handshake/multi/framing, path/chroot translation and Gradle-managed Java fixtures | Public transaction/auxiliary APIs and remaining live qualification |
+| Public types | Immutable snapshots, endpoints, create options, ACLs, versions, request failures, watch-removal results; contract tests | Public transaction and active-watch contracts |
+| Sessions and operations | Connect/authenticate/sync, snapshots/subscriptions, heartbeat, same-session recovery, cancellation, close and node/ACL methods | TTL creation, public transactions, watches and broader live recovery under faults |
 | Watches | Removal enums and result type only | Handles, registration, delivery, removal, restoration |
-| Security | TCP/TLS, optional custom roots/client certificates, digest replay, explicit plaintext override | Live secure ZooKeeper, ACL authorization and cross-platform security qualification |
-| Local servers | Pinned three-node Compose fixtures for 3.8.7 and 3.9.6 | Driver integration and security fixtures |
+| Security | TCP/TLS, optional custom roots/client certificates, digest replay, explicit plaintext override and live ACL tests | Live secure ZooKeeper, additional identity schemes and cross-platform security qualification |
+| Local servers | Pinned three-node Compose fixtures for 3.8.7 and 3.9.6 | Secure server and broader fault fixtures |
 | Native AOT | Planned requirement | Publish and direct execution evidence for consumers |
 | Performance | Initial small GetData codec allocation check | Session/load benchmarks and runtime performance evidence |
 
@@ -32,15 +32,18 @@ remote workflow results remain unverified. Proposed Native AOT targets are
 
 | ZooKeeper version | Intended role | Fixture settings | Driver compatibility |
 | --- | --- | --- | --- |
-| 3.8.7 | Required qualification target | [Version settings](../../dev/zookeeper-3.8.7.env) | Connection/auth/sync/close smoke passed |
-| 3.9.6 | Required qualification target and development default | [Version settings](../../dev/zookeeper-3.9.6.env) | Connection/auth/sync/close smoke passed |
+| 3.8.7 | Required qualification target | [Version settings](../../dev/zookeeper-3.8.7.env) | Connection smoke and node/ACL tests passed |
+| 3.9.6 | Required qualification target and development default | [Version settings](../../dev/zookeeper-3.9.6.env) | Connection smoke and node/ACL tests passed |
 
 The [project overview](../../README.md#local-zookeeper-testing) records fixture
 smoke checks on 2026-10-25 for both versions: three-node startup, exact-version
 verification, authenticated create/read/delete, and cleanup. Those readiness checks use
 the Java client in each image. `just zk-driver-matrix` additionally passed new
 session, digest auth, sync and acknowledged close through ZkLink on every node.
-This is connection smoke evidence, not full driver qualification.
+`just zk-operations-matrix` adds live .NET CRUD/stat/children, version conflicts,
+null/empty/large data, create modes, chroot, ACL checks and acknowledged-close
+ephemeral deletion, plus the CRUD example on each node. This remains scoped
+operation evidence rather than full driver qualification.
 
 TLS is required by default. Loopback tests cover trusted/custom roots, wrong
 identity, unknown issuer, expiry, mutual authentication, missing required client

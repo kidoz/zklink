@@ -1,8 +1,9 @@
 # Supporting public types
 
 All types below are in namespace `ZkLink`. They are implemented supporting
-contracts and have not shipped in a package. The current client exposes connection/session methods and `SyncAsync`; node
-result types and watch-removal values await their operation APIs.
+contracts and have not shipped in a package. The current client exposes connection/session and node/ACL methods; watch-removal
+values still await their operation APIs. Node result wrappers are returned by the
+[node operations](nodes.md).
 
 Exact signatures and nullable annotations are in the
 [unshipped API baseline](../../src/ZkLink/PublicAPI.Unshipped.txt). Source links

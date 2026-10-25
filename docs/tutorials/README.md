@@ -7,6 +7,9 @@ Learn through a guided exercise with a concrete result.
 
 - [Connect a session](connect-a-session.md) — authenticate, sync and close a
   managed client against the local ensemble.
+- [Create, read, update and delete a node](use-node-operations.md) — use the
+  authenticated CRUD example and run live operation tests.
+
 See [current capabilities](../reference/current-capabilities.md) for the available scope.
 
 [Documentation home](../README.md)
