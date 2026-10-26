@@ -12,7 +12,23 @@ remain unavailable. See
 
 ## [Unreleased]
 
+### Fixed
+
+- Watch restoration now retries timeout/session-moved responses within the owned
+  session budget and treats expiry/authentication responses as terminal failures.
+- Established-session readiness waits and watch streams report terminal session
+  failures consistently during reconnect.
+- Restoration completion, readiness and gap publication share the session lock,
+  preserving cleanup when disposal races the final acknowledgment.
+
 ### Added
+
+- Optional `ZkLink.Extensions.DependencyInjection` registration with one shared
+  host-connected client, asynchronous startup, acknowledged shutdown and lifecycle tests.
+
+- Controlled tests for interrupted multi-batch restoration, stale generations,
+  consumed one-shots and terminal session outcomes, plus live dropped-reset-reply
+  and local-loss checks on both pinned server versions.
 
 - Persistent and recursive `AddWatchAsync` subscriptions with repeated buffered
   delivery, profile-aware shared removal and bounded extended restoration.

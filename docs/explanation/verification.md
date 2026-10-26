@@ -67,6 +67,17 @@ independent removal on 3.9 and explicit
 reconnect gaps after a missed create/delete interval. Controlled peers cover
 gap publication before admission and global overflow, including gap fan-out.
 
+Controlled recovery tests interrupt multi-batch restoration, reject or time out
+reset acknowledgments, inject stale generation callbacks, and distinguish
+terminal expiry/authentication from local loss. They verify request outcomes,
+stream completion, and that a consumed one-shot is not restored again. The live
+proxy can hold and drop one server-applied reset acknowledgment before pausing
+reconnect. Tests verify closed admission, same-session retry, one gap after
+successful restoration, and no revival of a disposed handle. A short negotiated
+session timeout separately verifies local `Lost` while reconnect stays paused.
+These checks run on both pinned versions; live forced server expiry and the
+broader quorum/soak campaign remain open.
+
 `just zk-ttl-matrix` separately starts TTL-disabled and TTL-enabled fixtures for
 each patch. It checks opt-in, maximum TTL, single/atomic creation, close
 survival, child protection and eventual cleanup, plus disabled-server errors and

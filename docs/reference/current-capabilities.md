@@ -12,6 +12,7 @@ This describes the checkout as of **2026-10-26**. No package has been released.
 | Sessions and operations | Connect/authenticate/sync, snapshots/subscriptions, heartbeat, same-session recovery, cancellation, close, node/ACL methods, typed transactions, auxiliary queries, opt-in TTL creation and watches | Broader live recovery under faults |
 | Watches | One-shot reads, persistent/recursive subscriptions, buffered events, shared removal, cancellation cleanup, bounded restoration and explicit reconnect gaps | Broader fault and concurrency qualification |
 | Security | TCP/TLS, optional custom roots/client certificates, digest replay, explicit plaintext override and live ACL tests | Live secure ZooKeeper, additional identity schemes and cross-platform security qualification |
+| Dependency injection | Optional `AddZkLink` registration with one host-owned singleton and asynchronous startup/shutdown | Installed-package and DI-specific Native AOT qualification |
 | Local servers | Pinned three-node Compose fixtures for 3.8.7 and 3.9.6 | Secure server and broader fault fixtures |
 | Native AOT | Planned requirement | Publish and direct execution evidence for consumers |
 | Performance | Initial small GetData codec allocation check | Session/load benchmarks and runtime performance evidence |
@@ -57,7 +58,11 @@ connection cut followed by same-session restoration. Persistent/recursive checks
 add repeated delivery, chroot and explicit reconnect gaps. The default 3.8
 profile rejects conflicting modes at one path; the 3.9 profile additionally
 verifies independent categories at the same path. The `--watches` sample runs
-on every node. See the [watch reference](watches.md).
+on every node. Recovery checks also cover interrupted/reset-timeout retries,
+stale generations, terminal expiry/authentication, and consumed one-shots in
+controlled peers. Both live versions additionally exercise dropped reset
+acknowledgments and local loss while reconnect is paused. See the
+[watch reference](watches.md).
 
 TLS is required by default. Loopback tests cover trusted/custom roots, wrong
 identity, unknown issuer, expiry, mutual authentication, missing required client

@@ -117,6 +117,13 @@ then yields ordered transitions. Disposing/canceling it is local. Exhausting the
 shared event budget faults the client explicitly with
 `ZooKeeperEventOverflowException`; transitions are not silently dropped.
 
+Restoration failures follow the same session lifecycle. Retryable reset errors
+and attempt timeouts keep admission closed while retrying the existing session.
+After an established client receives confirmed expiry or authentication failure,
+readiness waits and watch streams fail with `ZooKeeperSessionException` and the
+terminal state. Initial connection failures retain `ZooKeeperConnectionException`.
+A failed restoration attempt emits no persistent reconnect-gap event.
+
 ## Closing
 
 `CloseAsync` stops admission, ends outstanding caller waits consistently, sends

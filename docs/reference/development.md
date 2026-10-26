@@ -47,6 +47,7 @@ Definitions are in the [justfile](../../justfile).
 | Project | Scope | External prerequisites |
 | --- | --- | --- |
 | [ZkLink.Tests](../../tests/ZkLink.Tests/ZkLink.Tests.csproj) | Endpoints, model ownership, create options, failure contracts | Pinned .NET SDK |
+| [ZkLink.Extensions.DependencyInjection.Tests](../../tests/ZkLink.Extensions.DependencyInjection.Tests/ZkLink.Extensions.DependencyInjection.Tests.csproj) | DI registration, real-host startup/shutdown and connection ownership | Pinned .NET SDK |
 | [ZkLink.Protocol.Tests](../../tests/ZkLink.Protocol.Tests/ZkLink.Protocol.Tests.csproj) | Protocol/path fixtures, malformed input, virtual-time sessions/requests and loopback TLS/mTLS | Pinned .NET SDK |
 | [ZkLink.IntegrationTests](../../tests/ZkLink.IntegrationTests/ZkLink.IntegrationTests.csproj) | Live node/ACL/transaction/auxiliary/watch operations, restoration, rollback, reply-loss, chroot and ephemeral lifecycle | Explicit pinned ensemble configuration; use `just zk-operations-matrix` |
 | [ZkLink.JavaOracle](../../tests/ZkLink.JavaOracle/README.md) | Optional Apache Java fixture generation and decoding of C# bytes | Gradle wrapper, JDK 25, Python 3, pinned .NET SDK, network access |
@@ -88,7 +89,8 @@ runs additionally retain SDK details, .NET results and per-node CRUD/transaction
 
 | Path | Contents |
 | --- | --- |
-| `src/ZkLink/` | Library, XML API documentation, and API baselines |
+| `src/ZkLink/` | Core library, XML API documentation, and API baselines |
+| `src/ZkLink.Extensions.DependencyInjection/` | Optional host-owned DI registration and API baselines |
 | `tests/` | Server-free/live .NET suites and optional Java oracle |
 | `samples/ZkLink.Samples.Basic/` | Connect/auth/sync/close and authenticated CRUD/transactions/auxiliary queries with `--nodes` / `--transactions` / `--auxiliary` / `--watches` |
 | `dev/` | Versioned server settings, health checks, and verification scripts |

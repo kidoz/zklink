@@ -6,11 +6,11 @@
 
 ZkLink is a managed .NET client for Apache ZooKeeper: a first-class C# implementation of the ZooKeeper client TCP protocol, targeting .NET 10. Native AOT compatibility is a planned, separately tested requirement, not a current capability.
 
-**Status: under development.** Internal protocol codecs, handshake records, transactions, connection-string/path/chroot handling, immutable result models and request-failure contracts are implemented and tested. A connectable client now provides TCP/TLS, digest authentication, session recovery, state subscriptions, bounded requests, `SyncAsync` and acknowledged close. Node CRUD, stat, children and ACL operations are now available. Typed write transactions, read batches, session ephemeral queries, descendant counts and identity queries are available. TTL creation is available with explicit client opt-in and server enablement; one-shot watched reads and persistent/recursive subscriptions are available, with removal, same-session restoration and explicit persistent reconnect gaps.
+**Status: under development.** Internal protocol codecs, handshake records, transactions, connection-string/path/chroot handling, immutable result models and request-failure contracts are implemented and tested. A connectable client now provides TCP/TLS, digest authentication, session recovery, state subscriptions, bounded requests, `SyncAsync` and acknowledged close. Node CRUD, stat, children and ACL operations are now available. Typed write transactions, read batches, session ephemeral queries, descendant counts and identity queries are available. TTL creation is available with explicit client opt-in and server enablement; one-shot watched reads and persistent/recursive subscriptions are available, with removal, same-session restoration and explicit persistent reconnect gaps. An optional `AddZkLink` helper provides host-owned dependency injection with server-free lifecycle tests.
 
 ## Current repository state
 
-- **Solution:** `ZkLink.slnx` with `src/ZkLink`, three .NET test projects and a runnable connection sample.
+- **Solution:** `ZkLink.slnx` with the core and dependency-injection libraries, four .NET test projects and a runnable connection sample.
 - **Target:** `net10.0`, C# 14, nullable reference types, and warnings as errors.
 - **Code:** checked protocol encoding/decoding for node, ACL, transaction and control messages; bounded asynchronous framing; new/resume handshake records; connection-string parsing and namespace translation. Public supporting types include immutable results, create options and failure/removal contracts. One explicit session per client, negotiated-timeout heartbeats, endpoint rotation, same-session reconnect, cancellation outcomes and close cleanup are implemented. Sent application requests are never replayed automatically.
 - **Tests:** xUnit suites cover Apache Java fixtures for all implemented opcodes, transaction success/error shapes, every reply split and truncation, all UTF-16 path code units, chroot boundaries and supporting public contracts. A bounded scripted stream and loopback fake server exercise delayed delivery, partial writes, dropped replies and handshake exchanges. Virtual-time tests exercise session and request lifecycles. Loopback TLS tests check chain/name validation, certificate expiry and mutual authentication. The managed connection sample has passed digest auth, sync and acknowledged close on every node of both pinned versions. Live .NET tests cover CRUD, versions, null/empty and 1,000,000-byte data, create modes, chroot, ACL authorization and acknowledged-close ephemeral deletion on both pinned versions. Live transaction tests verify atomic success/rollback, independent read errors, and committed writes whose replies are dropped, followed by same-session resume without replay. Auxiliary tests verify session-scoped textual ephemeral prefixes, chroot, recursive counts, permissions and server identities. One-shot watch tests cover events, sharing/removal, chroot, re-registration and same-session restoration after a connection cut. Persistent/recursive watch tests cover repeated delivery, profile-specific removal and reconnect gaps. Broader live faults remain unverified.
@@ -32,6 +32,7 @@ Install [just](https://just.systems/) and .NET SDK **10.0.402**. Docker with Com
 | `just check` | Check formatting and build |
 | `just test tests/ZkLink.Protocol.Tests` | Run the server-free protocol suite |
 | `just test tests/ZkLink.Tests` | Run the public model and failure-contract suite |
+| `just test tests/ZkLink.Extensions.DependencyInjection.Tests` | Run the server-free DI registration and host-lifetime suite |
 | `bash dev/test-jute-oracle.sh` | Use the Gradle wrapper to compare Java fixtures and verify C# requests |
 | `just zk-check [version]` | Validate the selected ZooKeeper configuration |
 | `just zk-up [version]` | Start the selected ensemble and wait for readiness |
@@ -101,7 +102,10 @@ Persistent and recursive watch validation adds repeated delivery, independent
 removal behavior, extended restoration and reconnect gaps on both versions.
 The default 3.8 profile rejects conflicting modes at one path; the 3.9 profile
 permits independent modes there.
-See [Watch repeated changes](docs/tutorials/watch-repeated-changes.md).
+Recovery validation also covers interrupted restoration, rejected/time-limited
+resets and terminal stream completion. Both live versions verify a dropped
+restore acknowledgment followed by same-session retry, plus local loss during
+paused reconnect. See [Watch repeated changes](docs/tutorials/watch-repeated-changes.md).
 
 ## Not yet available
 

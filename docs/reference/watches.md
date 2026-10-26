@@ -146,6 +146,19 @@ state; restoration does not replay missed events. Events received during
 restoration precede the gap in received order. Attempts that fail before
 readiness do not publish a gap. One-shot streams do not receive gap events.
 
+If a transport fails, a reset times out, or the server reports a retryable
+reset error, restoration retries within the session recovery budget. Application
+requests remain rejected with `NotSent` until every reset is acknowledged. A
+consumed one-shot is omitted from subsequent attempts, and local disposal still
+wins over captured restoration state. Failed attempts do not publish a gap.
+
+Confirmed expiry or authentication failure during restoration ends an established
+client with `ZooKeeperSessionException` (`Expired` or `AuthFailed`), including
+available server error metadata. Readiness waits and watch streams complete with
+the terminal failure. Silence through the negotiated session deadline produces
+`Lost`; it does not assert server-confirmed expiry. No terminal state creates a
+replacement session. Malformed or unsupported restore responses fault explicitly.
+
 ## Limits and verification
 
 `MaxWatches` defaults to 10,000, with range 1–1,000,000. Pending registrations and
@@ -170,7 +183,11 @@ tests on 3.8.7 and 3.9.6 cover normal events, sharing, chroot, removal,
 re-registration, close, and a real connection cut followed by same-session
 restoration, persistent/recursive delivery, independent removal categories and
 explicit reconnect gaps after missed create/delete intervals. Run `just zk-operations-matrix`; the `--watches` sample also runs on
-every node. Broader quorum faults, live secure-server and release/AOT
+every node. Additional live checks drop a server-applied reset acknowledgment,
+verify admission stays closed, resume the same session with one gap, and exercise
+local loss after a paused reconnect. Controlled peers cover multi-batch failure,
+reset rejection, stale generations and terminal expiry/authentication. Broader
+quorum faults, live secure-server and release/AOT
 qualification remain open.
 
 [Reference](README.md) · [Documentation home](../README.md)
