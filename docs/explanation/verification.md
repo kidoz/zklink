@@ -45,12 +45,14 @@ requests and assertions against both pinned versions.
 
 `just zk-driver-matrix` runs the managed sample against each node: a new session,
 digest authentication, sync and acknowledged close. It has passed on both pinned
-versions. `just zk-operations-matrix` also runs the live .NET node/ACL suite and
-CRUD and transaction samples. It checks version conflicts, null/empty/large data, create modes,
+versions. `just zk-operations-matrix` also runs the live .NET node/ACL/transaction/auxiliary suite and
+CRUD, transaction and auxiliary samples. It checks version conflicts, null/empty/large data, create modes,
 chroot, ACL enforcement and acknowledged-close ephemeral deletion. Transaction
 cases verify complete rollback and independent read errors. A bounded proxy
 consumes/drops a real transaction reply, then allows reconnect so tests can check
-actual commitment, session identity and exactly one transmitted write. Broader live
+actual commitment, session identity and exactly one transmitted write. Auxiliary
+cases verify textual-prefix session ephemeral queries, chroot, nested counts,
+READ permissions and authenticated/anonymous identities. Broader live
 recovery, watch delivery and TLS/mTLS ZooKeeper fixtures remain unverified.
 
 ## Release claims need consumer evidence

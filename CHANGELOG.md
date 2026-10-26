@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ZkLink is in initial development. No version has been released, so the entries
-below describe work in progress rather than supported behavior. TTL creation, auxiliary operation APIs, watch
+below describe work in progress rather than supported behavior. TTL creation, watch
 delivery, a NuGet package, Native AOT validation and runtime performance data
 remain unavailable. See
 [README.md](README.md) for the current status and verified scope.
@@ -14,6 +14,11 @@ remain unavailable. See
 ## [Unreleased]
 
 ### Added
+
+- Public `GetEphemeralsAsync`, `GetAllChildrenNumberAsync` and `WhoAmIAsync`, with
+  immutable results, textual-prefix/chroot semantics and existing request outcomes.
+- Controlled-peer and two-version live auxiliary tests, plus a runnable
+  `--auxiliary` sample that prints no identity values.
 
 - Root MIT `LICENSE` and central package author, copyright and license metadata.
 

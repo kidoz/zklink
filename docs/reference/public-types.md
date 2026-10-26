@@ -1,7 +1,7 @@
 # Supporting public types
 
 All types below are in namespace `ZkLink`. They are implemented supporting
-contracts and have not shipped in a package. The current client exposes connection/session, node/ACL and transaction methods; watch-removal
+contracts and have not shipped in a package. The current client exposes connection/session, node/ACL, transaction and auxiliary methods; watch-removal
 values still await their operation APIs. Node result wrappers are returned by the
 [node operations](nodes.md).
 
@@ -50,7 +50,7 @@ lists and returned data/collections are owned snapshots. See the
 | --- | --- |
 | [ZooKeeperAcl](../../src/ZkLink/Security/ZooKeeperAcl.cs) | Getter-only `Permissions`, `Scheme`, and `Id`; scheme-aware data, independent of authentication configuration. `OpenUnsafe` explicitly grants all permissions to `world:anyone`. |
 | [ZooKeeperPermissions](../../src/ZkLink/Security/ZooKeeperPermissions.cs) | Flags: `None=0`, `Read=1`, `Write=2`, `Create=4`, `Delete=8`, `Admin=16`, `All=31`. Child create/delete permissions apply to the parent. |
-| [ZooKeeperClientIdentity](../../src/ZkLink/Types/ZooKeeperClientIdentity.cs) | Getter-only `Scheme` and `User` for an authenticated identity. No `whoAmI` operation is implemented yet. |
+| [ZooKeeperClientIdentity](../../src/ZkLink/Types/ZooKeeperClientIdentity.cs) | Getter-only `Scheme` and `User` for a server-reported identity returned by `WhoAmIAsync`; values are opaque and omitted from default formatting. See [auxiliary operations](auxiliary-operations.md). |
 
 ## Node snapshots and versions
 

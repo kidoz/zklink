@@ -12,6 +12,8 @@ Look up the repository's current code, tooling, and verification scope.
   and verified live behavior.
 - [Transactions and read batches](transactions.md) — operation/result types,
   rollback diagnostics, input capture and uncertain outcomes.
+- [Ephemeral nodes, descendant counts and identities](auxiliary-operations.md) —
+  session-scoped prefixes, recursive counts and server-reported identities.
 - [Supporting public types](public-types.md) — models, options, failure metadata,
   and watch-removal values currently defined in namespace `ZkLink`.
 

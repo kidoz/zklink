@@ -7,6 +7,8 @@ accept a final `CancellationToken`. Exact declarations are in the
 [API baseline](../../src/ZkLink/PublicAPI.Unshipped.txt).
 
 Node CRUD, children/stat and ACL methods are described in the [node reference](nodes.md).
+Session ephemerals, descendant counts and identities are described in the
+[auxiliary reference](auxiliary-operations.md).
 
 ## Configuration
 

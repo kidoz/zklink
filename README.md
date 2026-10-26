@@ -6,18 +6,18 @@
 
 ZkLink is a managed .NET client for Apache ZooKeeper: a first-class C# implementation of the ZooKeeper client TCP protocol, targeting .NET 10. Native AOT compatibility is a planned, separately tested requirement, not a current capability.
 
-**Status: under development.** Internal protocol codecs, handshake records, transactions, connection-string/path/chroot handling, immutable result models and request-failure contracts are implemented and tested. A connectable client now provides TCP/TLS, digest authentication, session recovery, state subscriptions, bounded requests, `SyncAsync` and acknowledged close. Node CRUD, stat, children and ACL operations are now available. Typed write transactions and read batches are available; watch delivery remains unimplemented.
+**Status: under development.** Internal protocol codecs, handshake records, transactions, connection-string/path/chroot handling, immutable result models and request-failure contracts are implemented and tested. A connectable client now provides TCP/TLS, digest authentication, session recovery, state subscriptions, bounded requests, `SyncAsync` and acknowledged close. Node CRUD, stat, children and ACL operations are now available. Typed write transactions, read batches, session ephemeral queries, descendant counts and identity queries are available; watch delivery remains unimplemented.
 
 ## Current repository state
 
-- **Solution:** `ZkLink.slnx` with `src/ZkLink`, two .NET test projects and a runnable connection sample.
+- **Solution:** `ZkLink.slnx` with `src/ZkLink`, three .NET test projects and a runnable connection sample.
 - **Target:** `net10.0`, C# 14, nullable reference types, and warnings as errors.
 - **Code:** checked protocol encoding/decoding for node, ACL, transaction and control messages; bounded asynchronous framing; new/resume handshake records; connection-string parsing and namespace translation. Public supporting types include immutable results, create options and failure/removal contracts. One explicit session per client, negotiated-timeout heartbeats, endpoint rotation, same-session reconnect, cancellation outcomes and close cleanup are implemented. Sent application requests are never replayed automatically.
-- **Tests:** xUnit suites cover Apache Java fixtures for all implemented opcodes, transaction success/error shapes, every reply split and truncation, all UTF-16 path code units, chroot boundaries and supporting public contracts. A bounded scripted stream and loopback fake server exercise delayed delivery, partial writes, dropped replies and handshake exchanges. Virtual-time tests exercise session and request lifecycles. Loopback TLS tests check chain/name validation, certificate expiry and mutual authentication. The managed connection sample has passed digest auth, sync and acknowledged close on every node of both pinned versions. Live .NET tests cover CRUD, versions, null/empty and 1,000,000-byte data, create modes, chroot, ACL authorization and acknowledged-close ephemeral deletion on both pinned versions. Live transaction tests verify atomic success/rollback, independent read errors, and committed writes whose replies are dropped, followed by same-session resume without replay. Broader live faults and watch delivery remain unverified.
+- **Tests:** xUnit suites cover Apache Java fixtures for all implemented opcodes, transaction success/error shapes, every reply split and truncation, all UTF-16 path code units, chroot boundaries and supporting public contracts. A bounded scripted stream and loopback fake server exercise delayed delivery, partial writes, dropped replies and handshake exchanges. Virtual-time tests exercise session and request lifecycles. Loopback TLS tests check chain/name validation, certificate expiry and mutual authentication. The managed connection sample has passed digest auth, sync and acknowledged close on every node of both pinned versions. Live .NET tests cover CRUD, versions, null/empty and 1,000,000-byte data, create modes, chroot, ACL authorization and acknowledged-close ephemeral deletion on both pinned versions. Live transaction tests verify atomic success/rollback, independent read errors, and committed writes whose replies are dropped, followed by same-session resume without replay. Auxiliary tests verify session-scoped textual ephemeral prefixes, chroot, recursive counts, permissions and server identities. Broader live faults and watch delivery remain unverified.
 - **Build:** SDK 10.0.402 is pinned, with central dependency versions and lock files; core has no third-party runtime dependencies. Public API changes are checked against nullable baselines. The [build workflow](.github/workflows/build.yml) defines Linux/Windows/macOS checks and separate Gradle-based Apache Java verification. Only local macOS arm64 execution has been verified; remote runs and Native AOT remain unverified.
 - **Distribution:** no package has been released. The project is [MIT-licensed](LICENSE); remaining release packaging and qualification remain open. See the [dependency inventory](THIRD-PARTY-NOTICES.md).
 
-The library lives in `src/`; `tests/` contains public-contract tests, protocol tests and an optional Java oracle. The [basic sample](samples/ZkLink.Samples.Basic) can connect, exercise CRUD with `--nodes` and run transactions with `--transactions`; benchmarks are not yet available.
+The library lives in `src/`; `tests/` contains public-contract tests, protocol tests and an optional Java oracle. The [basic sample](samples/ZkLink.Samples.Basic) can connect, exercise CRUD with `--nodes`, run transactions with `--transactions`, and query ephemerals/counts/identities with `--auxiliary`; benchmarks are not yet available.
 
 ## Development commands
 
@@ -40,7 +40,7 @@ Install [just](https://just.systems/) and .NET SDK **10.0.402**. Docker with Com
 | `just zk-down [version]` | Remove the selected ensemble and its data volumes |
 | `just zk-matrix` | Smoke-test both pinned server versions and clean up |
 | `just zk-driver-matrix` | Also connect/authenticate/sync/close using ZkLink on every node |
-| `just zk-operations-matrix` | Run live node/ACL/transaction tests on both versions and examples on each node |
+| `just zk-operations-matrix` | Run live node/ACL/transaction/auxiliary tests on both versions and examples on each node |
 
 CSharpier **1.3.0** is pinned in [dotnet-tools.json](dotnet-tools.json). The format shortcuts restore the local tool automatically. Direct equivalents are `dotnet tool restore`, `dotnet csharpier format .`, and `dotnet csharpier check .`.
 
@@ -57,7 +57,7 @@ Start with the [ZkLink documentation](docs/README.md), organized using [Diátaxi
 
 ## Server compatibility target
 
-The intended server targets are **ZooKeeper 3.8.7 and 3.9.6**. These versions were selected from the [Apache release page](https://zookeeper.apache.org/releases/) in the **2026-10-25** research snapshot. Both must pass driver integration and release checks before support is advertised. Connection/auth/sync/close and node/ACL/transaction operations have live tests on both versions; full driver compatibility remains unqualified.
+The intended server targets are **ZooKeeper 3.8.7 and 3.9.6**. These versions were selected from the [Apache release page](https://zookeeper.apache.org/releases/) in the **2026-10-25** research snapshot. Both must pass driver integration and release checks before support is advertised. Connection/auth/sync/close and node/ACL/transaction/auxiliary operations have live tests on both versions; full driver compatibility remains unqualified.
 
 | Server | Role | Pinned Compose settings | Default host ports |
 | --- | --- | --- | --- |
@@ -90,6 +90,8 @@ Live operation validation on **2026-10-26**: `just zk-operations-matrix` checks 
 
 Transaction validation on **2026-10-26** adds rollback, per-member read errors and a real commit/drop-reply/reconnect test on both versions. The transaction sample runs on every node. See [Execute a transaction](docs/tutorials/use-transactions.md) and the [transaction reference](docs/reference/transactions.md).
 
+Auxiliary operation validation on **2026-10-26** adds session-scoped ephemeral prefixes, recursive counts, chroot, permission errors and authenticated/anonymous identities on both versions. The `--auxiliary` sample runs on every node. See the [auxiliary reference](docs/reference/auxiliary-operations.md).
+
 ## Not yet available
 
-TTL creation, auxiliary operation APIs, watch delivery, a NuGet package, Native AOT validation and runtime performance data are not available. TLS/mTLS has local loopback evidence only; live secure ZooKeeper and cross-platform security qualification remain open.
+TTL creation, watch delivery, a NuGet package, Native AOT validation and runtime performance data are not available. TLS/mTLS has local loopback evidence only; live secure ZooKeeper and cross-platform security qualification remain open.
