@@ -176,9 +176,51 @@ try
         if (events != 1)
             throw new InvalidOperationException("The one-shot watch did not deliver exactly once.");
         await client.DeleteAsync(path, ZNodeVersion.Any, deadline.Token).ConfigureAwait(false);
+        foreach (
+            var mode in new[]
+            {
+                PersistentWatchMode.Persistent,
+                PersistentWatchMode.PersistentRecursive,
+            }
+        )
+        {
+            var persistent = await client
+                .AddWatchAsync(path, mode, deadline.Token)
+                .ConfigureAwait(false);
+            var persistentEvents = persistent
+                .ReadEventsAsync(deadline.Token)
+                .GetAsyncEnumerator(deadline.Token);
+            await using var persistentLifetime = persistentEvents.ConfigureAwait(false);
+            await client
+                .CreateAsync(
+                    path,
+                    null,
+                    new CreateOptions(
+                        [new(ZooKeeperPermissions.All, "auth", "")],
+                        CreateMode.Ephemeral
+                    ),
+                    deadline.Token
+                )
+                .ConfigureAwait(false);
+            await VerifyWatchEventAsync(persistentEvents, ZooKeeperWatchEventKind.NodeCreated)
+                .ConfigureAwait(false);
+            await client
+                .SetDataAsync(path, "updated"u8.ToArray(), ZNodeVersion.Any, deadline.Token)
+                .ConfigureAwait(false);
+            await VerifyWatchEventAsync(persistentEvents, ZooKeeperWatchEventKind.NodeDataChanged)
+                .ConfigureAwait(false);
+            await persistent
+                .RemoveAsync(WatchRemovalMode.ServerConfirmed, deadline.Token)
+                .ConfigureAwait(false);
+            if (await persistentEvents.MoveNextAsync().ConfigureAwait(false))
+                throw new InvalidOperationException(
+                    "The removed persistent stream did not complete."
+                );
+            await client.DeleteAsync(path, ZNodeVersion.Any, deadline.Token).ConfigureAwait(false);
+        }
         await Console
             .Out.WriteLineAsync(
-                "Missing-node watch, buffered creation event and stream completion verified."
+                "One-shot, persistent and recursive watch delivery, removal and stream completion verified."
             )
             .ConfigureAwait(false);
     }
@@ -202,4 +244,13 @@ catch (Exception error)
 {
     await Console.Error.WriteLineAsync(error.Message).ConfigureAwait(false);
     return 1;
+}
+
+static async Task VerifyWatchEventAsync(
+    IAsyncEnumerator<ZooKeeperWatchEvent> events,
+    ZooKeeperWatchEventKind expected
+)
+{
+    if (!await events.MoveNextAsync().ConfigureAwait(false) || events.Current.Kind != expected)
+        throw new InvalidOperationException("The persistent watch returned an unexpected event.");
 }
