@@ -1,13 +1,16 @@
 using ZkLink;
 
 if (
-    args.Length is < 1 or > 4
-    || args.Skip(1).Any(value => value is not ("--plaintext" or "--nodes" or "--transactions"))
+    args.Length is < 1 or > 5
+    || args.Skip(1)
+        .Any(value =>
+            value is not ("--plaintext" or "--nodes" or "--transactions" or "--auxiliary")
+        )
 )
 {
     await Console
         .Error.WriteLineAsync(
-            "Usage: ZkLink.Samples.Basic host:port[,host:port] [--plaintext] [--nodes] [--transactions]"
+            "Usage: ZkLink.Samples.Basic host:port[,host:port] [--plaintext] [--nodes] [--transactions] [--auxiliary]"
         )
         .ConfigureAwait(false);
     return 2;
@@ -18,11 +21,12 @@ var user = Environment.GetEnvironmentVariable("ZKLINK_USER");
 var password = Environment.GetEnvironmentVariable("ZKLINK_PASSWORD");
 var nodes = args.Contains("--nodes", StringComparer.Ordinal);
 var transactions = args.Contains("--transactions", StringComparer.Ordinal);
-if ((user is null) != (password is null) || ((nodes || transactions) && user is null))
+var auxiliary = args.Contains("--auxiliary", StringComparer.Ordinal);
+if ((user is null) != (password is null) || ((nodes || transactions || auxiliary) && user is null))
 {
     await Console
         .Error.WriteLineAsync(
-            "Set both ZKLINK_USER and ZKLINK_PASSWORD; --nodes and --transactions require an authenticated creator ACL."
+            "Set both ZKLINK_USER and ZKLINK_PASSWORD; --nodes, --transactions and --auxiliary require an authenticated creator ACL."
         )
         .ConfigureAwait(false);
     return 2;
@@ -101,6 +105,34 @@ try
             .ConfigureAwait(false);
         await Console
             .Out.WriteLineAsync("Transaction create/update/check/read/delete completed.")
+            .ConfigureAwait(false);
+    }
+    if (auxiliary)
+    {
+        var path = "/zklink-auxiliary-sample-" + Guid.NewGuid().ToString("N");
+        var creatorAcl = new CreateOptions(
+            [new(ZooKeeperPermissions.All, "auth", "")],
+            CreateMode.Ephemeral
+        );
+        await client.CreateAsync(path, null, creatorAcl, deadline.Token).ConfigureAwait(false);
+        var ephemerals = await client
+            .GetEphemeralsAsync(path, deadline.Token)
+            .ConfigureAwait(false);
+        var descendants = await client
+            .GetAllChildrenNumberAsync(path, deadline.Token)
+            .ConfigureAwait(false);
+        var identities = await client.WhoAmIAsync(deadline.Token).ConfigureAwait(false);
+        if (
+            !ephemerals.Contains(path, StringComparer.Ordinal)
+            || descendants != 0
+            || !identities.Any(identity => identity.Scheme == "digest")
+        )
+            throw new InvalidOperationException(
+                "Auxiliary operation results did not match the sample's setup."
+            );
+        await client.DeleteAsync(path, ZNodeVersion.Any, deadline.Token).ConfigureAwait(false);
+        await Console
+            .Out.WriteLineAsync("Ephemeral listing, descendant count and identity query completed.")
             .ConfigureAwait(false);
     }
     await client.SyncAsync("/", deadline.Token).ConfigureAwait(false);
