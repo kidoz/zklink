@@ -10,6 +10,8 @@ Look up the repository's current code, tooling, and verification scope.
   cancellation, recovery and close behavior.
 - [Node and ACL operations](nodes.md) — methods, create modes, versions, errors
   and verified live behavior.
+- [Transactions and read batches](transactions.md) — operation/result types,
+  rollback diagnostics, input capture and uncertain outcomes.
 - [Supporting public types](public-types.md) — models, options, failure metadata,
   and watch-removal values currently defined in namespace `ZkLink`.
 

@@ -67,8 +67,7 @@ required prerequisite or check fails.
 To additionally run the managed driver's new-session, digest-authentication,
 sync and acknowledged-close checks on every node, use `just zk-driver-matrix`.
 It requires the pinned .NET SDK and OpenSSL, and retains per-node driver output.
-Use `just zk-operations-matrix` for the separate live node/ACL suite and CRUD
-example. Both commands leave live TLS, watches and broader fault recovery
+Use `just zk-operations-matrix` for the separate live node/ACL/transaction suite and examples. Both commands leave live TLS, watches and broader fault recovery
 unqualified.
 
 ## Resolve common startup problems

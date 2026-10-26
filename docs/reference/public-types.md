@@ -1,7 +1,7 @@
 # Supporting public types
 
 All types below are in namespace `ZkLink`. They are implemented supporting
-contracts and have not shipped in a package. The current client exposes connection/session and node/ACL methods; watch-removal
+contracts and have not shipped in a package. The current client exposes connection/session, node/ACL and transaction methods; watch-removal
 values still await their operation APIs. Node result wrappers are returned by the
 [node operations](nodes.md).
 
@@ -22,6 +22,19 @@ optional endpoint and server code during establishment. `ZooKeeperSessionExcepti
 reports session state and optional server code. `ZooKeeperEventOverflowException`
 identifies a terminal state-event gap. These describe connection/session failures
 without inventing an application request.
+
+## Transaction types
+
+`ZooKeeperWriteOperation` and `ZooKeeperReadOperation` are closed input
+descriptors with static factories. Data memory remains caller-owned until the
+batch invocation captures its packet before returning a task.
+
+`ZooKeeperWriteResult` has sealed `ZooKeeperCreatedResult`,
+`ZooKeeperDataSetResult`, `ZooKeeperDeletedResult` and `ZooKeeperCheckedResult`
+variants. `ZooKeeperReadResult` has sealed `ZooKeeperDataReadResult`,
+`ZooKeeperChildrenReadResult` and `ZooKeeperReadErrorResult` variants. Result
+lists and returned data/collections are owned snapshots. See the
+[transaction reference](transactions.md) for exact fields and error semantics.
 
 ## Endpoints and create settings
 

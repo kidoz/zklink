@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ZkLink is in initial development. No version has been released, so the entries
-below describe work in progress rather than supported behavior. TTL creation, public transactions, watch
+below describe work in progress rather than supported behavior. TTL creation, auxiliary operation APIs, watch
 delivery, a NuGet package, Native AOT validation and runtime performance data
 remain unavailable. See
 [README.md](README.md) for the current status and verified scope.
@@ -14,6 +14,15 @@ remain unavailable. See
 ## [Unreleased]
 
 ### Added
+
+- Typed `MultiAsync` atomic writes and `MultiReadAsync` read batches, with closed
+  operation/result types, ordered owned results and whole-batch input capture.
+- Complete rejected-transaction diagnostics with the actual request ID, failing
+  member index and raw member codes; unknown outcomes are never replayed.
+- Controlled-peer cancellation/validation checks and live transaction success,
+  rollback, chroot, read-error and real dropped-response tests on both patches.
+- A runnable `--transactions` example and transaction guides; the live matrix
+  exercises it on every node.
 
 - Public node operations: exists, data, children, create, set-data and delete,
   plus ACL reads/replacement with separate data and ACL version conditions.

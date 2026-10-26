@@ -3,8 +3,8 @@
 ZkLink aims to implement the ZooKeeper client TCP protocol in managed C#.
 The client owns one explicit session and at most one active transport, with
 a serialized writer and ordered reader. Session management, bounded request
-scheduling, TCP/TLS and node/ACL operations are implemented; active watches and
-public transactions remain planned.
+scheduling, TCP/TLS, node/ACL operations and typed transactions are implemented;
+active watches and auxiliary APIs remain planned.
 
 ## Wire records and public results serve different lifetimes
 
@@ -56,6 +56,17 @@ write completion even if a reply arrives first.
 Terminal loss clears owned secrets and never creates a replacement session.
 Applications choose a new client explicitly. The [connection reference](../reference/connections.md)
 describes timeouts, state streams, security and close acknowledgment.
+
+## Transaction replies carry two levels of evidence
+
+An outer success header does not prove that a write transaction succeeded. The
+scheduler examines all members before completing the caller: a nonzero member
+error produces complete rollback diagnostics with the assigned request metadata.
+No successful result list escapes from a rejected write transaction.
+
+Read batches preserve independent data, child-name and error results. They do
+not imply a shared snapshot. Both kinds capture the full request before returning
+their task, and neither is replayed after an uncertain response loss.
 
 ## Metadata is separate from default diagnostics
 

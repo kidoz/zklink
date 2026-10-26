@@ -80,7 +80,7 @@ close. Controlled peers additionally check synchronous input capture, local
 size rejection, late replies and cancellation outcomes.
 
 Run `just zk-operations-matrix` for isolated live servers, retained evidence and
-cleanup. These are plaintext tests. TTL, public transactions, watch delivery,
+cleanup. These are plaintext tests. TTL, auxiliary APIs, watch delivery,
 live secure ZooKeeper and broader fault qualification remain open.
 
 [Reference](README.md) · [Documentation home](../README.md)

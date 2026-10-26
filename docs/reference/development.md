@@ -34,7 +34,7 @@ notation; omit the brackets when invoking a command.
 | `just zk-status [version]` | Show health and host ports |
 | `just zk-logs [version]` | Print server logs |
 | `just zk-down [version]` | Remove the selected ensemble and its volumes |
-| `just zk-operations-matrix` | Run live node/ACL tests on both versions and CRUD example on each node; requires Docker, .NET, Bash and OpenSSL |
+| `just zk-operations-matrix` | Run live node/ACL/transaction tests and examples on both versions; requires Docker, .NET, Bash and OpenSSL |
 | `just zk-driver-matrix` | Run the fixture matrix plus managed session/auth/sync/close on each node; requires .NET and OpenSSL |
 | `just zk-matrix` | Smoke-test both pinned versions with isolated projects, retained logs, and cleanup; requires Bash |
 
@@ -47,7 +47,7 @@ Definitions are in the [justfile](../../justfile).
 | --- | --- | --- |
 | [ZkLink.Tests](../../tests/ZkLink.Tests/ZkLink.Tests.csproj) | Endpoints, model ownership, create options, failure contracts | Pinned .NET SDK |
 | [ZkLink.Protocol.Tests](../../tests/ZkLink.Protocol.Tests/ZkLink.Protocol.Tests.csproj) | Protocol/path fixtures, malformed input, virtual-time sessions/requests and loopback TLS/mTLS | Pinned .NET SDK |
-| [ZkLink.IntegrationTests](../../tests/ZkLink.IntegrationTests/ZkLink.IntegrationTests.csproj) | Live node/ACL operations, versions, chroot and ephemeral lifecycle | Explicit pinned ensemble configuration; use `just zk-operations-matrix` |
+| [ZkLink.IntegrationTests](../../tests/ZkLink.IntegrationTests/ZkLink.IntegrationTests.csproj) | Live node/ACL/transaction operations, rollback, reply-loss, chroot and ephemeral lifecycle | Explicit pinned ensemble configuration; use `just zk-operations-matrix` |
 | [ZkLink.JavaOracle](../../tests/ZkLink.JavaOracle/README.md) | Optional Apache Java fixture generation and decoding of C# bytes | Gradle wrapper, JDK 25, Python 3, pinned .NET SDK, network access |
 
 The public-contract and protocol suites need neither a ZooKeeper installation
@@ -76,7 +76,7 @@ The matrix runner ignores inherited image overrides, allocates dynamic host
 ports, and assigns unique project names. Its printed artifact directory contains
 Docker versions, revision/working-tree details, resolved Compose settings,
 startup and server logs, exact-version output, status, and cleanup logs. Operation
-runs additionally retain SDK details, .NET results and per-node CRUD sample output.
+runs additionally retain SDK details, .NET results and per-node CRUD/transaction sample output.
 `ZKLINK_MATRIX_ARTIFACT_ROOT` selects the parent evidence directory.
 
 ## Repository layout
@@ -85,7 +85,7 @@ runs additionally retain SDK details, .NET results and per-node CRUD sample outp
 | --- | --- |
 | `src/ZkLink/` | Library, XML API documentation, and API baselines |
 | `tests/` | Server-free/live .NET suites and optional Java oracle |
-| `samples/ZkLink.Samples.Basic/` | Connect/auth/sync/close and authenticated CRUD with `--nodes` |
+| `samples/ZkLink.Samples.Basic/` | Connect/auth/sync/close and authenticated CRUD/transactions with `--nodes` / `--transactions` |
 | `dev/` | Versioned server settings, health checks, and verification scripts |
 | `docs/` | Tutorials, how-to guides, reference, and explanation |
 | `.github/workflows/` | Separate build, server-free, live-operation and Java jobs |

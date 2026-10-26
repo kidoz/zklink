@@ -101,6 +101,7 @@ This requires OpenSSL as well as Docker and .NET. It retains logs, checks digest
 auth/sync/close, and cleans up its own servers. For behavior after disconnection,
 cancellation and close failure, read the [connection reference](../reference/connections.md).
 Continue with [Create, read, update and delete a node](use-node-operations.md).
-Public transactions and watch delivery await further implementation.
+Continue with [Execute a transaction](use-transactions.md). Watch delivery
+awaits further implementation.
 
 [Tutorials](README.md) · [Documentation home](../README.md)
