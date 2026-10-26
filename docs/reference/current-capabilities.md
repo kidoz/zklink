@@ -1,7 +1,7 @@
 # Current capabilities
 
 This describes the checkout as of **2026-10-26**. No package has been released,
-and TTL creation and watch delivery remain unavailable.
+and watch delivery remains unavailable.
 
 ## Code and verification
 
@@ -10,7 +10,7 @@ and TTL creation and watch delivery remain unavailable.
 | Build | .NET 10, C# 14, deterministic builds, locked dependencies, warnings as errors, MIT license | Release package metadata and package qualification |
 | Protocol | Internal codecs for all 27 implemented opcodes, handshake/multi/framing, path/chroot translation and Gradle-managed Java fixtures | Remaining live qualification |
 | Public types | Immutable snapshots, endpoints, create options, ACLs, versions, request failures, watch-removal results; contract tests | Active-watch contracts |
-| Sessions and operations | Connect/authenticate/sync, snapshots/subscriptions, heartbeat, same-session recovery, cancellation, close, node/ACL methods, typed transactions and auxiliary queries | TTL creation, watches and broader live recovery under faults |
+| Sessions and operations | Connect/authenticate/sync, snapshots/subscriptions, heartbeat, same-session recovery, cancellation, close, node/ACL methods, typed transactions, auxiliary queries and opt-in TTL creation | Watches and broader live recovery under faults |
 | Watches | Removal enums and result type only | Handles, registration, delivery, removal, restoration |
 | Security | TCP/TLS, optional custom roots/client certificates, digest replay, explicit plaintext override and live ACL tests | Live secure ZooKeeper, additional identity schemes and cross-platform security qualification |
 | Local servers | Pinned three-node Compose fixtures for 3.8.7 and 3.9.6 | Secure server and broader fault fixtures |
@@ -32,8 +32,8 @@ remote workflow results remain unverified. Proposed Native AOT targets are
 
 | ZooKeeper version | Intended role | Fixture settings | Driver compatibility |
 | --- | --- | --- | --- |
-| 3.8.7 | Required qualification target | [Version settings](../../dev/zookeeper-3.8.7.env) | Connection, node/ACL, transaction and auxiliary tests passed |
-| 3.9.6 | Required qualification target and development default | [Version settings](../../dev/zookeeper-3.9.6.env) | Connection, node/ACL, transaction and auxiliary tests passed |
+| 3.8.7 | Required qualification target | [Version settings](../../dev/zookeeper-3.8.7.env) | Connection, node/ACL, transaction, auxiliary and TTL tests passed |
+| 3.9.6 | Required qualification target and development default | [Version settings](../../dev/zookeeper-3.9.6.env) | Connection, node/ACL, transaction, auxiliary and TTL tests passed |
 
 The [project overview](../../README.md#local-zookeeper-testing) records fixture
 smoke checks on 2026-10-25 for both versions: three-node startup, exact-version
@@ -47,7 +47,10 @@ operation evidence rather than full driver qualification. Transaction tests also
 verify rollback, member-specific read failures and a real committed reply dropped
 before same-session resume, without request replay. Auxiliary cases verify session-only
 ephemerals, textual prefixes, chroot, nested counts, permissions and identities;
-see the [auxiliary reference](auxiliary-operations.md).
+see the [auxiliary reference](auxiliary-operations.md). `just zk-ttl-matrix`
+separately verifies TTL-enabled and TTL-disabled servers on each patch, including
+client opt-in, both create modes, chroot, maximum TTL, close survival, child
+protection and eventual cleanup. See [TTL node creation](ttl-nodes.md).
 
 TLS is required by default. Loopback tests cover trusted/custom roots, wrong
 identity, unknown issuer, expiry, mutual authentication, missing required client

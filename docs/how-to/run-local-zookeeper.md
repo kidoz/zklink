@@ -98,4 +98,7 @@ unset COMPOSE_PROJECT_NAME ZOOKEEPER_PORT_1 ZOOKEEPER_PORT_2 ZOOKEEPER_PORT_3
 See [What the verification layers prove](../explanation/verification.md) for why
 successful fixture checks do not establish driver compatibility.
 
+For TTL creation, run `just zk-ttl-matrix` for enabled and disabled fixtures, or
+follow the manual override commands in [TTL node creation](../reference/ttl-nodes.md).
+
 [How-to guides](README.md) · [Documentation home](../README.md)

@@ -55,6 +55,12 @@ cases verify textual-prefix session ephemeral queries, chroot, nested counts,
 READ permissions and authenticated/anonymous identities. Broader live
 recovery, watch delivery and TLS/mTLS ZooKeeper fixtures remain unverified.
 
+`just zk-ttl-matrix` separately starts TTL-disabled and TTL-enabled fixtures for
+each patch. It checks opt-in, maximum TTL, single/atomic creation, close
+survival, child protection and eventual cleanup, plus disabled-server errors and
+rollback. Bounded cleanup polling establishes eventual removal under the test
+conditions, without promising exact deletion timing.
+
 ## Release claims need consumer evidence
 
 The build workflow defines checks on Linux, Windows, and macOS. A workflow file

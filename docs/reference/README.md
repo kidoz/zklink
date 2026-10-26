@@ -10,6 +10,8 @@ Look up the repository's current code, tooling, and verification scope.
   cancellation, recovery and close behavior.
 - [Node and ACL operations](nodes.md) — methods, create modes, versions, errors
   and verified live behavior.
+- [TTL node creation](ttl-nodes.md) — explicit enablement, create modes, bounds
+  and eventual cleanup.
 - [Transactions and read batches](transactions.md) — operation/result types,
   rollback diagnostics, input capture and uncertain outcomes.
 - [Ephemeral nodes, descendant counts and identities](auxiliary-operations.md) —

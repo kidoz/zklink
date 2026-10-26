@@ -31,8 +31,8 @@ copy is allocated before byte admission.
 
 Empty lists, null members, invalid paths and oversized batches fail locally.
 Combined frame size includes every member header, data, ACL and chroot prefix.
-Create modes follow the [node reference](nodes.md#create-modes); TTL creation is
-still unavailable. See [connection limits](connections.md#configuration).
+Create modes follow the [node reference](nodes.md#create-modes); TTL descriptors require `EnableTtlNodes` on the submitting client and extended
+node types on every endpoint; see [TTL node creation](ttl-nodes.md). See [connection limits](connections.md#configuration).
 
 ## Typed results
 

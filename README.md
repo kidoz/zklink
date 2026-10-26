@@ -6,7 +6,7 @@
 
 ZkLink is a managed .NET client for Apache ZooKeeper: a first-class C# implementation of the ZooKeeper client TCP protocol, targeting .NET 10. Native AOT compatibility is a planned, separately tested requirement, not a current capability.
 
-**Status: under development.** Internal protocol codecs, handshake records, transactions, connection-string/path/chroot handling, immutable result models and request-failure contracts are implemented and tested. A connectable client now provides TCP/TLS, digest authentication, session recovery, state subscriptions, bounded requests, `SyncAsync` and acknowledged close. Node CRUD, stat, children and ACL operations are now available. Typed write transactions, read batches, session ephemeral queries, descendant counts and identity queries are available; watch delivery remains unimplemented.
+**Status: under development.** Internal protocol codecs, handshake records, transactions, connection-string/path/chroot handling, immutable result models and request-failure contracts are implemented and tested. A connectable client now provides TCP/TLS, digest authentication, session recovery, state subscriptions, bounded requests, `SyncAsync` and acknowledged close. Node CRUD, stat, children and ACL operations are now available. Typed write transactions, read batches, session ephemeral queries, descendant counts and identity queries are available. TTL creation is available with explicit client opt-in and server enablement; watch delivery remains unimplemented.
 
 ## Current repository state
 
@@ -40,6 +40,7 @@ Install [just](https://just.systems/) and .NET SDK **10.0.402**. Docker with Com
 | `just zk-down [version]` | Remove the selected ensemble and its data volumes |
 | `just zk-matrix` | Smoke-test both pinned server versions and clean up |
 | `just zk-driver-matrix` | Also connect/authenticate/sync/close using ZkLink on every node |
+| `just zk-ttl-matrix` | Test TTL-enabled and TTL-disabled servers on both versions |
 | `just zk-operations-matrix` | Run live node/ACL/transaction/auxiliary tests on both versions and examples on each node |
 
 CSharpier **1.3.0** is pinned in [dotnet-tools.json](dotnet-tools.json). The format shortcuts restore the local tool automatically. Direct equivalents are `dotnet tool restore`, `dotnet csharpier format .`, and `dotnet csharpier check .`.
@@ -92,6 +93,8 @@ Transaction validation on **2026-10-26** adds rollback, per-member read errors a
 
 Auxiliary operation validation on **2026-10-26** adds session-scoped ephemeral prefixes, recursive counts, chroot, permission errors and authenticated/anonymous identities on both versions. The `--auxiliary` sample runs on every node. See the [auxiliary reference](docs/reference/auxiliary-operations.md).
 
+TTL validation on **2026-10-26** adds explicit client opt-in, both create modes, atomic creation, chroot, maximum TTL, close survival, child protection, eventual cleanup and disabled-server errors on both versions. Run `just zk-ttl-matrix`; see [TTL node creation](docs/reference/ttl-nodes.md).
+
 ## Not yet available
 
-TTL creation, watch delivery, a NuGet package, Native AOT validation and runtime performance data are not available. TLS/mTLS has local loopback evidence only; live secure ZooKeeper and cross-platform security qualification remain open.
+Watch delivery, a NuGet package, Native AOT validation and runtime performance data are not available. TLS/mTLS has local loopback evidence only; live secure ZooKeeper and cross-platform security qualification remain open.

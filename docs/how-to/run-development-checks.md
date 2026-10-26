@@ -70,4 +70,7 @@ both versions, run `just zk-operations-matrix`. Required live configuration and
 prerequisites fail explicitly when absent. Live TLS/mTLS and broader operation
 fault tests remain open.
 
+Run `just zk-ttl-matrix` separately for TTL-enabled and TTL-disabled servers on
+both pinned versions. The ordinary operation suite excludes those fixture cases.
+
 [How-to guides](README.md) · [Documentation home](../README.md)

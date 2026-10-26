@@ -34,6 +34,7 @@ notation; omit the brackets when invoking a command.
 | `just zk-status [version]` | Show health and host ports |
 | `just zk-logs [version]` | Print server logs |
 | `just zk-down [version]` | Remove the selected ensemble and its volumes |
+| `just zk-ttl-matrix` | Verify single/atomic TTL creates with enabled and disabled servers on both versions |
 | `just zk-operations-matrix` | Run live node/ACL/transaction/auxiliary tests and examples on both versions; requires Docker, .NET, Bash and OpenSSL |
 | `just zk-driver-matrix` | Run the fixture matrix plus managed session/auth/sync/close on each node; requires .NET and OpenSSL |
 | `just zk-matrix` | Smoke-test both pinned versions with isolated projects, retained logs, and cleanup; requires Bash |
@@ -53,13 +54,17 @@ Definitions are in the [justfile](../../justfile).
 The public-contract and protocol suites need neither a ZooKeeper installation
 nor Java. The integration project requires live configuration and fails when it
 is absent. `just zk-operations-matrix` supplies isolated servers and verified
-version settings. Its tests use unique namespaces and retain cleanup evidence.
+version settings, excluding TTL fixture tests. `just zk-ttl-matrix` selects the
+TTL cases with explicit enabled/disabled configuration. Both use unique
+namespaces and retain cleanup evidence.
 
 ## ZooKeeper fixture settings
 
 [compose.yaml](../../compose.yaml) defines `zoo1`, `zoo2`, and `zoo3`. Each node
 has container client port 2181, an authenticated readiness probe, and a loopback
-host binding. Both versions use plaintext.
+host binding. Both versions use plaintext. Extended node types are explicitly disabled by
+default; [compose.ttl.yaml](../../compose.ttl.yaml) enables them and shortens
+cleanup scans for the TTL matrix.
 
 | Version | Settings | Default Compose project | Default host ports |
 | --- | --- | --- | --- |

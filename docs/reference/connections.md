@@ -23,6 +23,7 @@ client, except that endpoint updates affect future connection attempts.
 | `Tls` | `ZooKeeperTlsOptions.Required()`; secure ports must be explicit |
 | `Authentication` | Empty; at most 32 digest entries, each frame-bounded; combined credentials at most 32 MiB |
 | `AllowUnsafePlaintextDigest` | False; explicit opt-in required for digest over plaintext |
+| `EnableTtlNodes` | False; operator assertion that every endpoint enables extended node types; required for TTL creation |
 | `CompatibilityProfile` | `ZooKeeper38`; `ZooKeeper39` is an operator assertion, not negotiated discovery |
 | `SessionTimeout` | 30 seconds requested; actual negotiated timeout governs liveness |
 | `InitialConnectTimeout` | 30 seconds across endpoint attempts |
