@@ -1,8 +1,7 @@
 # Supporting public types
 
 All types below are in namespace `ZkLink`. They are implemented supporting
-contracts and have not shipped in a package. The current client exposes connection/session, node/ACL, transaction and auxiliary methods; watch-removal
-values still await their operation APIs. Node result wrappers are returned by the
+contracts and have not shipped in a package. The current client exposes connection/session, node/ACL, transaction, auxiliary and one-shot watch methods. Node result wrappers are returned by the
 [node operations](nodes.md).
 
 Exact signatures and nullable annotations are in the
@@ -100,7 +99,7 @@ Default exception text omits paths and endpoints. Payload, ACL, and identity
 wrappers use type-name formatting rather than formatting their contents.
 Explicit property inspection can still expose those values.
 
-## Watch-removal values
+## Watches and removal
 
 | Type | Contract |
 | --- | --- |
@@ -108,6 +107,11 @@ Explicit property inspection can still expose those values.
 | [WatchRemovalStatus](../../src/ZkLink/Types/WatchRemovalStatus.cs) | `LocalOnly`, `ServerConfirmed`, `NoWatcher`, or `SharedRegistrationRetained`. Shared retention means another logical handle still needs the server registration. |
 | [ZooKeeperWatchRemovalResult](../../src/ZkLink/Watches/ZooKeeperWatchRemovalResult.cs) | Getter-only positive `RegistrationId` and validated `Status`. |
 
-No watch handle, event stream, or removal operation is implemented yet.
+`WatchedResult<T>` returns `Value` and an owned `ZooKeeperWatch`. Handles expose
+registration identity/path/mode, a single-consumer event stream, explicit removal
+and asynchronous disposal. `ZooKeeperWatchEvent` has immutable registration ID,
+kind, client-relative path and optional zxid. See [one-shot watches](watches.md)
+for ownership, cancellation, event budgets and restoration. Persistent and
+recursive watch registration remains unimplemented.
 
 [Reference](README.md) · [Documentation home](../README.md)

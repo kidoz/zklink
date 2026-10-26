@@ -13,6 +13,9 @@ Learn through a guided exercise with a concrete result.
 - [Execute a transaction](use-transactions.md) — submit atomic writes, inspect
   ordered results and understand read batches.
 
+- [Watch a node once](watch-a-node.md) — observe a value and create a buffered
+  watch, then read one invalidation and release its handle.
+
 See [current capabilities](../reference/current-capabilities.md) for the available scope.
 
 [Documentation home](../README.md)

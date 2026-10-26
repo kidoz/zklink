@@ -6,14 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ZkLink is in initial development. No version has been released, so the entries
-below describe work in progress rather than supported behavior. Watch
-delivery, a NuGet package, Native AOT validation and runtime performance data
+below describe work in progress rather than supported behavior. Persistent/recursive watches, a NuGet package, Native AOT validation and runtime performance data
 remain unavailable. See
 [README.md](README.md) for the current status and verified scope.
 
 ## [Unreleased]
 
 ### Added
+
+- One-shot existence/data/children watched reads with owned handles, immutable
+  events, single-consumer streams and reader-ordered registration.
+- Shared/local/server-confirmed removal, canceled-request cleanup, a shared
+  state/watch event budget and same-session restoration before readiness.
+- Controlled-peer watch races and 10,000-path restoration checks, live watch tests
+  on both pinned patches, and a runnable `--watches` example.
 
 - Explicit `EnableTtlNodes` opt-in for TTL creation in `CreateAsync` and
   `MultiAsync`, retaining integer-millisecond bounds and no automatic replay.

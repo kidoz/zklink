@@ -16,7 +16,7 @@ Virtual-time peers also check handshake/session identity, negotiated liveness,
 cancellation outcomes, ordered late replies, bounded admission and close cleanup.
 Loopback TCP/TLS tests exercise sockets and certificate validation with ephemeral
 certificates. They do not establish recovery against a real quorum or live ACL
-and watch semantics. Watch-removal values remain supporting contracts only.
+and broad watch semantics. One-shot watch behavior also has separate live evidence.
 
 ## Java fixtures provide an independent byte comparison
 
@@ -53,7 +53,15 @@ consumes/drops a real transaction reply, then allows reconnect so tests can chec
 actual commitment, session identity and exactly one transmitted write. Auxiliary
 cases verify textual-prefix session ephemeral queries, chroot, nested counts,
 READ permissions and authenticated/anonymous identities. Broader live
-recovery, watch delivery and TLS/mTLS ZooKeeper fixtures remain unverified.
+recovery, persistent/recursive watches and TLS/mTLS ZooKeeper fixtures remain unverified.
+
+One-shot watch tests cover reader ordering, missing-node registration, shared
+removal, cancellation/timeouts, global event overflow, unknown lost-response
+intents, and restoration of 10,000 long Unicode paths in bounded frames. The
+live suite checks events, sharing/removal, chroot, close and same-session recovery
+through a full-duplex proxy. A dedicated pause permits mutation and local disposal
+while disconnected before restoration is allowed. These observations do not
+qualify a general network/quorum fault matrix.
 
 `just zk-ttl-matrix` separately starts TTL-disabled and TTL-enabled fixtures for
 each patch. It checks opt-in, maximum TTL, single/atomic creation, close

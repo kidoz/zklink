@@ -16,6 +16,8 @@ Look up the repository's current code, tooling, and verification scope.
   rollback diagnostics, input capture and uncertain outcomes.
 - [Ephemeral nodes, descendant counts and identities](auxiliary-operations.md) —
   session-scoped prefixes, recursive counts and server-reported identities.
+- [One-shot watches](watches.md) — watched reads, events, shared removal, limits
+  and reconnect restoration.
 - [Supporting public types](public-types.md) — models, options, failure metadata,
   and watch-removal values currently defined in namespace `ZkLink`.
 

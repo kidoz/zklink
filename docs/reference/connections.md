@@ -27,7 +27,7 @@ client, except that endpoint updates affect future connection attempts.
 | `CompatibilityProfile` | `ZooKeeper38`; `ZooKeeper39` is an operator assertion, not negotiated discovery |
 | `SessionTimeout` | 30 seconds requested; actual negotiated timeout governs liveness |
 | `InitialConnectTimeout` | 30 seconds across endpoint attempts |
-| `ConnectAttemptTimeout` | 5 seconds, reduced by remaining initial/recovery time |
+| `ConnectAttemptTimeout` | 5 seconds for an attempt, including auth and watch restoration; reduced by remaining initial/recovery time |
 | `OperationTimeout` | 30 seconds from invocation, including queue time |
 | `CloseTimeout` | 5 seconds to obtain acknowledgment before cleanup |
 | `MaxInFlightRequests` | 256; range 1–65,536; canceled sent requests retain their slots |
@@ -36,7 +36,8 @@ client, except that endpoint updates affect future connection attempts.
 | `MaxFrameBytes` | 1,048,575, excluding four-byte prefix; range 45 bytes–64 MiB |
 | `MaxDataBytes` | 1,000,000; range 0–64 MiB, additionally constrained by frame size |
 | `MaxCollectionElements` | 100,000; range 1–1,000,000, additionally constrained by frame size |
-| `MaxBufferedEvents` | 4,096 globally after fan-out; range 1–1,000,000; also bounds subscription count |
+| `MaxWatches` | 10,000 owned logical handles and bounded cleanup metadata; range 1–1,000,000 |
+| `MaxBufferedEvents` | 4,096 across state and watch queues after fan-out; range 1–1,000,000; also bounds subscription count |
 
 Timeouts require positive whole milliseconds, at most `int.MaxValue` milliseconds.
 Frame/data limits do not change the server's Jute limits. Chroot is namespace
@@ -74,7 +75,7 @@ They never expose the session password.
 
 | State | Meaning |
 | --- | --- |
-| `Connecting`, `Authenticating`, `Restoring` | Establishment before application readiness; restoration currently has no watches to restore |
+| `Connecting`, `Authenticating`, `Restoring` | Establishment before application readiness; acknowledged one-shot watches are restored before readiness |
 | `Connected` | Application admission is open |
 | `Disconnected` | Admission is revoked while the same session is being recovered |
 | `Expired` | Server-confirmed expiry; terminal |

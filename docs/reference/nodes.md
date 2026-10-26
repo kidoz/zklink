@@ -83,7 +83,7 @@ size rejection, late replies and cancellation outcomes.
 
 Run `just zk-operations-matrix` for isolated live servers, retained evidence and
 cleanup. For session ephemerals, descendant counts and identities, see
-[auxiliary operations](auxiliary-operations.md). These are plaintext tests. Watch delivery,
+[auxiliary operations](auxiliary-operations.md). These are plaintext tests. Persistent/recursive watches,
 live secure ZooKeeper and broader fault qualification remain open.
 
 [Reference](README.md) · [Documentation home](../README.md)
