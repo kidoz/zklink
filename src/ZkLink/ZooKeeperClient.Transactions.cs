@@ -15,7 +15,10 @@ public sealed partial class ZooKeeperClient
             _session.Submit(
                 new MultiRequest(
                     false,
-                    new OperationView<ZooKeeperWriteOperation>(operations, static op => op.Request)
+                    new OperationView<ZooKeeperWriteOperation>(
+                        operations,
+                        op => ValidateCreateFeatures(op.Request)
+                    )
                 ),
                 new ZooKeeperRequestInfo(ZooKeeperOperation.Multi),
                 cancellationToken

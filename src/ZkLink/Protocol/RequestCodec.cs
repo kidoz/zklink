@@ -59,7 +59,11 @@ internal static class RequestCodec
     {
         switch (request)
         {
-            case EmptyRequest { Opcode: 11 or 107 or -11 }:
+            case PingRequest:
+            case EmptyRequest
+            {
+                Type: ZooKeeperOperation.WhoAmI or ZooKeeperOperation.CloseSession,
+            }:
                 break;
             case PathRequest path
                 when path.Type
@@ -69,11 +73,17 @@ internal static class RequestCodec
                         or ZooKeeperOperation.GetAllChildrenNumber:
                 Path(ref output, path.Path);
                 break;
-            case ReadRequest read when read.Opcode is 3 or 4 or 8 or 12:
+            case ReadRequest read
+                when read.Type
+                    is ZooKeeperOperation.Exists
+                        or ZooKeeperOperation.GetData
+                        or ZooKeeperOperation.GetChildrenNames
+                        or ZooKeeperOperation.GetChildren:
                 Path(ref output, read.Path);
                 output.WriteBoolean(read.Watch);
                 break;
-            case VersionRequest version when version.Opcode is 2 or 13:
+            case VersionRequest version
+                when version.Type is ZooKeeperOperation.Delete or ZooKeeperOperation.Check:
                 Path(ref output, version.Path);
                 output.WriteInt32(version.Version);
                 break;
@@ -82,13 +92,18 @@ internal static class RequestCodec
                 Data(ref output, set.Data, limits);
                 output.WriteInt32(set.Version);
                 break;
-            case CreateRequest create when create.Opcode is 1 or 15 or 19 or 21:
+            case CreateRequest create
+                when create.Type
+                    is ZooKeeperOperation.Create
+                        or ZooKeeperOperation.CreateWithStat
+                        or ZooKeeperOperation.CreateContainer
+                        or ZooKeeperOperation.CreateTtl:
                 ValidateCreate(create);
                 Path(ref output, create.Path, create.Flags is 2 or 3 or 6);
                 Data(ref output, create.Data, limits);
                 Acl(ref output, create.Acl, limits);
                 output.WriteInt32(create.Flags);
-                if (create.Opcode == 21)
+                if (create.Type == ZooKeeperOperation.CreateTtl)
                 {
                     output.WriteInt64(create.Ttl!.Value);
                 }
@@ -98,8 +113,16 @@ internal static class RequestCodec
                 Acl(ref output, acl.Acl, limits);
                 output.WriteInt32(acl.Version);
                 break;
-            case WatchRequest watch when watch.Opcode is 17 or 18 or 106:
-                if (watch.Opcode == 106 ? watch.Mode is < 0 or > 1 : watch.Mode is < 1 or > 5)
+            case WatchRequest watch
+                when watch.Type
+                    is ZooKeeperOperation.CheckWatches
+                        or ZooKeeperOperation.RemoveWatches
+                        or ZooKeeperOperation.AddWatch:
+                if (
+                    watch.Type == ZooKeeperOperation.AddWatch
+                        ? watch.Mode is < 0 or > 1
+                        : watch.Mode is < 1 or > 5
+                )
                 {
                     throw new InvalidDataException("Invalid watch category or mode.");
                 }
@@ -141,11 +164,26 @@ internal static class RequestCodec
                 foreach (var member in multi.Members)
                 {
                     var allowed = multi.ReadOnly
-                        ? member is ReadRequest { Opcode: 4 or 8, Watch: false }
+                        ? member
+                            is ReadRequest
+                            {
+                                Type: ZooKeeperOperation.GetData
+                                    or ZooKeeperOperation.GetChildrenNames,
+                                Watch: false,
+                            }
                         : member
-                            is CreateRequest { Opcode: 1 or 15 or 19 or 21 }
+                            is CreateRequest
+                                {
+                                    Type: ZooKeeperOperation.Create
+                                        or ZooKeeperOperation.CreateWithStat
+                                        or ZooKeeperOperation.CreateContainer
+                                        or ZooKeeperOperation.CreateTtl,
+                                }
                                 or SetDataRequest
-                                or VersionRequest { Opcode: 2 or 13 };
+                                or VersionRequest
+                                {
+                                    Type: ZooKeeperOperation.Delete or ZooKeeperOperation.Check,
+                                };
                     if (!allowed)
                     {
                         throw new InvalidDataException(
@@ -230,10 +268,10 @@ internal static class RequestCodec
     {
         if (
             create.Flags is < 0 or > 6
-            || (create.Opcode == 19 && create.Flags != 4)
-            || (create.Flags == 4 && create.Opcode != 19)
-            || ((create.Flags is 5 or 6) != (create.Opcode == 21))
-            || ((create.Opcode == 21) != create.Ttl.HasValue)
+            || (create.Type == ZooKeeperOperation.CreateContainer && create.Flags != 4)
+            || (create.Flags == 4 && create.Type != ZooKeeperOperation.CreateContainer)
+            || ((create.Flags is 5 or 6) != (create.Type == ZooKeeperOperation.CreateTtl))
+            || ((create.Type == ZooKeeperOperation.CreateTtl) != create.Ttl.HasValue)
             || create.Ttl is <= 0 or > CreateOptions.MaxTtlMilliseconds
         )
         {

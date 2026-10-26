@@ -415,7 +415,7 @@ internal sealed class RequestScheduler(
             {
                 Preparing = false,
                 Prepared = true,
-                Shape = new EmptyRequest(-11),
+                Shape = new EmptyRequest(ZooKeeperOperation.CloseSession),
                 Packet = new byte[8],
             };
             RequestCodec.Encode(_close.Packet, 1, _close.Shape, options.Limits);

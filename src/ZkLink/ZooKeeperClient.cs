@@ -9,8 +9,13 @@ namespace ZkLink;
 public sealed partial class ZooKeeperClient : IAsyncDisposable
 {
     private readonly SessionManager _session;
+    private readonly bool _enableTtlNodes;
 
-    private ZooKeeperClient(SessionManager session) => _session = session;
+    private ZooKeeperClient(SessionManager session, bool enableTtlNodes)
+    {
+        _session = session;
+        _enableTtlNodes = enableTtlNodes;
+    }
 
     /// <summary>Snapshots options before returning its Task, then connects/authenticates within the initial deadline.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -57,7 +62,7 @@ public sealed partial class ZooKeeperClient : IAsyncDisposable
         {
             manager = new SessionManager(options, time, connector, random);
             await manager.Start().WaitAsync(cancellationToken).ConfigureAwait(false);
-            var result = new ZooKeeperClient(manager);
+            var result = new ZooKeeperClient(manager, options.Settings.EnableTtlNodes);
             manager = null;
             transferred = true;
             return result;

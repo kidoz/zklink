@@ -22,6 +22,7 @@ public abstract class ZooKeeperWriteOperation
     public ZooKeeperOperation Operation => (ZooKeeperOperation)Request.Opcode;
 
     /// <summary>Describes a create with explicit ACLs; no payload copy or network admission occurs here.</summary>
+    /// <remarks>TTL descriptors require EnableTtlNodes on the client that submits the transaction.</remarks>
     public static ZooKeeperWriteOperation Create(
         string path,
         ReadOnlyMemory<byte>? data,
@@ -37,11 +38,11 @@ public abstract class ZooKeeperWriteOperation
 
     /// <summary>Describes a data-version-conditional delete.</summary>
     public static ZooKeeperWriteOperation Delete(string path, ZNodeVersion version) =>
-        new Descriptor(path, new VersionRequest(2, path, version.Value));
+        new Descriptor(path, new VersionRequest(ZooKeeperOperation.Delete, path, version.Value));
 
     /// <summary>Describes a data-version check within the atomic transaction.</summary>
     public static ZooKeeperWriteOperation Check(string path, ZNodeVersion version) =>
-        new Descriptor(path, new VersionRequest(13, path, version.Value));
+        new Descriptor(path, new VersionRequest(ZooKeeperOperation.Check, path, version.Value));
 
     private sealed class Descriptor(string path, WireRequest request)
         : ZooKeeperWriteOperation(path, request);

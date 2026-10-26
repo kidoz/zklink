@@ -40,7 +40,7 @@ public sealed partial class ZooKeeperClient
     ) =>
         ReadIdentitiesAsync(
             _session.Submit(
-                new EmptyRequest((int)ZooKeeperOperation.WhoAmI),
+                new EmptyRequest(ZooKeeperOperation.WhoAmI),
                 new ZooKeeperRequestInfo(ZooKeeperOperation.WhoAmI),
                 cancellationToken
             )

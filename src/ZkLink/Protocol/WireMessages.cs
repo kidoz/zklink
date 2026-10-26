@@ -9,16 +9,20 @@ internal abstract record WireRequest(int Opcode)
     public sealed override string ToString() => "ZooKeeper wire request";
 }
 
-internal sealed record EmptyRequest(int Type) : WireRequest(Type);
+internal sealed record EmptyRequest(ZooKeeperOperation Type) : WireRequest((int)Type);
+
+internal sealed record PingRequest() : WireRequest(11);
 
 internal sealed record PathRequest(ZooKeeperOperation Type, string Path) : WireRequest((int)Type);
 
-internal sealed record ReadRequest(int Type, string Path, bool Watch) : WireRequest(Type);
+internal sealed record ReadRequest(ZooKeeperOperation Type, string Path, bool Watch)
+    : WireRequest((int)Type);
 
-internal sealed record VersionRequest(int Type, string Path, int Version) : WireRequest(Type);
+internal sealed record VersionRequest(ZooKeeperOperation Type, string Path, int Version)
+    : WireRequest((int)Type);
 
 internal sealed record SetDataRequest(string Path, ReadOnlyMemory<byte>? Data, int Version)
-    : WireRequest(5);
+    : WireRequest((int)ZooKeeperOperation.SetData);
 
 internal sealed record WireAcl(int Permissions, string Scheme, string Id)
 {
@@ -26,18 +30,19 @@ internal sealed record WireAcl(int Permissions, string Scheme, string Id)
 }
 
 internal sealed record CreateRequest(
-    int Type,
+    ZooKeeperOperation Type,
     string Path,
     ReadOnlyMemory<byte>? Data,
     IReadOnlyList<WireAcl> Acl,
     int Flags,
     long? Ttl = null
-) : WireRequest(Type);
+) : WireRequest((int)Type);
 
 internal sealed record SetAclRequest(string Path, IReadOnlyList<WireAcl> Acl, int Version)
-    : WireRequest(7);
+    : WireRequest((int)ZooKeeperOperation.SetAcl);
 
-internal sealed record WatchRequest(int Type, string Path, int Mode) : WireRequest(Type);
+internal sealed record WatchRequest(ZooKeeperOperation Type, string Path, int Mode)
+    : WireRequest((int)Type);
 
 internal sealed record AuthRequest(string Scheme, ReadOnlyMemory<byte> Credentials)
     : WireRequest(100);
@@ -52,7 +57,7 @@ internal sealed record RestoreRequest(
 ) : WireRequest(Persistent is null && Recursive is null ? 101 : 105);
 
 internal sealed record MultiRequest(bool ReadOnly, IReadOnlyList<WireRequest> Members)
-    : WireRequest(ReadOnly ? 22 : 14);
+    : WireRequest((int)(ReadOnly ? ZooKeeperOperation.MultiRead : ZooKeeperOperation.Multi));
 
 internal abstract record WireResult
 {

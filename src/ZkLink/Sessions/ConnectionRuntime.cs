@@ -90,7 +90,7 @@ internal sealed class ConnectionRuntime(
                     var acknowledgment = ReplyCodec.Decode(
                         packet,
                         -2,
-                        new EmptyRequest(11),
+                        new PingRequest(),
                         options.Limits
                     );
                     if (!scheduler.ConsumePing(Generation))

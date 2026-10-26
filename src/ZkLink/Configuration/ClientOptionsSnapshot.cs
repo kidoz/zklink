@@ -129,6 +129,7 @@ internal sealed class ClientOptionsSnapshot : IDisposable
                     )
                     : ZooKeeperTlsOptions.Disabled(),
                 AllowUnsafePlaintextDigest = options.AllowUnsafePlaintextDigest,
+                EnableTtlNodes = options.EnableTtlNodes,
                 CompatibilityProfile = options.CompatibilityProfile,
                 SessionTimeout = options.SessionTimeout,
                 InitialConnectTimeout = options.InitialConnectTimeout,

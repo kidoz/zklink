@@ -55,7 +55,7 @@ internal static class NamespaceTranslator
                     m.Members.Select(member => TranslateRequest(member, paths)).ToArray()
                 )
             ),
-            EmptyRequest or AuthRequest => request,
+            PingRequest or EmptyRequest or AuthRequest => request,
             _ => throw new InvalidDataException("Unsupported request namespace shape."),
         };
 

@@ -18,6 +18,10 @@ public sealed class ZooKeeperClientOptions
     /// <summary>Gets an explicit unsafe development opt-in for digest over plaintext.</summary>
     public bool AllowUnsafePlaintextDigest { get; init; }
 
+    /// <summary>Gets explicit permission to create TTL nodes; every endpoint must have extended node types enabled.</summary>
+    /// <remarks>Disabled by default. This operator assertion does not configure or probe the server.</remarks>
+    public bool EnableTtlNodes { get; init; }
+
     /// <summary>Gets the operator-asserted minimum endpoint compatibility profile.</summary>
     public ZooKeeperCompatibilityProfile CompatibilityProfile { get; init; } =
         ZooKeeperCompatibilityProfile.ZooKeeper38;

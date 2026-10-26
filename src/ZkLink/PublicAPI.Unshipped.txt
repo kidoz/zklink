@@ -148,6 +148,8 @@ ZkLink.ZooKeeperClientOptions.ConnectAttemptTimeout.get -> System.TimeSpan
 ZkLink.ZooKeeperClientOptions.ConnectAttemptTimeout.init -> void
 ZkLink.ZooKeeperClientOptions.ConnectionString.get -> string!
 ZkLink.ZooKeeperClientOptions.ConnectionString.init -> void
+ZkLink.ZooKeeperClientOptions.EnableTtlNodes.get -> bool
+ZkLink.ZooKeeperClientOptions.EnableTtlNodes.init -> void
 ZkLink.ZooKeeperClientOptions.InitialConnectTimeout.get -> System.TimeSpan
 ZkLink.ZooKeeperClientOptions.InitialConnectTimeout.init -> void
 ZkLink.ZooKeeperClientOptions.MaxBufferedEvents.get -> int
@@ -259,6 +261,7 @@ ZkLink.ZooKeeperMultiException.ZooKeeperMultiException(ZkLink.ZooKeeperRequestIn
 ZkLink.ZooKeeperOperation
 ZkLink.ZooKeeperOperation.AddWatch = 106 -> ZkLink.ZooKeeperOperation
 ZkLink.ZooKeeperOperation.Check = 13 -> ZkLink.ZooKeeperOperation
+ZkLink.ZooKeeperOperation.CheckWatches = 17 -> ZkLink.ZooKeeperOperation
 ZkLink.ZooKeeperOperation.CloseSession = -11 -> ZkLink.ZooKeeperOperation
 ZkLink.ZooKeeperOperation.Create = 1 -> ZkLink.ZooKeeperOperation
 ZkLink.ZooKeeperOperation.CreateContainer = 19 -> ZkLink.ZooKeeperOperation

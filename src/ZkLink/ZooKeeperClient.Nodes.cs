@@ -12,7 +12,7 @@ public sealed partial class ZooKeeperClient
     ) =>
         ReadExistsAsync(
             SubmitNode(
-                new ReadRequest(3, path, false),
+                new ReadRequest(ZooKeeperOperation.Exists, path, false),
                 ZooKeeperOperation.Exists,
                 path,
                 cancellationToken
@@ -26,7 +26,7 @@ public sealed partial class ZooKeeperClient
     ) =>
         ReadDataAsync(
             SubmitNode(
-                new ReadRequest(4, path, false),
+                new ReadRequest(ZooKeeperOperation.GetData, path, false),
                 ZooKeeperOperation.GetData,
                 path,
                 cancellationToken
@@ -40,7 +40,7 @@ public sealed partial class ZooKeeperClient
     ) =>
         ReadChildrenAsync(
             SubmitNode(
-                new ReadRequest(12, path, false),
+                new ReadRequest(ZooKeeperOperation.GetChildren, path, false),
                 ZooKeeperOperation.GetChildren,
                 path,
                 cancellationToken
@@ -48,7 +48,7 @@ public sealed partial class ZooKeeperClient
         );
 
     /// <summary>Creates one node with explicit ACLs and returns the actual client-relative path and stat.</summary>
-    /// <remarks>Parents are not created implicitly. TTL modes are unavailable until explicit server enablement is implemented.</remarks>
+    /// <remarks>Parents are not created implicitly. TTL modes require EnableTtlNodes and server extended node types.</remarks>
     public Task<CreateResult> CreateAsync(
         string path,
         ReadOnlyMemory<byte>? data,
@@ -57,6 +57,7 @@ public sealed partial class ZooKeeperClient
     )
     {
         var request = CreateNodeRequest(path, data, options);
+        ValidateCreateFeatures(request);
         return ReadCreateAsync(
             SubmitNode(request, (ZooKeeperOperation)request.Opcode, path, cancellationToken)
         );
@@ -69,23 +70,32 @@ public sealed partial class ZooKeeperClient
     )
     {
         ArgumentNullException.ThrowIfNull(options);
-        if (options.Mode is CreateMode.PersistentWithTtl or CreateMode.PersistentSequentialWithTtl)
+        var operation = options.Mode switch
         {
-            throw new NotSupportedException(
-                "TTL creation requires server enablement, which is not implemented yet."
-            );
-        }
-        var operation =
-            options.Mode == CreateMode.Container
-                ? ZooKeeperOperation.CreateContainer
-                : ZooKeeperOperation.CreateWithStat;
+            CreateMode.Container => ZooKeeperOperation.CreateContainer,
+            CreateMode.PersistentWithTtl or CreateMode.PersistentSequentialWithTtl =>
+                ZooKeeperOperation.CreateTtl,
+            _ => ZooKeeperOperation.CreateWithStat,
+        };
         return new CreateRequest(
-            (int)operation,
+            operation,
             path,
             data,
             new PublicAclView(options.Acl),
-            (int)options.Mode
+            (int)options.Mode,
+            options.Ttl?.Ticks / TimeSpan.TicksPerMillisecond
         );
+    }
+
+    private WireRequest ValidateCreateFeatures(WireRequest request)
+    {
+        if (request is CreateRequest { Ttl: not null } && !_enableTtlNodes)
+        {
+            throw new NotSupportedException(
+                "TTL creation requires EnableTtlNodes and server extended node types on every endpoint."
+            );
+        }
+        return request;
     }
 
     /// <summary>Writes an owned snapshot of data under a data-version condition and returns the updated stat.</summary>
@@ -112,7 +122,7 @@ public sealed partial class ZooKeeperClient
     ) =>
         SyncCoreAsync(
             SubmitNode(
-                new VersionRequest(2, path, version.Value),
+                new VersionRequest(ZooKeeperOperation.Delete, path, version.Value),
                 ZooKeeperOperation.Delete,
                 path,
                 cancellationToken

@@ -36,6 +36,9 @@ public enum ZooKeeperOperation
     /// <summary>Check a version inside multi.</summary>
     Check = 13,
 
+    /// <summary>Check a server watch.</summary>
+    CheckWatches = 17,
+
     /// <summary>Atomic write multi.</summary>
     Multi = 14,
 
