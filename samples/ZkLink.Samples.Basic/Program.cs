@@ -1,13 +1,13 @@
 using ZkLink;
 
 if (
-    args.Length is < 1 or > 3
-    || args.Skip(1).Any(value => value is not ("--plaintext" or "--nodes"))
+    args.Length is < 1 or > 4
+    || args.Skip(1).Any(value => value is not ("--plaintext" or "--nodes" or "--transactions"))
 )
 {
     await Console
         .Error.WriteLineAsync(
-            "Usage: ZkLink.Samples.Basic host:port[,host:port] [--plaintext] [--nodes]"
+            "Usage: ZkLink.Samples.Basic host:port[,host:port] [--plaintext] [--nodes] [--transactions]"
         )
         .ConfigureAwait(false);
     return 2;
@@ -17,11 +17,12 @@ using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 var user = Environment.GetEnvironmentVariable("ZKLINK_USER");
 var password = Environment.GetEnvironmentVariable("ZKLINK_PASSWORD");
 var nodes = args.Contains("--nodes", StringComparer.Ordinal);
-if ((user is null) != (password is null) || (nodes && user is null))
+var transactions = args.Contains("--transactions", StringComparer.Ordinal);
+if ((user is null) != (password is null) || ((nodes || transactions) && user is null))
 {
     await Console
         .Error.WriteLineAsync(
-            "Set both ZKLINK_USER and ZKLINK_PASSWORD; --nodes requires an authenticated creator ACL."
+            "Set both ZKLINK_USER and ZKLINK_PASSWORD; --nodes and --transactions require an authenticated creator ACL."
         )
         .ConfigureAwait(false);
     return 2;
@@ -66,6 +67,40 @@ try
             .ConfigureAwait(false);
         await Console
             .Out.WriteLineAsync("Node create/read/update/delete completed.")
+            .ConfigureAwait(false);
+    }
+    if (transactions)
+    {
+        var path = "/zklink-transaction-sample-" + Guid.NewGuid().ToString("N");
+        var creatorAcl = new CreateOptions(
+            [new(ZooKeeperPermissions.All, "auth", "")],
+            CreateMode.Ephemeral
+        );
+        await client
+            .MultiAsync(
+                [
+                    ZooKeeperWriteOperation.Create(path, "initial"u8.ToArray(), creatorAcl),
+                    ZooKeeperWriteOperation.SetData(
+                        path,
+                        "updated"u8.ToArray(),
+                        ZNodeVersion.Exact(0)
+                    ),
+                    ZooKeeperWriteOperation.Check(path, ZNodeVersion.Exact(1)),
+                ],
+                deadline.Token
+            )
+            .ConfigureAwait(false);
+        await client
+            .MultiReadAsync([ZooKeeperReadOperation.GetData(path)], deadline.Token)
+            .ConfigureAwait(false);
+        await client
+            .MultiAsync(
+                [ZooKeeperWriteOperation.Delete(path, ZNodeVersion.Exact(1))],
+                deadline.Token
+            )
+            .ConfigureAwait(false);
+        await Console
+            .Out.WriteLineAsync("Transaction create/update/check/read/delete completed.")
             .ConfigureAwait(false);
     }
     await client.SyncAsync("/", deadline.Token).ConfigureAwait(false);
