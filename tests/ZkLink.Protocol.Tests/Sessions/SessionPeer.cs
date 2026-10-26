@@ -26,6 +26,15 @@ internal sealed class SessionPeer : Stream
     private readonly Channel<ReceivedPacket> _requests = Channel.CreateBounded<ReceivedPacket>(256);
     private readonly Channel<bool> _readWaits = Channel.CreateBounded<bool>(256);
     private TaskCompletionSource? _heldWrite;
+    private readonly TaskCompletionSource _applicationWriteHeld = new(
+        TaskCreationOptions.RunContinuationsAsynchronously
+    );
+    internal Task ApplicationWriteHeld => _applicationWriteHeld.Task;
+    private TaskCompletionSource? _heldPingWrite;
+    private readonly TaskCompletionSource _pingWriteHeld = new(
+        TaskCreationOptions.RunContinuationsAsynchronously
+    );
+    internal Task PingWriteHeld => _pingWriteHeld.Task;
     internal int NegotiatedTimeout { get; init; } = 600;
     internal long Id { get; init; } = 123;
     internal bool ReplyHandshake { get; set; } = true;
@@ -33,9 +42,11 @@ internal sealed class SessionPeer : Stream
     internal bool ReplyPings { get; set; } = true;
     internal bool ReplyClose { get; set; } = true;
     internal bool ReplyAuth { get; set; } = true;
+    internal bool ReplyRestores { get; set; } = true;
     internal int AuthError { get; init; }
     internal int? FailWriteAt { get; set; }
     internal bool HoldApplicationWrite { get; set; }
+    internal bool HoldPingWrite { get; set; }
     internal ReadOnlyMemory<byte> HeldWriterMemory { get; private set; }
     internal int WrittenCount => _written;
     internal bool IsDisposed => Volatile.Read(ref _disposed) != 0;
@@ -50,6 +61,12 @@ internal sealed class SessionPeer : Stream
     {
         HoldApplicationWrite = false;
         _heldWrite?.TrySetResult();
+    }
+
+    internal void ReleasePingWrite()
+    {
+        HoldPingWrite = false;
+        _heldPingWrite?.TrySetResult();
     }
 
     internal void Drop() => _incoming.CompleteInput();
@@ -80,7 +97,7 @@ internal sealed class SessionPeer : Stream
 
     internal void Inject(byte[] payload) => _incoming.Enqueue(PeerTests.Frame(payload));
 
-    private void HandshakeReply()
+    internal void HandshakeReply()
     {
         var bytes = new byte[64];
         var output = new JuteWriter(bytes, Limits);
@@ -154,6 +171,14 @@ internal sealed class SessionPeer : Stream
                     {
                         Reply(request);
                     }
+                    if (HoldPingWrite)
+                    {
+                        _heldPingWrite = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                        _pingWriteHeld.TrySetResult();
+                        await _heldPingWrite
+                            .Task.WaitAsync(cancellationToken)
+                            .ConfigureAwait(false);
+                    }
                 }
                 else if (request.Opcode == -11)
                 {
@@ -161,6 +186,11 @@ internal sealed class SessionPeer : Stream
                     {
                         Reply(request);
                     }
+                }
+                else if (request.Opcode == 101 || request.Opcode == 105)
+                {
+                    if (ReplyRestores)
+                        Reply(request);
                 }
                 else
                 {
@@ -172,6 +202,7 @@ internal sealed class SessionPeer : Stream
                     {
                         HeldWriterMemory = buffer;
                         _heldWrite = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                        _applicationWriteHeld.TrySetResult();
                         await _heldWrite.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
                     }
                 }
@@ -196,6 +227,7 @@ internal sealed class SessionPeer : Stream
         if (disposing && Interlocked.Exchange(ref _disposed, 1) == 0)
         {
             ReleaseWrite();
+            ReleasePingWrite();
             _incoming.Dispose();
             _accumulated.Dispose();
             _requests.Writer.TryComplete();
@@ -312,7 +344,8 @@ internal sealed class SessionFixture : IAsyncDisposable
         string connection = "first:2181",
         IReadOnlyList<ZooKeeperAuthentication>? authentication = null,
         int collections = 100_000,
-        bool enableTtlNodes = false
+        bool enableTtlNodes = false,
+        int watches = 10_000
     ) =>
         new()
         {
@@ -331,6 +364,7 @@ internal sealed class SessionFixture : IAsyncDisposable
             MaxBufferedEvents = events,
             MaxCollectionElements = collections,
             EnableTtlNodes = enableTtlNodes,
+            MaxWatches = watches,
         };
 
     public async ValueTask DisposeAsync()
