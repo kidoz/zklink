@@ -24,6 +24,9 @@ public enum ZooKeeperOperation
     /// <summary>Write ACL entries.</summary>
     SetAcl = 7,
 
+    /// <summary>Read child names without parent Stat inside multi-read.</summary>
+    GetChildrenNames = 8,
+
     /// <summary>Read children and stat.</summary>
     GetChildren = 12,
 

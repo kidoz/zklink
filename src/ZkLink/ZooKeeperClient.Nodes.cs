@@ -56,6 +56,18 @@ public sealed partial class ZooKeeperClient
         CancellationToken cancellationToken = default
     )
     {
+        var request = CreateNodeRequest(path, data, options);
+        return ReadCreateAsync(
+            SubmitNode(request, (ZooKeeperOperation)request.Opcode, path, cancellationToken)
+        );
+    }
+
+    internal static CreateRequest CreateNodeRequest(
+        string path,
+        ReadOnlyMemory<byte>? data,
+        CreateOptions options
+    )
+    {
         ArgumentNullException.ThrowIfNull(options);
         if (options.Mode is CreateMode.PersistentWithTtl or CreateMode.PersistentSequentialWithTtl)
         {
@@ -67,19 +79,12 @@ public sealed partial class ZooKeeperClient
             options.Mode == CreateMode.Container
                 ? ZooKeeperOperation.CreateContainer
                 : ZooKeeperOperation.CreateWithStat;
-        return ReadCreateAsync(
-            SubmitNode(
-                new CreateRequest(
-                    (int)operation,
-                    path,
-                    data,
-                    new PublicAclView(options.Acl),
-                    (int)options.Mode
-                ),
-                operation,
-                path,
-                cancellationToken
-            )
+        return new CreateRequest(
+            (int)operation,
+            path,
+            data,
+            new PublicAclView(options.Acl),
+            (int)options.Mode
         );
     }
 
@@ -199,7 +204,7 @@ public sealed partial class ZooKeeperClient
         );
     }
 
-    private static ZNodeStat ToPublic(WireStat stat) =>
+    internal static ZNodeStat ToPublic(WireStat stat) =>
         new(
             stat.Czxid,
             stat.Mzxid,

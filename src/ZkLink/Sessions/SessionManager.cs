@@ -607,14 +607,25 @@ internal sealed class SessionManager : IAsyncDisposable
                 return new(RuntimeStop.Stopped);
             }
             Inbound(value, reply.Header);
+            int errorCode = reply.Header.Error;
+            if (errorCode == 0 && reply.Result is MultiResult multi)
+            {
+                errorCode =
+                    multi
+                        .Members.FirstOrDefault(static member =>
+                            member.Error is -112 or -115 or -124 or -118 or -12
+                        )
+                        ?.Error
+                    ?? 0;
+            }
             RuntimeFailure? result = null;
-            if (reply.Header.Error is -112 or -115 or -124)
+            if (errorCode is -112 or -115 or -124)
             {
                 result = new RuntimeFailure(
-                    reply.Header.Error == -112 ? RuntimeStop.Expired : RuntimeStop.AuthFailed,
-                    reply.Header.Error
+                    errorCode == -112 ? RuntimeStop.Expired : RuntimeStop.AuthFailed,
+                    errorCode
                 );
-                _terminalCode = reply.Header.Error;
+                _terminalCode = errorCode;
                 _serverExpired = result.Value.Kind == RuntimeStop.Expired;
                 _terminalCause = new ZooKeeperSessionException(
                     _serverExpired
@@ -629,7 +640,7 @@ internal sealed class SessionManager : IAsyncDisposable
                     detach: false
                 );
             }
-            if (reply.Header.Error is -118 or -12)
+            if (errorCode is -118 or -12)
             {
                 Scheduler.StopAdmission();
                 if (!_closing)
@@ -640,9 +651,9 @@ internal sealed class SessionManager : IAsyncDisposable
                         _connectionReady = NewSignal();
                     }
                 }
-                result = new(RuntimeStop.Disconnected, reply.Header.Error);
+                result = new(RuntimeStop.Disconnected, errorCode);
             }
-            if (pending.Control && reply.Header.Error == 0)
+            if (pending.Control && errorCode == 0)
             {
                 _closeAcknowledged = true;
                 _closeStatus = ZooKeeperCloseStatus.Acknowledged;

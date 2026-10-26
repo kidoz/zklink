@@ -125,6 +125,23 @@ internal static class ReplyCodec
         {
             throw new InvalidDataException("Invalid multi terminator or extra member.");
         }
+        if (
+            request.ReadOnly
+            && results.Any(static member => member.Result is ErrorResult { Error: 0 })
+        )
+        {
+            throw new InvalidDataException("A read error cannot represent success.");
+        }
+        if (
+            !request.ReadOnly
+            && results.Any(static member => member.Result is ErrorResult)
+            && !results.Any(static member => member.Error != 0)
+        )
+        {
+            throw new InvalidDataException(
+                "Write placeholders require an explicit failing member."
+            );
+        }
         return new MultiResult(results);
     }
 

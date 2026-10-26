@@ -551,6 +551,22 @@ internal sealed class RequestScheduler(
                     new ZooKeeperException(pending.Info, outcome, reply.Header.Error)
                 );
             }
+            else if (
+                pending.Shape is MultiRequest { ReadOnly: false }
+                && reply.Result is MultiResult multi
+                && !pending.Completion.Task.IsCompleted
+            )
+            {
+                ZooKeeperMultiException? failure = MultiFailure.Create(pending.Info, multi);
+                if (failure is not null)
+                {
+                    pending.Completion.TrySetException(failure);
+                }
+                else
+                {
+                    pending.Completion.TrySetResult(reply);
+                }
+            }
             else
             {
                 pending.Completion.TrySetResult(reply);
