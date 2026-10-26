@@ -92,7 +92,13 @@ internal sealed class SessionPeer : Stream
             input.ReadRequestHeader();
             path = input.ReadString();
         }
-        _incoming.Enqueue(PeerTests.Frame(Packet(request.Xid, error, zxid, path)));
+        var packet = Packet(request.Xid, error, zxid, path);
+        if (
+            request.Opcode == (int)ZooKeeperOperation.AddWatch
+            && error == ZkLink.Watches.WatchProtocol.Success
+        )
+            Array.Resize(ref packet, packet.Length + sizeof(int));
+        _incoming.Enqueue(PeerTests.Frame(packet));
     }
 
     internal void Inject(byte[] payload) => _incoming.Enqueue(PeerTests.Frame(payload));
@@ -345,7 +351,8 @@ internal sealed class SessionFixture : IAsyncDisposable
         IReadOnlyList<ZooKeeperAuthentication>? authentication = null,
         int collections = 100_000,
         bool enableTtlNodes = false,
-        int watches = 10_000
+        int watches = 10_000,
+        ZooKeeperCompatibilityProfile profile = ZooKeeperCompatibilityProfile.ZooKeeper38
     ) =>
         new()
         {
@@ -365,6 +372,7 @@ internal sealed class SessionFixture : IAsyncDisposable
             MaxCollectionElements = collections,
             EnableTtlNodes = enableTtlNodes,
             MaxWatches = watches,
+            CompatibilityProfile = profile,
         };
 
     public async ValueTask DisposeAsync()
