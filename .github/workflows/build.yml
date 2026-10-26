@@ -43,7 +43,7 @@ jobs:
         run: dotnet test --project tests/ZkLink.Protocol.Tests -c Release --no-build --no-restore
 
   operations:
-    name: Live node, ACL, transaction and auxiliary operations
+    name: Live node, ACL, transaction, auxiliary and one-shot watch operations
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
