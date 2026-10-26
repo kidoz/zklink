@@ -122,7 +122,12 @@ public sealed partial class ZooKeeperClient
     /// <summary>Reads immutable ACL entries and the corresponding stat, including ACL version.</summary>
     public Task<ZNodeAcl> GetAclAsync(string path, CancellationToken cancellationToken = default) =>
         ReadAclAsync(
-            SubmitNode(new PathRequest(6, path), ZooKeeperOperation.GetAcl, path, cancellationToken)
+            SubmitNode(
+                new PathRequest(ZooKeeperOperation.GetAcl, path),
+                ZooKeeperOperation.GetAcl,
+                path,
+                cancellationToken
+            )
         );
 
     /// <summary>Replaces ACLs under an ACL-version condition and returns the updated stat.</summary>

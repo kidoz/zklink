@@ -61,7 +61,12 @@ internal static class RequestCodec
         {
             case EmptyRequest { Opcode: 11 or 107 or -11 }:
                 break;
-            case PathRequest path when path.Opcode is 6 or 9 or 103 or 104:
+            case PathRequest path
+                when path.Type
+                    is ZooKeeperOperation.GetAcl
+                        or ZooKeeperOperation.Sync
+                        or ZooKeeperOperation.GetEphemerals
+                        or ZooKeeperOperation.GetAllChildrenNumber:
                 Path(ref output, path.Path);
                 break;
             case ReadRequest read when read.Opcode is 3 or 4 or 8 or 12:

@@ -11,7 +11,7 @@ internal abstract record WireRequest(int Opcode)
 
 internal sealed record EmptyRequest(int Type) : WireRequest(Type);
 
-internal sealed record PathRequest(int Type, string Path) : WireRequest(Type);
+internal sealed record PathRequest(ZooKeeperOperation Type, string Path) : WireRequest((int)Type);
 
 internal sealed record ReadRequest(int Type, string Path, bool Watch) : WireRequest(Type);
 

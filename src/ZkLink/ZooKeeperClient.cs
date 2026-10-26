@@ -105,7 +105,7 @@ public sealed partial class ZooKeeperClient : IAsyncDisposable
     public Task SyncAsync(string path, CancellationToken cancellationToken = default) =>
         SyncCoreAsync(
             _session.Submit(
-                new PathRequest(9, path),
+                new PathRequest(ZooKeeperOperation.Sync, path),
                 new ZooKeeperRequestInfo(ZooKeeperOperation.Sync, path: path),
                 cancellationToken
             )
