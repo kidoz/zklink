@@ -80,7 +80,7 @@ for version in 3.8.7 3.9.6; do
       endpoint=$(compose port "${service}" 2181)
       sample_args=("${endpoint}" --plaintext)
       if [[ "${operations}" == true ]]; then
-        sample_args+=(--nodes --transactions)
+        sample_args+=(--nodes --transactions --auxiliary)
       fi
       ZKLINK_USER="zklink-connection-smoke" ZKLINK_PASSWORD="$(openssl rand -hex 16)" \
         dotnet run --project samples/ZkLink.Samples.Basic -c Release --no-build -- \
@@ -93,7 +93,7 @@ for version in 3.8.7 3.9.6; do
       dotnet test --project tests/ZkLink.IntegrationTests -c Release --no-build --no-restore \
       --results-directory "${artifacts}/${version}-results" >"${artifacts}/${version}-operations.txt" 2>&1; then
       cat "${artifacts}/${version}-operations.txt" >&2
-      echo "ZkLink node/ACL tests failed on ${version}; see ${artifacts}" >&2
+      echo "ZkLink node/ACL/transaction/auxiliary tests failed on ${version}; see ${artifacts}" >&2
       exit 1
     fi
     cat "${artifacts}/${version}-operations.txt"
@@ -107,6 +107,6 @@ for version in 3.8.7 3.9.6; do
     echo "ZkLink ${version}: PASS (new session, digest auth, sync, acknowledged close on every node)"
   fi
   if [[ "${operations}" == true ]]; then
-    echo "ZkLink ${version}: PASS (managed node/ACL/transaction integration tests, CRUD and transaction samples on every node, cleanup)"
+    echo "ZkLink ${version}: PASS (managed node/ACL/transaction/auxiliary integration tests and samples on every node, cleanup)"
   fi
 done
