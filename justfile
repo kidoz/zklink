@@ -59,6 +59,6 @@ zk-matrix:
 zk-driver-matrix:
     bash dev/test-zookeeper-matrix.sh --driver
 
-# Verify node and ACL operations against both pinned live server versions.
+# Verify node, ACL and transaction operations against both pinned live server versions.
 zk-operations-matrix:
     bash dev/test-zookeeper-matrix.sh --operations

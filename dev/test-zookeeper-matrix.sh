@@ -80,7 +80,7 @@ for version in 3.8.7 3.9.6; do
       endpoint=$(compose port "${service}" 2181)
       sample_args=("${endpoint}" --plaintext)
       if [[ "${operations}" == true ]]; then
-        sample_args+=(--nodes)
+        sample_args+=(--nodes --transactions)
       fi
       ZKLINK_USER="zklink-connection-smoke" ZKLINK_PASSWORD="$(openssl rand -hex 16)" \
         dotnet run --project samples/ZkLink.Samples.Basic -c Release --no-build -- \
@@ -107,6 +107,6 @@ for version in 3.8.7 3.9.6; do
     echo "ZkLink ${version}: PASS (new session, digest auth, sync, acknowledged close on every node)"
   fi
   if [[ "${operations}" == true ]]; then
-    echo "ZkLink ${version}: PASS (managed node/ACL integration tests, CRUD sample on every node, cleanup)"
+    echo "ZkLink ${version}: PASS (managed node/ACL/transaction integration tests, CRUD and transaction samples on every node, cleanup)"
   fi
 done
