@@ -1,85 +1,28 @@
-using System.Security.Cryptography;
-
 namespace ZkLink.IntegrationTests;
 
-// These are required live tests: the matrix runner supplies configuration, and missing
-// configuration fails initialization. Ordinary server-free jobs run their own projects.
 public sealed class NodeOperationsTests : IAsyncLifetime
 {
-    private static readonly CreateOptions OwnerCreate = new([
-        new(ZooKeeperPermissions.All, "auth", ""),
-    ]);
-    private readonly string _root = "/zklink-tests-" + Guid.NewGuid().ToString("N");
-    private readonly string _user = "zklink-" + Guid.NewGuid().ToString("N");
-    private readonly string _password = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
-    private string _connection = "";
-    private ZooKeeperClient? _client;
-    private bool _created;
-    private ZooKeeperClient Client => _client!;
+    private readonly LiveZooKeeperFixture _fixture = new();
+    private static CreateOptions OwnerCreate => LiveZooKeeperFixture.OwnerCreate;
+    private ZooKeeperClient Client => _fixture.Client;
+    private string Root => _fixture.Root;
+    private string ConnectionString => _fixture.ConnectionString;
 
-    public async ValueTask InitializeAsync()
-    {
-        _connection =
-            Environment.GetEnvironmentVariable("ZKLINK_TEST_CONNECTION_STRING")
-            ?? throw new InvalidOperationException(
-                "Run just zk-operations-matrix to supply the required isolated live ensemble."
-            );
-        string? version = Environment.GetEnvironmentVariable("ZKLINK_TEST_SERVER_VERSION");
-        if (version is not ("3.8.7" or "3.9.6"))
-            throw new InvalidOperationException(
-                "The live runner must verify and supply a pinned server version."
-            );
-        _client = await ConnectAsync().ConfigureAwait(false);
-        await Client
-            .CreateAsync(_root, null, OwnerCreate, TestContext.Current.CancellationToken)
-            .ConfigureAwait(false);
-        _created = true;
-    }
+    public ValueTask InitializeAsync() => _fixture.InitializeAsync();
 
-    public async ValueTask DisposeAsync()
-    {
-        if (_client is null)
-            return;
-        try
-        {
-            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            if (_created)
-                await DeleteTreeAsync(_root, cleanup.Token).ConfigureAwait(false);
-        }
-        finally
-        {
-            await _client.DisposeAsync().ConfigureAwait(false);
-        }
-    }
+    public ValueTask DisposeAsync() => _fixture.DisposeAsync();
 
-    private async Task<ZooKeeperClient> ConnectAsync(
+    private Task<ZooKeeperClient> ConnectAsync(
         bool authenticated = true,
-        string? chroot = null
-    )
-    {
-        using var credentials = ZooKeeperAuthentication.Digest(_user, _password);
-        var options = new ZooKeeperClientOptions
-        {
-            ConnectionString = _connection,
-            Chroot = chroot,
-            Tls = ZooKeeperTlsOptions.Disabled(),
-            AllowUnsafePlaintextDigest = true,
-            Authentication = authenticated ? [credentials] : [],
-            InitialConnectTimeout = TimeSpan.FromSeconds(5),
-            ConnectAttemptTimeout = TimeSpan.FromSeconds(2),
-            OperationTimeout = TimeSpan.FromSeconds(5),
-            CloseTimeout = TimeSpan.FromSeconds(2),
-        };
-        return await ZooKeeperClient
-            .ConnectAsync(options, TestContext.Current.CancellationToken)
-            .ConfigureAwait(false);
-    }
+        string? chroot = null,
+        string? connectionString = null
+    ) => _fixture.ConnectAsync(authenticated, chroot, connectionString);
 
     [Fact(Timeout = 60000)]
     [Trait("Acceptance", "T15")]
     public async Task CrudPreservesNullEmptyAndLargeDataWithStatAndChildren()
     {
-        string path = _root + "/data";
+        string path = Root + "/data";
         CreateResult created = await Client
             .CreateAsync(path, null, OwnerCreate, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
@@ -131,7 +74,7 @@ public sealed class NodeOperationsTests : IAsyncLifetime
         Assert.Equal(large.Length, read.Stat.DataLength);
         Assert.True(read.Data!.Value.Span.ContainsAnyExcept((byte)42) == false);
         ZNodeChildren children = await Client
-            .GetChildrenAsync(_root, TestContext.Current.CancellationToken)
+            .GetChildrenAsync(Root, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         Assert.Single(children.Children, "data");
         Assert.Equal(1, children.Stat.NumChildren);
@@ -156,7 +99,7 @@ public sealed class NodeOperationsTests : IAsyncLifetime
     [Trait("Acceptance", "T15")]
     public async Task MissingNodesAndVersionConflictsRemainExplicitServerRejections()
     {
-        string path = _root + "/missing";
+        string path = Root + "/missing";
         Assert.Null(
             await Client
                 .ExistsAsync(path, TestContext.Current.CancellationToken)
@@ -277,7 +220,7 @@ public sealed class NodeOperationsTests : IAsyncLifetime
     [Trait("Acceptance", "T16")]
     public async Task CreateModesReturnActualPathStatAndSessionOwner(CreateMode mode)
     {
-        string prefix = _root + "/node-";
+        string prefix = Root + "/node-";
         CreateResult result = await Client
             .CreateAsync(
                 prefix,
@@ -317,7 +260,7 @@ public sealed class NodeOperationsTests : IAsyncLifetime
         await RejectedAsync(
                 () =>
                     Client.CreateAsync(
-                        _root + "/absent/child",
+                        Root + "/absent/child",
                         null,
                         OwnerCreate,
                         TestContext.Current.CancellationToken
@@ -327,10 +270,10 @@ public sealed class NodeOperationsTests : IAsyncLifetime
             .ConfigureAwait(true);
         Assert.Null(
             await Client
-                .ExistsAsync(_root + "/absent", TestContext.Current.CancellationToken)
+                .ExistsAsync(Root + "/absent", TestContext.Current.CancellationToken)
                 .ConfigureAwait(true)
         );
-        string ephemeral = _root + "/ephemeral";
+        string ephemeral = Root + "/ephemeral";
         await Client
             .CreateAsync(
                 ephemeral,
@@ -351,16 +294,11 @@ public sealed class NodeOperationsTests : IAsyncLifetime
             )
             .ConfigureAwait(true);
         await Client
-            .CreateAsync(
-                _root + "/parent",
-                null,
-                OwnerCreate,
-                TestContext.Current.CancellationToken
-            )
+            .CreateAsync(Root + "/parent", null, OwnerCreate, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         await Client
             .CreateAsync(
-                _root + "/parent/child",
+                Root + "/parent/child",
                 null,
                 OwnerCreate,
                 TestContext.Current.CancellationToken
@@ -369,7 +307,7 @@ public sealed class NodeOperationsTests : IAsyncLifetime
         await RejectedAsync(
                 () =>
                     Client.DeleteAsync(
-                        _root + "/parent",
+                        Root + "/parent",
                         ZNodeVersion.Any,
                         TestContext.Current.CancellationToken
                     ),
@@ -378,7 +316,7 @@ public sealed class NodeOperationsTests : IAsyncLifetime
             .ConfigureAwait(true);
         Assert.NotNull(
             await Client
-                .ExistsAsync(_root + "/parent/child", TestContext.Current.CancellationToken)
+                .ExistsAsync(Root + "/parent/child", TestContext.Current.CancellationToken)
                 .ConfigureAwait(true)
         );
     }
@@ -387,7 +325,7 @@ public sealed class NodeOperationsTests : IAsyncLifetime
     [Trait("Acceptance", "T15")]
     public async Task ChrootTranslatesEveryNodeAndAclOperationAndSequentialResult()
     {
-        ZooKeeperClient scoped = await ConnectAsync(chroot: _root).ConfigureAwait(true);
+        ZooKeeperClient scoped = await ConnectAsync(chroot: Root).ConfigureAwait(true);
         await using var scopedLifetime = scoped.ConfigureAwait(true);
         Assert.NotNull(
             await scoped
@@ -405,7 +343,7 @@ public sealed class NodeOperationsTests : IAsyncLifetime
         Assert.Equal("/child", created.Path);
         Assert.NotNull(
             await Client
-                .ExistsAsync(_root + "/child", TestContext.Current.CancellationToken)
+                .ExistsAsync(Root + "/child", TestContext.Current.CancellationToken)
                 .ConfigureAwait(true)
         );
         await scoped
@@ -443,7 +381,7 @@ public sealed class NodeOperationsTests : IAsyncLifetime
             )
             .ConfigureAwait(true);
         Assert.StartsWith("/prefix-", sequential.Path, StringComparison.Ordinal);
-        Assert.DoesNotContain(_root, sequential.Path, StringComparison.Ordinal);
+        Assert.DoesNotContain(Root, sequential.Path, StringComparison.Ordinal);
         ZNodeChildren children = await scoped
             .GetChildrenAsync("/", TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
@@ -455,7 +393,7 @@ public sealed class NodeOperationsTests : IAsyncLifetime
             .ConfigureAwait(true);
         Assert.Null(
             await Client
-                .ExistsAsync(_root + "/child", TestContext.Current.CancellationToken)
+                .ExistsAsync(Root + "/child", TestContext.Current.CancellationToken)
                 .ConfigureAwait(true)
         );
         await scoped.CloseAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
@@ -465,11 +403,11 @@ public sealed class NodeOperationsTests : IAsyncLifetime
     [Trait("Acceptance", "T19")]
     public async Task AclReadWriteAndAdminRightsAreIndependentAndVersionsStayDistinct()
     {
-        string path = _root + "/acl";
+        string path = Root + "/acl";
         ZooKeeperAcl owner = Assert.Single(
             (
                 await Client
-                    .GetAclAsync(_root, TestContext.Current.CancellationToken)
+                    .GetAclAsync(Root, TestContext.Current.CancellationToken)
                     .ConfigureAwait(true)
             ).Acl
         );
@@ -594,11 +532,11 @@ public sealed class NodeOperationsTests : IAsyncLifetime
     [Trait("Acceptance", "T19")]
     public async Task CreateAndDeleteRightsApplyToTheParentAndAclDoesNotInherit()
     {
-        string parent = _root + "/parent";
+        string parent = Root + "/parent";
         ZooKeeperAcl owner = Assert.Single(
             (
                 await Client
-                    .GetAclAsync(_root, TestContext.Current.CancellationToken)
+                    .GetAclAsync(Root, TestContext.Current.CancellationToken)
                     .ConfigureAwait(true)
             ).Acl
         );
@@ -664,7 +602,7 @@ public sealed class NodeOperationsTests : IAsyncLifetime
     {
         ZooKeeperClient owner = await ConnectAsync().ConfigureAwait(true);
         await using var ownerLifetime = owner.ConfigureAwait(true);
-        string path = _root + "/ephemeral";
+        string path = Root + "/ephemeral";
         CreateResult created = await owner
             .CreateAsync(
                 path,
@@ -674,7 +612,7 @@ public sealed class NodeOperationsTests : IAsyncLifetime
             )
             .ConfigureAwait(true);
         Assert.Equal(owner.Session.SessionId, created.Stat.EphemeralOwner);
-        await Client.SyncAsync(_root, TestContext.Current.CancellationToken).ConfigureAwait(true);
+        await Client.SyncAsync(Root, TestContext.Current.CancellationToken).ConfigureAwait(true);
         Assert.NotNull(
             await Client
                 .ExistsAsync(path, TestContext.Current.CancellationToken)
@@ -682,7 +620,7 @@ public sealed class NodeOperationsTests : IAsyncLifetime
         );
         await owner.CloseAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
         Assert.Equal(ZooKeeperCloseStatus.Acknowledged, owner.Session.CloseStatus);
-        await Client.SyncAsync(_root, TestContext.Current.CancellationToken).ConfigureAwait(true);
+        await Client.SyncAsync(Root, TestContext.Current.CancellationToken).ConfigureAwait(true);
         Assert.Null(
             await Client
                 .ExistsAsync(path, TestContext.Current.CancellationToken)
@@ -700,7 +638,7 @@ public sealed class NodeOperationsTests : IAsyncLifetime
         await RejectedAsync(
                 () =>
                     Client.CreateAsync(
-                        _root + "/invalid",
+                        Root + "/invalid",
                         null,
                         invalid,
                         TestContext.Current.CancellationToken
@@ -710,11 +648,11 @@ public sealed class NodeOperationsTests : IAsyncLifetime
             .ConfigureAwait(true);
         Assert.Null(
             await Client
-                .ExistsAsync(_root + "/invalid", TestContext.Current.CancellationToken)
+                .ExistsAsync(Root + "/invalid", TestContext.Current.CancellationToken)
                 .ConfigureAwait(true)
         );
         CreateResult created = await Client
-            .CreateAsync(_root + "/valid", null, OwnerCreate, TestContext.Current.CancellationToken)
+            .CreateAsync(Root + "/valid", null, OwnerCreate, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         Assert.Equal(0, created.Stat.Version);
     }
@@ -727,20 +665,5 @@ public sealed class NodeOperationsTests : IAsyncLifetime
         Assert.Equal(code, error.KnownErrorCode);
         Assert.Equal(RequestOutcome.Rejected, error.Outcome);
         Assert.NotNull(error.Request.RequestId);
-    }
-
-    private async Task DeleteTreeAsync(string path, CancellationToken token)
-    {
-        try
-        {
-            ZNodeChildren children = await Client
-                .GetChildrenAsync(path, token)
-                .ConfigureAwait(false);
-            foreach (string child in children.Children)
-                await DeleteTreeAsync(path + "/" + child, token).ConfigureAwait(false);
-            await Client.DeleteAsync(path, ZNodeVersion.Any, token).ConfigureAwait(false);
-        }
-        catch (ZooKeeperException error) when (error.KnownErrorCode == ZooKeeperErrorCode.NoNode)
-        { }
     }
 }
