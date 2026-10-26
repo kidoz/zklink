@@ -311,7 +311,8 @@ internal sealed class SessionFixture : IAsyncDisposable
         int events = 64,
         string connection = "first:2181",
         IReadOnlyList<ZooKeeperAuthentication>? authentication = null,
-        int collections = 100_000
+        int collections = 100_000,
+        bool enableTtlNodes = false
     ) =>
         new()
         {
@@ -329,6 +330,7 @@ internal sealed class SessionFixture : IAsyncDisposable
             MaxPendingRequestBytes = bytes,
             MaxBufferedEvents = events,
             MaxCollectionElements = collections,
+            EnableTtlNodes = enableTtlNodes,
         };
 
     public async ValueTask DisposeAsync()

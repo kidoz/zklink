@@ -35,7 +35,7 @@ public sealed class ProtocolValidationTests
     [Trait("Acceptance", "T04")]
     public void ErrorCodesRemainRawAndRepliesMustMatchTheExpectedXid()
     {
-        var request = new ReadRequest(4, "/node", false);
+        var request = new ReadRequest(ZooKeeperOperation.GetData, "/node", false);
         var error = ProtocolFixtures.Bytes("get-data-error");
         BinaryPrimitives.WriteInt32BigEndian(error.AsSpan(12), -999);
         var reply = ReplyCodec.Decode(error, 1, request, ProtocolFixtures.Limits);
@@ -45,7 +45,12 @@ public sealed class ProtocolValidationTests
             ReplyCodec.Decode(error, 2, request, ProtocolFixtures.Limits)
         );
         Assert.Throws<InvalidDataException>(() =>
-            ReplyCodec.Decode(error, 1, new EmptyRequest(999), ProtocolFixtures.Limits)
+            ReplyCodec.Decode(
+                error,
+                1,
+                new EmptyRequest((ZooKeeperOperation)999),
+                ProtocolFixtures.Limits
+            )
         );
         foreach (var control in ProtocolFixtures.All.Where(f => f.Xid < 0))
         {
@@ -91,7 +96,12 @@ public sealed class ProtocolValidationTests
         var bytes = ProtocolFixtures.Bytes("get-children-reply");
         BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(16), count);
         Assert.Throws<InvalidDataException>(() =>
-            ReplyCodec.Decode(bytes, 1, new ReadRequest(8, "/node", false), ProtocolFixtures.Limits)
+            ReplyCodec.Decode(
+                bytes,
+                1,
+                new ReadRequest(ZooKeeperOperation.GetChildrenNames, "/node", false),
+                ProtocolFixtures.Limits
+            )
         );
     }
 
@@ -151,15 +161,31 @@ public sealed class ProtocolValidationTests
         [
             new MultiRequest(false, [ProtocolFixtures.Writes[0], ProtocolFixtures.Reads[0]]),
             new MultiRequest(true, [ProtocolFixtures.Reads[0], ProtocolFixtures.Writes[0]]),
-            new MultiRequest(true, [new ReadRequest(4, "/node", true)]),
+            new MultiRequest(true, [new ReadRequest(ZooKeeperOperation.GetData, "/node", true)]),
             new MultiRequest(false, [new MultiRequest(false, [])]),
-            new MultiRequest(true, [new ReadRequest(12, "/node", false)]),
-            new CreateRequest(19, "/node", null, ProtocolFixtures.Acl, 0),
-            new CreateRequest(21, "/node", null, ProtocolFixtures.Acl, 5, 0),
-            new EmptyRequest(20),
-            new EmptyRequest(16),
-            new EmptyRequest(102),
-            new EmptyRequest(999),
+            new MultiRequest(
+                true,
+                [new ReadRequest(ZooKeeperOperation.GetChildren, "/node", false)]
+            ),
+            new CreateRequest(
+                ZooKeeperOperation.CreateContainer,
+                "/node",
+                null,
+                ProtocolFixtures.Acl,
+                0
+            ),
+            new CreateRequest(
+                ZooKeeperOperation.CreateTtl,
+                "/node",
+                null,
+                ProtocolFixtures.Acl,
+                5,
+                0
+            ),
+            new EmptyRequest((ZooKeeperOperation)20),
+            new EmptyRequest((ZooKeeperOperation)16),
+            new EmptyRequest((ZooKeeperOperation)102),
+            new EmptyRequest((ZooKeeperOperation)999),
         ];
         var storage = new byte[1024];
         Array.Fill(storage, (byte)0x5a);
@@ -200,7 +226,7 @@ public sealed class ProtocolValidationTests
         var paths = new ChrootPath("/long-namespace");
         Assert.Throws<InvalidDataException>(() =>
             NamespaceTranslator.ToServer(
-                new ReadRequest(4, "/node", false),
+                new ReadRequest(ZooKeeperOperation.GetData, "/node", false),
                 paths,
                 new ProtocolLimits(maxFrameBytes: 20)
             )
@@ -270,7 +296,7 @@ public sealed class ProtocolValidationTests
     [Fact]
     public void ChrootBudgetUsesUtf8BytesRatherThanCharacterCount()
     {
-        var request = new ReadRequest(4, "/node", false);
+        var request = new ReadRequest(ZooKeeperOperation.GetData, "/node", false);
         var paths = new ChrootPath("/Ж");
         Assert.Throws<InvalidDataException>(() =>
             NamespaceTranslator.ToServer(request, paths, new ProtocolLimits(maxFrameBytes: 20))
@@ -294,7 +320,7 @@ public sealed class ProtocolValidationTests
         var payload = storage[..writer.WrittenCount];
         WireRequest request =
             opcode == 8
-                ? new ReadRequest(8, "/node", false)
+                ? new ReadRequest(ZooKeeperOperation.GetChildrenNames, "/node", false)
                 : new PathRequest(ZooKeeperOperation.GetEphemerals, "/node");
         Assert.Throws<InvalidDataException>(() =>
             ReplyCodec.Decode(payload, 1, request, ProtocolFixtures.Limits)

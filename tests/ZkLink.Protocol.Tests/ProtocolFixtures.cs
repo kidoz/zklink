@@ -18,18 +18,18 @@ internal static class ProtocolFixtures
     internal static readonly string[] Children = ["a", "Ж"];
     internal static readonly WireRequest[] Writes =
     [
-        new CreateRequest(1, "/node", Data, Acl, 0),
-        new CreateRequest(15, "/node", Data, Acl, 0),
-        new CreateRequest(19, "/node", Data, Acl, 4),
-        new CreateRequest(21, "/node", Data, Acl, 5, 1234),
+        new CreateRequest(ZooKeeperOperation.Create, "/node", Data, Acl, 0),
+        new CreateRequest(ZooKeeperOperation.CreateWithStat, "/node", Data, Acl, 0),
+        new CreateRequest(ZooKeeperOperation.CreateContainer, "/node", Data, Acl, 4),
+        new CreateRequest(ZooKeeperOperation.CreateTtl, "/node", Data, Acl, 5, 1234),
         new SetDataRequest("/node", Data, -1),
-        new VersionRequest(2, "/node", -1),
-        new VersionRequest(13, "/node", -1),
+        new VersionRequest(ZooKeeperOperation.Delete, "/node", -1),
+        new VersionRequest(ZooKeeperOperation.Check, "/node", -1),
     ];
     internal static readonly WireRequest[] Reads =
     [
-        new ReadRequest(4, "/node", false),
-        new ReadRequest(8, "/node", false),
+        new ReadRequest(ZooKeeperOperation.GetData, "/node", false),
+        new ReadRequest(ZooKeeperOperation.GetChildrenNames, "/node", false),
     ];
 
     internal static readonly ProtocolFixture[] All = Build();
@@ -45,8 +45,18 @@ internal static class ProtocolFixtures
     private static ProtocolFixture[] Build() =>
         [
             new("create", 1, Writes[0], new PathResult("/node")),
-            new("delete", 1, new VersionRequest(2, "/node", -1), new EmptyResult()),
-            new("exists", 1, new ReadRequest(3, "/node", true), new StatResult(Stat)),
+            new(
+                "delete",
+                1,
+                new VersionRequest(ZooKeeperOperation.Delete, "/node", -1),
+                new EmptyResult()
+            ),
+            new(
+                "exists",
+                1,
+                new ReadRequest(ZooKeeperOperation.Exists, "/node", true),
+                new StatResult(Stat)
+            ),
             new("get-data", 1, Reads[0], new DataResult(Data, Stat)),
             new("get-null-data", 1, Reads[0], new DataResult(null, Stat)),
             new("get-empty-data", 1, Reads[0], new DataResult([], Stat)),
@@ -70,47 +80,69 @@ internal static class ProtocolFixtures
                 new PathRequest(ZooKeeperOperation.Sync, "/node"),
                 new PathResult("/node")
             ),
-            new("ping", -2, new EmptyRequest(11), new EmptyResult()),
+            new("ping", -2, new PingRequest(), new EmptyResult()),
             new(
                 "get-children-stat",
                 1,
-                new ReadRequest(12, "/node", true),
+                new ReadRequest(ZooKeeperOperation.GetChildren, "/node", true),
                 new StringsResult(Children, Stat)
             ),
-            new("check", 1, new VersionRequest(13, "/node", -1), new EmptyResult()),
+            new(
+                "check",
+                1,
+                new VersionRequest(ZooKeeperOperation.Check, "/node", -1),
+                new EmptyResult()
+            ),
             new("create-stat", 1, Writes[1], new PathResult("/node", Stat)),
             new(
                 "create-ephemeral",
                 1,
-                new CreateRequest(15, "/node", Data, Acl, 1),
+                new CreateRequest(ZooKeeperOperation.CreateWithStat, "/node", Data, Acl, 1),
                 new PathResult("/node", Stat)
             ),
             new(
                 "create-sequential",
                 1,
-                new CreateRequest(15, "/node", Data, Acl, 2),
+                new CreateRequest(ZooKeeperOperation.CreateWithStat, "/node", Data, Acl, 2),
                 new PathResult("/node0000000001", Stat)
             ),
             new(
                 "create-ephemeral-sequential",
                 1,
-                new CreateRequest(15, "/node", Data, Acl, 3),
+                new CreateRequest(ZooKeeperOperation.CreateWithStat, "/node", Data, Acl, 3),
                 new PathResult("/node0000000001", Stat)
             ),
             new(
                 "create-sequential-prefix",
                 1,
-                new CreateRequest(15, "/node/", Data, Acl, 2),
+                new CreateRequest(ZooKeeperOperation.CreateWithStat, "/node/", Data, Acl, 2),
                 new PathResult("/node/0000000001", Stat)
             ),
-            new("check-watches", 1, new WatchRequest(17, "/node", 3), new EmptyResult()),
-            new("remove-watches", 1, new WatchRequest(18, "/node", 4), new EmptyResult()),
+            new(
+                "check-watches",
+                1,
+                new WatchRequest(ZooKeeperOperation.CheckWatches, "/node", 3),
+                new EmptyResult()
+            ),
+            new(
+                "remove-watches",
+                1,
+                new WatchRequest(ZooKeeperOperation.RemoveWatches, "/node", 4),
+                new EmptyResult()
+            ),
             new("create-container", 1, Writes[2], new PathResult("/node", Stat)),
             new("create-ttl", 1, Writes[3], new PathResult("/node", Stat)),
             new(
                 "create-ttl-sequential",
                 1,
-                new CreateRequest(21, "/node", Data, Acl, 6, CreateOptions.MaxTtlMilliseconds),
+                new CreateRequest(
+                    ZooKeeperOperation.CreateTtl,
+                    "/node",
+                    Data,
+                    Acl,
+                    6,
+                    CreateOptions.MaxTtlMilliseconds
+                ),
                 new PathResult("/node0000000001", Stat)
             ),
             new("auth", -4, new AuthRequest("digest", Data), new EmptyResult()),
@@ -145,14 +177,19 @@ internal static class ProtocolFixtures
                 ),
                 new EmptyResult()
             ),
-            new("add-watch", 1, new WatchRequest(106, "/node", 1), new EmptyResult()),
+            new(
+                "add-watch",
+                1,
+                new WatchRequest(ZooKeeperOperation.AddWatch, "/node", 1),
+                new EmptyResult()
+            ),
             new(
                 "who-am-i",
                 1,
-                new EmptyRequest(107),
+                new EmptyRequest(ZooKeeperOperation.WhoAmI),
                 new IdentityResult([new ZooKeeperClientIdentity("digest", "fixture-user")])
             ),
-            new("close", 1, new EmptyRequest(-11), new EmptyResult()),
+            new("close", 1, new EmptyRequest(ZooKeeperOperation.CloseSession), new EmptyResult()),
             new(
                 "multi-write",
                 1,

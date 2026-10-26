@@ -307,13 +307,15 @@ public sealed class MultiApiTests : IAsyncLifetime
         Assert.Throws<ArgumentException>(() =>
             ZooKeeperWriteOperation.Check("relative", ZNodeVersion.Any)
         );
-        Assert.Throws<NotSupportedException>(() =>
-            ZooKeeperWriteOperation.Create(
-                "/ttl",
-                null,
-                new CreateOptions(Create.Acl, CreateMode.PersistentWithTtl, TimeSpan.FromSeconds(1))
-            )
+        var ttl = ZooKeeperWriteOperation.Create(
+            "/ttl",
+            null,
+            new CreateOptions(Create.Acl, CreateMode.PersistentWithTtl, TimeSpan.FromSeconds(1))
         );
+        Assert.Throws<NotSupportedException>(() =>
+        {
+            _ = Client.MultiAsync([ttl], TestContext.Current.CancellationToken);
+        });
         byte[] oversized = new byte[1_000_001];
         Assert.Throws<InvalidDataException>(() =>
         {
