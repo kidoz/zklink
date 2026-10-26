@@ -18,6 +18,7 @@ internal sealed class LiveZooKeeperFixture : IAsyncLifetime
     internal ZooKeeperClient Client => _client!;
     internal string ConnectionString => _connection;
     internal string User => _user;
+    internal ZooKeeperCompatibilityProfile CompatibilityProfile { get; private set; }
 
     public async ValueTask InitializeAsync()
     {
@@ -31,6 +32,10 @@ internal sealed class LiveZooKeeperFixture : IAsyncLifetime
             throw new InvalidOperationException(
                 "The live runner must verify and supply a pinned server version."
             );
+        CompatibilityProfile =
+            version == "3.9.6"
+                ? ZooKeeperCompatibilityProfile.ZooKeeper39
+                : ZooKeeperCompatibilityProfile.ZooKeeper38;
         _client = await ConnectAsync().ConfigureAwait(false);
         await Client
             .CreateAsync(Root, null, OwnerCreate, TestContext.Current.CancellationToken)
@@ -69,6 +74,7 @@ internal sealed class LiveZooKeeperFixture : IAsyncLifetime
             Tls = ZooKeeperTlsOptions.Disabled(),
             AllowUnsafePlaintextDigest = true,
             EnableTtlNodes = enableTtlNodes,
+            CompatibilityProfile = CompatibilityProfile,
             Authentication = authenticated ? [credentials] : [],
             InitialConnectTimeout = TimeSpan.FromSeconds(5),
             ConnectAttemptTimeout = TimeSpan.FromSeconds(2),
