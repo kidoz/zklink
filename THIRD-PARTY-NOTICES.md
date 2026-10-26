@@ -1,6 +1,6 @@
 # Third-party dependency inventory
 
-Snapshot: 2026-10-25. The core library has **no third-party runtime dependencies**. No source from another driver was copied. Project license selection and package publication remain pending; this inventory does not relicense upstream material.
+Snapshot: 2026-10-26. The core library has **no third-party runtime dependencies**. No source from another driver was copied. The project is [MIT-licensed](LICENSE); package publication remains pending, and this inventory does not relicense upstream material.
 
 The resolved dependency graphs and integrity hashes are in the project `packages.lock.json` files. License expressions below were read from the restored NuGet package manifests. NuGet packages retain their upstream license/notice files in the package cache; they are not redistributed by this source change.
 

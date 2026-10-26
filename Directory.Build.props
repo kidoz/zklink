@@ -12,5 +12,8 @@
     <NuGetAudit>true</NuGetAudit>
     <NuGetAuditMode>all</NuGetAuditMode>
     <IsPackable>false</IsPackable>
+    <Authors>Aleksandr Pavlov</Authors>
+    <Copyright>Copyright (c) 2026 Aleksandr Pavlov</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 </Project>

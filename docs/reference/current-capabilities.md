@@ -7,7 +7,7 @@ and TTL creation, auxiliary APIs and watch delivery remain unavailable.
 
 | Area | Available now | Remaining scope |
 | --- | --- | --- |
-| Build | .NET 10, C# 14, deterministic builds, locked dependencies, warnings as errors | Release package metadata, license selection, package qualification |
+| Build | .NET 10, C# 14, deterministic builds, locked dependencies, warnings as errors, MIT license | Release package metadata and package qualification |
 | Protocol | Internal codecs for all 27 implemented opcodes, handshake/multi/framing, path/chroot translation and Gradle-managed Java fixtures | Auxiliary APIs and remaining live qualification |
 | Public types | Immutable snapshots, endpoints, create options, ACLs, versions, request failures, watch-removal results; contract tests | Active-watch contracts and remaining auxiliary APIs |
 | Sessions and operations | Connect/authenticate/sync, snapshots/subscriptions, heartbeat, same-session recovery, cancellation, close, node/ACL methods and typed transactions | TTL creation, auxiliary APIs, watches and broader live recovery under faults |

@@ -15,6 +15,8 @@ remain unavailable. See
 
 ### Added
 
+- Root MIT `LICENSE` and central package author, copyright and license metadata.
+
 - Typed `MultiAsync` atomic writes and `MultiReadAsync` read batches, with closed
   operation/result types, ordered owned results and whole-batch input capture.
 - Complete rejected-transaction diagnostics with the actual request ID, failing
