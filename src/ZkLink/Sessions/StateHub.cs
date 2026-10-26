@@ -2,11 +2,10 @@ using System.Threading.Channels;
 
 namespace ZkLink.Sessions;
 
-internal sealed class StateHub(object gate, int budget, ZooKeeperSessionSnapshot initial)
+internal sealed class StateHub(object gate, EventBudget budget, ZooKeeperSessionSnapshot initial)
 {
     private readonly HashSet<ZooKeeperStateSubscription> _subscriptions = [];
     private ZooKeeperSessionSnapshot _current = initial;
-    private int _buffered;
     private bool _completed;
     private Exception? _completionError;
     internal ZooKeeperSessionSnapshot Current => Volatile.Read(ref _current);
@@ -16,14 +15,13 @@ internal sealed class StateHub(object gate, int budget, ZooKeeperSessionSnapshot
     {
         lock (gate)
         {
-            if (_subscriptions.Count >= budget || _buffered >= budget)
+            if (_subscriptions.Count >= budget.Limit || !budget.Reserve(1))
             {
                 return null;
             }
-            var subscription = new ZooKeeperStateSubscription(this, budget);
+            var subscription = new ZooKeeperStateSubscription(this, budget.Limit);
             _subscriptions.Add(subscription);
             subscription.Queue.Writer.TryWrite(_current);
-            _buffered++;
             if (_completed)
             {
                 subscription.Queue.Writer.TryComplete(_completionError);
@@ -36,7 +34,7 @@ internal sealed class StateHub(object gate, int budget, ZooKeeperSessionSnapshot
     {
         lock (gate)
         {
-            if (notify && !_completed && _subscriptions.Count > budget - _buffered)
+            if (notify && !_completed && !budget.Reserve(_subscriptions.Count))
             {
                 return false;
             }
@@ -49,7 +47,6 @@ internal sealed class StateHub(object gate, int budget, ZooKeeperSessionSnapshot
                     {
                         throw new InvalidOperationException("State budget invariant violated.");
                     }
-                    _buffered++;
                 }
             }
             return true;
@@ -79,7 +76,7 @@ internal sealed class StateHub(object gate, int budget, ZooKeeperSessionSnapshot
         {
             if (subscription.Queue.Reader.TryRead(out value))
             {
-                _buffered--;
+                budget.Release(1);
                 return true;
             }
             return false;
@@ -96,7 +93,7 @@ internal sealed class StateHub(object gate, int budget, ZooKeeperSessionSnapshot
             }
             while (subscription.Queue.Reader.TryRead(out _))
             {
-                _buffered--;
+                budget.Release(1);
             }
             subscription.Queue.Writer.TryComplete();
         }

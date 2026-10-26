@@ -53,6 +53,9 @@ ZkLink.WatchRemovalStatus.LocalOnly = 0 -> ZkLink.WatchRemovalStatus
 ZkLink.WatchRemovalStatus.NoWatcher = 2 -> ZkLink.WatchRemovalStatus
 ZkLink.WatchRemovalStatus.ServerConfirmed = 1 -> ZkLink.WatchRemovalStatus
 ZkLink.WatchRemovalStatus.SharedRegistrationRetained = 3 -> ZkLink.WatchRemovalStatus
+ZkLink.WatchedResult<T>
+ZkLink.WatchedResult<T>.Value.get -> T
+ZkLink.WatchedResult<T>.Watch.get -> ZkLink.ZooKeeperWatch!
 ZkLink.ZNodeAcl
 ZkLink.ZNodeAcl.Acl.get -> System.Collections.Generic.IReadOnlyList<ZkLink.ZooKeeperAcl!>!
 ZkLink.ZNodeAcl.Stat.get -> ZkLink.ZNodeStat
@@ -113,10 +116,13 @@ ZkLink.ZooKeeperClient.CloseAsync(System.Threading.CancellationToken cancellatio
 ZkLink.ZooKeeperClient.CreateAsync(string! path, System.ReadOnlyMemory<byte>? data, ZkLink.CreateOptions! options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<ZkLink.CreateResult!>!
 ZkLink.ZooKeeperClient.DeleteAsync(string! path, ZkLink.ZNodeVersion version, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 ZkLink.ZooKeeperClient.DisposeAsync() -> System.Threading.Tasks.ValueTask
+ZkLink.ZooKeeperClient.ExistsAndWatchAsync(string! path, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<ZkLink.WatchedResult<ZkLink.ZNodeStat?>!>!
 ZkLink.ZooKeeperClient.ExistsAsync(string! path, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<ZkLink.ZNodeStat?>!
 ZkLink.ZooKeeperClient.GetAclAsync(string! path, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<ZkLink.ZNodeAcl!>!
 ZkLink.ZooKeeperClient.GetAllChildrenNumberAsync(string! path, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
+ZkLink.ZooKeeperClient.GetChildrenAndWatchAsync(string! path, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<ZkLink.WatchedResult<ZkLink.ZNodeChildren!>!>!
 ZkLink.ZooKeeperClient.GetChildrenAsync(string! path, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<ZkLink.ZNodeChildren!>!
+ZkLink.ZooKeeperClient.GetDataAndWatchAsync(string! path, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<ZkLink.WatchedResult<ZkLink.ZNodeData!>!>!
 ZkLink.ZooKeeperClient.GetDataAsync(string! path, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<ZkLink.ZNodeData!>!
 ZkLink.ZooKeeperClient.GetEphemeralsAsync(string! prefixPath, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string!>!>!
 ZkLink.ZooKeeperClient.MultiAsync(System.Collections.Generic.IReadOnlyList<ZkLink.ZooKeeperWriteOperation!>! operations, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<ZkLink.ZooKeeperWriteResult!>!>!
@@ -166,6 +172,8 @@ ZkLink.ZooKeeperClientOptions.MaxPendingRequestBytes.get -> int
 ZkLink.ZooKeeperClientOptions.MaxPendingRequestBytes.init -> void
 ZkLink.ZooKeeperClientOptions.MaxQueuedRequests.get -> int
 ZkLink.ZooKeeperClientOptions.MaxQueuedRequests.init -> void
+ZkLink.ZooKeeperClientOptions.MaxWatches.get -> int
+ZkLink.ZooKeeperClientOptions.MaxWatches.init -> void
 ZkLink.ZooKeeperClientOptions.OperationTimeout.get -> System.TimeSpan
 ZkLink.ZooKeeperClientOptions.OperationTimeout.init -> void
 ZkLink.ZooKeeperClientOptions.SessionTimeout.get -> System.TimeSpan
@@ -347,6 +355,30 @@ ZkLink.ZooKeeperTlsOptions.Enabled.get -> bool
 ZkLink.ZooKeeperTlsOptions.RevocationMode.get -> System.Security.Cryptography.X509Certificates.X509RevocationMode
 ZkLink.ZooKeeperTlsOptions.ServerName.get -> string?
 ZkLink.ZooKeeperTlsOptions.TrustRoots.get -> System.Collections.Generic.IReadOnlyList<System.Security.Cryptography.X509Certificates.X509Certificate2!>!
+ZkLink.ZooKeeperWatch
+ZkLink.ZooKeeperWatch.DisposeAsync() -> System.Threading.Tasks.ValueTask
+ZkLink.ZooKeeperWatch.Mode.get -> ZkLink.ZooKeeperWatchMode
+ZkLink.ZooKeeperWatch.Path.get -> string!
+ZkLink.ZooKeeperWatch.ReadEventsAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<ZkLink.ZooKeeperWatchEvent!>!
+ZkLink.ZooKeeperWatch.RegistrationId.get -> long
+ZkLink.ZooKeeperWatch.RemoveAsync(ZkLink.WatchRemovalMode mode, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<ZkLink.ZooKeeperWatchRemovalResult!>!
+ZkLink.ZooKeeperWatchEvent
+ZkLink.ZooKeeperWatchEvent.Kind.get -> ZkLink.ZooKeeperWatchEventKind
+ZkLink.ZooKeeperWatchEventKind.None = 0 -> ZkLink.ZooKeeperWatchEventKind
+ZkLink.ZooKeeperWatchEvent.Path.get -> string!
+ZkLink.ZooKeeperWatchEvent.RegistrationId.get -> long
+ZkLink.ZooKeeperWatchEvent.Zxid.get -> long?
+ZkLink.ZooKeeperWatchEventKind
+ZkLink.ZooKeeperWatchEventKind.ChildWatchRemoved = 6 -> ZkLink.ZooKeeperWatchEventKind
+ZkLink.ZooKeeperWatchEventKind.DataWatchRemoved = 5 -> ZkLink.ZooKeeperWatchEventKind
+ZkLink.ZooKeeperWatchEventKind.NodeChildrenChanged = 4 -> ZkLink.ZooKeeperWatchEventKind
+ZkLink.ZooKeeperWatchEventKind.NodeCreated = 1 -> ZkLink.ZooKeeperWatchEventKind
+ZkLink.ZooKeeperWatchEventKind.NodeDataChanged = 3 -> ZkLink.ZooKeeperWatchEventKind
+ZkLink.ZooKeeperWatchEventKind.NodeDeleted = 2 -> ZkLink.ZooKeeperWatchEventKind
+ZkLink.ZooKeeperWatchMode
+ZkLink.ZooKeeperWatchMode.OneShotChildren = 2 -> ZkLink.ZooKeeperWatchMode
+ZkLink.ZooKeeperWatchMode.OneShotData = 1 -> ZkLink.ZooKeeperWatchMode
+ZkLink.ZooKeeperWatchMode.OneShotExists = 0 -> ZkLink.ZooKeeperWatchMode
 ZkLink.ZooKeeperWatchRemovalResult
 ZkLink.ZooKeeperWatchRemovalResult.RegistrationId.get -> long
 ZkLink.ZooKeeperWatchRemovalResult.Status.get -> ZkLink.WatchRemovalStatus

@@ -49,6 +49,7 @@ internal sealed class ClientOptionsSnapshot : IDisposable
         ValidateCount(options.MaxInFlightRequests, 65536);
         ValidateCount(options.MaxQueuedRequests, 1_000_000);
         ValidateCount(options.MaxBufferedEvents, 1_000_000);
+        ValidateCount(options.MaxWatches, 1_000_000);
         ArgumentOutOfRangeException.ThrowIfLessThan(options.MaxPendingRequestBytes, 8);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(options.MaxPendingRequestBytes, 1 << 30);
         _ = new ProtocolLimits(
@@ -143,6 +144,7 @@ internal sealed class ClientOptionsSnapshot : IDisposable
                 MaxDataBytes = options.MaxDataBytes,
                 MaxCollectionElements = options.MaxCollectionElements,
                 MaxBufferedEvents = options.MaxBufferedEvents,
+                MaxWatches = options.MaxWatches,
             };
             var result = new ClientOptionsSnapshot(settings, parsed, copies.ToArray());
             certificate = null;

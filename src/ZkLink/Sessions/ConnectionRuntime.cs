@@ -174,6 +174,7 @@ internal sealed class ConnectionRuntime(
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                owner.PrepareWatchCleanup(Generation);
                 (var pending, var ping) = scheduler.Take(Generation);
                 if (pending is null && !ping)
                 {

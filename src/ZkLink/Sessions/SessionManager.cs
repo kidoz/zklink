@@ -4,10 +4,11 @@ using ZkLink.Configuration;
 using ZkLink.Protocol;
 using ZkLink.Requests;
 using ZkLink.Transport;
+using ZkLink.Watches;
 
 namespace ZkLink.Sessions;
 
-internal sealed class SessionManager : IAsyncDisposable
+internal sealed partial class SessionManager : IAsyncDisposable
 {
     private readonly object _gate = new();
     private readonly ClientOptionsSnapshot _options;
@@ -16,6 +17,7 @@ internal sealed class SessionManager : IAsyncDisposable
     private readonly SessionRandom _random;
     private readonly EndpointProvider _endpoints;
     private readonly StateHub _states;
+    private readonly WatchManager _watches;
     private readonly AsyncPulse _work = new();
     private readonly CancellationTokenSource _stop = new();
     private readonly TaskCompletionSource _initialReady = NewSignal();
@@ -51,11 +53,9 @@ internal sealed class SessionManager : IAsyncDisposable
         this._connector = connector;
         this._random = random;
         _endpoints = new EndpointProvider(_options.Endpoints, _random);
-        _states = new StateHub(
-            _gate,
-            _options.Settings.MaxBufferedEvents,
-            BuildSnapshot(ZooKeeperSessionState.Connecting)
-        );
+        var events = new EventBudget(_options.Settings.MaxBufferedEvents);
+        _watches = new WatchManager(_gate, _options, events, this);
+        _states = new StateHub(_gate, events, BuildSnapshot(ZooKeeperSessionState.Connecting));
         Scheduler = new RequestScheduler(_gate, _options, _time, _work);
     }
 
@@ -361,7 +361,7 @@ internal sealed class SessionManager : IAsyncDisposable
                             _connectionReady = NewSignal();
                         }
                     }
-                    Scheduler.Detach();
+                    DetachRequests();
                 }
                 if (last)
                 {
@@ -394,7 +394,8 @@ internal sealed class SessionManager : IAsyncDisposable
             lock (_gate)
             {
                 Scheduler.StopAdmission();
-                Scheduler.Detach();
+                DetachRequests();
+                _watches.Finish(_terminalCause);
                 if (!_closing && !IsTerminal(Session.State))
                 {
                     _closeStatus = ZooKeeperCloseStatus.Unacknowledged;
@@ -579,6 +580,7 @@ internal sealed class SessionManager : IAsyncDisposable
         {
             PublishState(ZooKeeperSessionState.Restoring);
         }
+        await RestoreWatchesAsync(transport, authentication.Token).ConfigureAwait(false);
     }
 
     internal void Inbound(long value, ReplyHeader? reply)
@@ -653,7 +655,7 @@ internal sealed class SessionManager : IAsyncDisposable
                 }
                 result = new(RuntimeStop.Disconnected, errorCode);
             }
-            if (pending.Control && errorCode == 0)
+            if (pending.Info.Operation == ZooKeeperOperation.CloseSession && errorCode == 0)
             {
                 _closeAcknowledged = true;
                 _closeStatus = ZooKeeperCloseStatus.Acknowledged;
@@ -666,7 +668,7 @@ internal sealed class SessionManager : IAsyncDisposable
                 { Kind: RuntimeStop.Expired or RuntimeStop.AuthFailed or RuntimeStop.Disconnected }
             )
             {
-                Scheduler.Detach();
+                DetachRequests();
             }
             return result;
         }
@@ -680,9 +682,19 @@ internal sealed class SessionManager : IAsyncDisposable
             {
                 return new(RuntimeStop.Stopped);
             }
-            if (!notification.IsRecognized || notification.Type != -1)
-            {
+            if (!notification.IsRecognized)
                 return new(RuntimeStop.Protocol);
+            if (notification.Type != WatchProtocol.SessionEvent)
+            {
+                if (notification.State != WatchProtocol.ServerConnected)
+                    return new(RuntimeStop.Protocol);
+                Inbound(value, null);
+                if (!_watches.Dispatch(notification))
+                {
+                    FaultOverflow();
+                    return new(RuntimeStop.Protocol);
+                }
+                return null;
             }
             Inbound(value, null);
             return notification.State switch
@@ -736,7 +748,7 @@ internal sealed class SessionManager : IAsyncDisposable
                 {
                     _connectionReady = NewSignal();
                 }
-                Scheduler.Detach();
+                DetachRequests();
             }
         }
     }
@@ -750,6 +762,7 @@ internal sealed class SessionManager : IAsyncDisposable
                 return _closeTask;
             }
             _closing = true;
+            _watches.Finish(null);
             Scheduler.StopAdmission();
             if (!IsTerminal(Session.State))
             {
@@ -893,10 +906,11 @@ internal sealed class SessionManager : IAsyncDisposable
     private void FaultOverflow(bool detach = true)
     {
         _terminalCause = new ZooKeeperEventOverflowException();
+        _watches.Finish(_terminalCause);
         Scheduler.StopAdmission();
         if (detach)
         {
-            Scheduler.Detach();
+            DetachRequests();
         }
         _states.Finish(BuildSnapshot(ZooKeeperSessionState.Faulted), _terminalCause);
         _cancelCompletion = _stop.CancelAsync();
@@ -906,11 +920,12 @@ internal sealed class SessionManager : IAsyncDisposable
 
     private void PublishTerminal(ZooKeeperSessionState state, bool detach = true)
     {
+        _watches.Finish(_terminalCause ?? new ZooKeeperSessionException(state, _terminalCode));
         Scheduler.StopAdmission();
         PublishState(state, detach);
         if (detach)
         {
-            Scheduler.Detach();
+            DetachRequests();
         }
         _states.Finish(Session, _terminalCause);
         _connectionReady.TrySetException(

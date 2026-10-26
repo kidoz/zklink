@@ -43,6 +43,7 @@ internal sealed class PendingRequest
     internal LinkedListNode<PendingRequest>? Node;
     internal byte[]? Packet;
     internal WireRequest? Shape;
+    internal IRequestObserver? Observer;
     internal bool Preparing = true;
     internal bool Prepared;
     internal bool Sent;
@@ -74,7 +75,10 @@ internal sealed class RequestScheduler(
     private bool _pingQueued;
     private bool _pingSent;
     private PendingRequest? _close;
+    private PendingRequest? _maintenance;
     private TaskCompletionSource _preparersDrained = CompletedSignal();
+
+    internal bool MaintenanceAvailable => _maintenance is null;
 
     internal int OwnedBytes
     {
@@ -92,7 +96,7 @@ internal sealed class RequestScheduler(
         {
             lock (gate)
             {
-                return _queued.Count + _sent.Count;
+                return _queued.Count + _sent.Count + (_maintenance is { Sent: false } ? 1 : 0);
             }
         }
     }
@@ -160,7 +164,10 @@ internal sealed class RequestScheduler(
     internal Task<WireReply> Submit(
         WireRequest request,
         ZooKeeperRequestInfo info,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        IRequestObserver? observer = null,
+        bool watchOperation = false,
+        bool maintenance = false
     )
     {
         var started = timeProvider.GetTimestamp();
@@ -173,8 +180,8 @@ internal sealed class RequestScheduler(
             throw new ArgumentException("Request metadata must match the opcode.", nameof(info));
         }
         if (
-            request is AuthRequest or RestoreRequest or WatchRequest
-            || request is ReadRequest { Watch: true }
+            request is AuthRequest or RestoreRequest
+            || (!watchOperation && request is WatchRequest or ReadRequest { Watch: true })
             || request.Opcode is 11 or -11
         )
         {
@@ -193,15 +200,32 @@ internal sealed class RequestScheduler(
                 );
             }
             if (
-                _queued.Count >= options.Settings.MaxQueuedRequests
-                || size > options.Settings.MaxPendingRequestBytes - _bytes
+                (
+                    maintenance
+                        ? _maintenance is not null
+                        : _queued.Count >= options.Settings.MaxQueuedRequests
+                            || size > options.Settings.MaxPendingRequestBytes - _bytes
+                )
             )
             {
                 return Task.FromException<WireReply>(new ZooKeeperBackpressureException(info));
             }
-            pending = new PendingRequest(info, size, _generation, started, cancellationToken);
-            pending.Node = _queued.AddLast(pending);
-            _bytes += size;
+            pending = new PendingRequest(
+                info,
+                maintenance ? 0 : size,
+                _generation,
+                started,
+                cancellationToken,
+                maintenance
+            )
+            {
+                Observer = observer,
+            };
+            if (maintenance)
+                _maintenance = pending;
+            else
+                pending.Node = _queued.AddLast(pending);
+            _bytes += pending.ReservedBytes;
             if (_preparing++ == 0)
             {
                 _preparersDrained = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -333,6 +357,7 @@ internal sealed class RequestScheduler(
                     pending.Outcome,
                     pending.Token
                 );
+            pending.Observer?.Canceled(pending);
             pending.Completion.TrySetException(error);
             pending.Cancellation.Unregister();
             pending.Timer?.Dispose();
@@ -439,6 +464,11 @@ internal sealed class RequestScheduler(
                 _pingSent = true;
                 return (null, true);
             }
+            if (
+                pending is null
+                && _maintenance is { Sent: false, Prepared: true, Completed: false }
+            )
+                pending = _maintenance;
             if (pending is null)
             {
                 if (
@@ -515,6 +545,10 @@ internal sealed class RequestScheduler(
             {
                 throw new InvalidDataException("Pending FIFO changed unexpectedly.");
             }
+            pending.Observer?.Replied(pending, reply);
+            pending.Observer = null;
+            if (ReferenceEquals(_maintenance, pending))
+                _maintenance = null;
             _sent.Dequeue();
             _xids.Remove(pending.Info.RequestId!.Value);
             if (!pending.Control)
@@ -581,7 +615,9 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
-            return _sent.TryPeek(out var pending) && !pending.Control
+            return
+                _sent.TryPeek(out var pending)
+                && pending.Info.Operation != ZooKeeperOperation.CloseSession
                 ? options.Settings.OperationTimeout
                     + sessionTimeout
                     - timeProvider.GetElapsedTime(pending.Started)
@@ -601,8 +637,15 @@ internal sealed class RequestScheduler(
             {
                 Finish(pending, new ZooKeeperException(pending.Info, RequestOutcome.NotSent));
             }
+            if (_maintenance is { Sent: false, Completed: false })
+                Finish(
+                    _maintenance,
+                    new ZooKeeperException(_maintenance.Info, RequestOutcome.NotSent)
+                );
             foreach (var pending in _sent)
             {
+                pending.Observer?.Abandoned(pending);
+                pending.Observer = null;
                 pending.Completed = true;
                 pending.Completion.TrySetException(
                     new ZooKeeperException(pending.Info, RequestOutcome.Unknown)
@@ -615,6 +658,7 @@ internal sealed class RequestScheduler(
             {
                 Finish(_close, new ZooKeeperException(_close.Info, RequestOutcome.NotSent));
             }
+            _maintenance = null;
             _sent.Clear();
             _xids.Clear();
             _inFlight = 0;
@@ -624,6 +668,8 @@ internal sealed class RequestScheduler(
 
     private void Finish(PendingRequest pending, Exception error)
     {
+        pending.Observer?.Abandoned(pending);
+        pending.Observer = null;
         RemoveQueued(pending);
         pending.Completed = true;
         pending.Completion.TrySetException(error);
@@ -634,6 +680,8 @@ internal sealed class RequestScheduler(
 
     private void RemoveQueued(PendingRequest pending)
     {
+        if (!pending.Sent && ReferenceEquals(_maintenance, pending))
+            _maintenance = null;
         if (pending.Node is { List: not null })
         {
             _queued.Remove(pending.Node);

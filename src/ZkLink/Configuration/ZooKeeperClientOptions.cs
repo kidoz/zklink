@@ -32,7 +32,7 @@ public sealed class ZooKeeperClientOptions
     /// <summary>Gets the total deadline for initial connection across all endpoints.</summary>
     public TimeSpan InitialConnectTimeout { get; init; } = TimeSpan.FromSeconds(30);
 
-    /// <summary>Gets the maximum DNS/TCP/TLS/handshake/authentication time for one endpoint attempt.</summary>
+    /// <summary>Gets the maximum DNS/TCP/TLS/handshake/authentication/restoration time for one endpoint attempt.</summary>
     public TimeSpan ConnectAttemptTimeout { get; init; } = TimeSpan.FromSeconds(5);
 
     /// <summary>Gets the application request deadline, including admission delay.</summary>
@@ -59,6 +59,9 @@ public sealed class ZooKeeperClientOptions
     /// <summary>Gets the maximum collection element count, additionally constrained by frame size.</summary>
     public int MaxCollectionElements { get; init; } = 100_000;
 
-    /// <summary>Gets the global buffered state-event budget and maximum state-subscription count.</summary>
+    /// <summary>Gets the bound for owned watch handles and cleanup metadata, including pending reads and unread completed streams.</summary>
+    public int MaxWatches { get; init; } = 10_000;
+
+    /// <summary>Gets the global buffered state/watch-event budget and maximum state-subscription count.</summary>
     public int MaxBufferedEvents { get; init; } = 4096;
 }
