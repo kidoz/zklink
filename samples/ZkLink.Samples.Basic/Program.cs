@@ -1,16 +1,23 @@
 using ZkLink;
 
 if (
-    args.Length is < 1 or > 5
+    args.Length is < 1 or > 6
     || args.Skip(1)
         .Any(value =>
-            value is not ("--plaintext" or "--nodes" or "--transactions" or "--auxiliary")
+            value
+                is not (
+                    "--plaintext"
+                    or "--nodes"
+                    or "--transactions"
+                    or "--auxiliary"
+                    or "--watches"
+                )
         )
 )
 {
     await Console
         .Error.WriteLineAsync(
-            "Usage: ZkLink.Samples.Basic host:port[,host:port] [--plaintext] [--nodes] [--transactions] [--auxiliary]"
+            "Usage: ZkLink.Samples.Basic host:port[,host:port] [--plaintext] [--nodes] [--transactions] [--auxiliary] [--watches]"
         )
         .ConfigureAwait(false);
     return 2;
@@ -22,11 +29,15 @@ var password = Environment.GetEnvironmentVariable("ZKLINK_PASSWORD");
 var nodes = args.Contains("--nodes", StringComparer.Ordinal);
 var transactions = args.Contains("--transactions", StringComparer.Ordinal);
 var auxiliary = args.Contains("--auxiliary", StringComparer.Ordinal);
-if ((user is null) != (password is null) || ((nodes || transactions || auxiliary) && user is null))
+var watches = args.Contains("--watches", StringComparer.Ordinal);
+if (
+    (user is null) != (password is null)
+    || ((nodes || transactions || auxiliary || watches) && user is null)
+)
 {
     await Console
         .Error.WriteLineAsync(
-            "Set both ZKLINK_USER and ZKLINK_PASSWORD; --nodes, --transactions and --auxiliary require an authenticated creator ACL."
+            "Set both ZKLINK_USER and ZKLINK_PASSWORD; --nodes, --transactions, --auxiliary and --watches require an authenticated creator ACL."
         )
         .ConfigureAwait(false);
     return 2;
@@ -133,6 +144,42 @@ try
         await client.DeleteAsync(path, ZNodeVersion.Any, deadline.Token).ConfigureAwait(false);
         await Console
             .Out.WriteLineAsync("Ephemeral listing, descendant count and identity query completed.")
+            .ConfigureAwait(false);
+    }
+    if (watches)
+    {
+        var path = "/zklink-watch-sample-" + Guid.NewGuid().ToString("N");
+        var watched = await client.ExistsAndWatchAsync(path, deadline.Token).ConfigureAwait(false);
+        await using var watchLifetime = watched.Watch.ConfigureAwait(false);
+        if (watched.Value is not null)
+            throw new InvalidOperationException("The sample path already exists.");
+        await client
+            .CreateAsync(
+                path,
+                null,
+                new CreateOptions(
+                    [new(ZooKeeperPermissions.All, "auth", "")],
+                    CreateMode.Ephemeral
+                ),
+                deadline.Token
+            )
+            .ConfigureAwait(false);
+        var events = 0;
+        await foreach (
+            var change in watched.Watch.ReadEventsAsync(deadline.Token).ConfigureAwait(false)
+        )
+        {
+            if (change.Kind != ZooKeeperWatchEventKind.NodeCreated)
+                throw new InvalidOperationException("The watch returned an unexpected event.");
+            events++;
+        }
+        if (events != 1)
+            throw new InvalidOperationException("The one-shot watch did not deliver exactly once.");
+        await client.DeleteAsync(path, ZNodeVersion.Any, deadline.Token).ConfigureAwait(false);
+        await Console
+            .Out.WriteLineAsync(
+                "Missing-node watch, buffered creation event and stream completion verified."
+            )
             .ConfigureAwait(false);
     }
     await client.SyncAsync("/", deadline.Token).ConfigureAwait(false);
