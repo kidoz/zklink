@@ -28,7 +28,7 @@ public sealed class RequestLifecycleTests : IDisposable
 
     private Task<WireReply> Submit(string path = "/a", CancellationToken token = default) =>
         _scheduler.Submit(
-            new PathRequest(9, path),
+            new PathRequest(ZooKeeperOperation.Sync, path),
             new ZooKeeperRequestInfo(ZooKeeperOperation.Sync, path: path),
             token
         );

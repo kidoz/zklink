@@ -56,10 +56,20 @@ internal static class ProtocolFixtures
                 new SetDataRequest("/node", Data, int.MinValue),
                 new StatResult(Stat)
             ),
-            new("get-acl", 1, new PathRequest(6, "/node"), new AclResult(Acl, Stat)),
+            new(
+                "get-acl",
+                1,
+                new PathRequest(ZooKeeperOperation.GetAcl, "/node"),
+                new AclResult(Acl, Stat)
+            ),
             new("set-acl", 1, new SetAclRequest("/node", Acl, -1), new StatResult(Stat)),
             new("get-children", 1, Reads[1], new StringsResult(Children)),
-            new("sync", 1, new PathRequest(9, "/node"), new PathResult("/node")),
+            new(
+                "sync",
+                1,
+                new PathRequest(ZooKeeperOperation.Sync, "/node"),
+                new PathResult("/node")
+            ),
             new("ping", -2, new EmptyRequest(11), new EmptyResult()),
             new(
                 "get-children-stat",
@@ -113,10 +123,15 @@ internal static class ProtocolFixtures
             new(
                 "get-ephemerals",
                 1,
-                new PathRequest(103, "/node"),
+                new PathRequest(ZooKeeperOperation.GetEphemerals, "/node"),
                 new StringsResult(["/node", "/node2"])
             ),
-            new("count-children", 1, new PathRequest(104, "/node"), new CountResult(123)),
+            new(
+                "count-children",
+                1,
+                new PathRequest(ZooKeeperOperation.GetAllChildrenNumber, "/node"),
+                new CountResult(123)
+            ),
             new(
                 "restore-persistent",
                 -8,

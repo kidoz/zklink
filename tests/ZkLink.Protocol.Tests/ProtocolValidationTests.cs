@@ -293,7 +293,9 @@ public sealed class ProtocolValidationTests
         writer.WriteStringVector([value]);
         var payload = storage[..writer.WrittenCount];
         WireRequest request =
-            opcode == 8 ? new ReadRequest(8, "/node", false) : new PathRequest(103, "/node");
+            opcode == 8
+                ? new ReadRequest(8, "/node", false)
+                : new PathRequest(ZooKeeperOperation.GetEphemerals, "/node");
         Assert.Throws<InvalidDataException>(() =>
             ReplyCodec.Decode(payload, 1, request, ProtocolFixtures.Limits)
         );
