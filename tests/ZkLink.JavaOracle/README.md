@@ -38,6 +38,10 @@ These fixtures establish wire-format parity for the stated inputs. They do not e
 
 The protocol suite also records a small GetData codec allocation baseline, without a timing/throughput gate. The script writes `artifacts/jute-oracle/allocation-baseline.json` with workload, iteration count, runtime/OS/architecture, observed allocations and initial budgets. This is one codec workload, not a production performance qualification. The Java verification CI job retains that report.
 
+The add-watch success fixture includes Apache `ErrorResponse(0)`, matching the
+body emitted by `FinalRequestProcessor` on both pinned server versions. It is
+validated even though the Java client API itself expects no response record.
+
 ## Provenance
 
 Frozen on 2026-10-25:

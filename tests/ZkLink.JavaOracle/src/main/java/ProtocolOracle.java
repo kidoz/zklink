@@ -50,7 +50,7 @@ public final class ProtocolOracle {
         map.put("get-ephemerals", new Fixture(1, ZooDefs.OpCode.getEphemerals, new Body(new GetEphemeralsRequest("/node"), GetEphemeralsRequest::new), new Body(new GetEphemeralsResponse(List.of("/node", "/node2")), GetEphemeralsResponse::new)));
         map.put("count-children", new Fixture(1, ZooDefs.OpCode.getAllChildrenNumber, new Body(new GetAllChildrenNumberRequest("/node"), GetAllChildrenNumberRequest::new), new Body(new GetAllChildrenNumberResponse(123), GetAllChildrenNumberResponse::new)));
         map.put("restore-persistent", new Fixture(ClientCnxn.SET_WATCHES_XID, ZooDefs.OpCode.setWatches2, new Body(new SetWatches2(12, List.of("/data"), List.of("/exists"), List.of("/children"), List.of("/persistent"), List.of("/recursive")), SetWatches2::new), null));
-        map.put("add-watch", new Fixture(1, ZooDefs.OpCode.addWatch, new Body(new AddWatchRequest("/node", 1), AddWatchRequest::new), null));
+        map.put("add-watch", new Fixture(1, ZooDefs.OpCode.addWatch, new Body(new AddWatchRequest("/node", 1), AddWatchRequest::new), new Body(new ErrorResponse(KeeperException.Code.OK.intValue()), ErrorResponse::new)));
         map.put("who-am-i", new Fixture(1, ZooDefs.OpCode.whoAmI, null, new Body(new WhoAmIResponse(List.of(new ClientInfo("digest", "fixture-user"))), WhoAmIResponse::new)));
         map.put("close", new Fixture(1, ZooDefs.OpCode.closeSession, null, null));
 

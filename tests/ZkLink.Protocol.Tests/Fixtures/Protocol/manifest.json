@@ -31,7 +31,7 @@
     {"name": "get-ephemerals", "opcode": 103, "xid": 1, "requestRecord": "GetEphemeralsRequest", "responseRecord": "GetEphemeralsResponse"},
     {"name": "count-children", "opcode": 104, "xid": 1, "requestRecord": "GetAllChildrenNumberRequest", "responseRecord": "GetAllChildrenNumberResponse"},
     {"name": "restore-persistent", "opcode": 105, "xid": -8, "requestRecord": "SetWatches2", "responseRecord": "none"},
-    {"name": "add-watch", "opcode": 106, "xid": 1, "requestRecord": "AddWatchRequest", "responseRecord": "none"},
+    {"name": "add-watch", "opcode": 106, "xid": 1, "requestRecord": "AddWatchRequest", "responseRecord": "ErrorResponse"},
     {"name": "who-am-i", "opcode": 107, "xid": 1, "requestRecord": "none", "responseRecord": "WhoAmIResponse"},
     {"name": "close", "opcode": -11, "xid": 1, "requestRecord": "none", "responseRecord": "none"},
     {"name": "multi-write", "opcode": 14, "xid": 1, "requestRecord": "MultiOperationRecord", "responseRecord": "MultiResponse"},

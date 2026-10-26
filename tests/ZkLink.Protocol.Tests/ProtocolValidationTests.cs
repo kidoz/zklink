@@ -6,6 +6,32 @@ namespace ZkLink.Protocol.Tests;
 
 public sealed class ProtocolValidationTests
 {
+    [Fact]
+    public void AddWatchAcknowledgmentRequiresItsZeroStatusBody()
+    {
+        var request = new WatchRequest(
+            ZooKeeperOperation.AddWatch,
+            "/node",
+            (int)PersistentWatchMode.PersistentRecursive
+        );
+        var bytes = ProtocolFixtures.Bytes("add-watch-reply");
+        Assert.Throws<InvalidDataException>(() =>
+            ReplyCodec.Decode(
+                bytes.AsSpan(0, bytes.Length - sizeof(int)),
+                1,
+                request,
+                ProtocolFixtures.Limits
+            )
+        );
+        System.Buffers.Binary.BinaryPrimitives.WriteInt32BigEndian(
+            bytes.AsSpan(bytes.Length - sizeof(int)),
+            (int)ZooKeeperErrorCode.NoAuth
+        );
+        Assert.Throws<InvalidDataException>(() =>
+            ReplyCodec.Decode(bytes, 1, request, ProtocolFixtures.Limits)
+        );
+    }
+
     public static IEnumerable<object[]> Names => ProtocolGoldenTests.Names;
 
     [Theory]

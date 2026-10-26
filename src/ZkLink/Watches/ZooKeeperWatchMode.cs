@@ -1,6 +1,6 @@
 namespace ZkLink;
 
-/// <summary>Identifies a logical one-shot watch, independently of server removal categories.</summary>
+/// <summary>Identifies a logical watch, independently of server removal categories.</summary>
 public enum ZooKeeperWatchMode
 {
     /// <summary>A watch established by an existence read, including when the node is absent.</summary>
@@ -11,4 +11,10 @@ public enum ZooKeeperWatchMode
 
     /// <summary>A watch established by a successful child-list read.</summary>
     OneShotChildren = 2,
+
+    /// <summary>A persistent watch at the exact path.</summary>
+    Persistent = 3,
+
+    /// <summary>A persistent watch at the path and descendants.</summary>
+    PersistentRecursive = 4,
 }

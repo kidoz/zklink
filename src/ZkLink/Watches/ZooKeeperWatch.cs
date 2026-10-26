@@ -4,28 +4,36 @@ using ZkLink.Watches;
 
 namespace ZkLink;
 
-/// <summary>An owned single-consumer one-shot watch; disposal suppresses local delivery immediately.</summary>
+/// <summary>An owned single-consumer watch; disposal suppresses local delivery immediately.</summary>
 public sealed class ZooKeeperWatch : IAsyncDisposable
 {
     private readonly WatchManager _owner;
     private int _started;
 
-    internal ZooKeeperWatch(WatchManager owner, long id, string path, ZooKeeperWatchMode mode)
+    internal ZooKeeperWatch(
+        WatchManager owner,
+        long id,
+        string path,
+        ZooKeeperWatchMode mode,
+        int capacity
+    )
     {
         _owner = owner;
         RegistrationId = id;
         Path = path;
         Mode = mode;
-    }
-
-    internal Channel<ZooKeeperWatchEvent> Queue { get; } =
-        Channel.CreateBounded<ZooKeeperWatchEvent>(
-            new BoundedChannelOptions(1)
+        Queue = Channel.CreateBounded<ZooKeeperWatchEvent>(
+            new BoundedChannelOptions(capacity)
             {
                 SingleReader = true,
                 AllowSynchronousContinuations = false,
             }
         );
+    }
+
+    internal Channel<ZooKeeperWatchEvent> Queue { get; }
+    internal bool Persistent =>
+        Mode is ZooKeeperWatchMode.Persistent or ZooKeeperWatchMode.PersistentRecursive;
     internal bool Pending = true;
     internal bool Active;
     internal bool Suppressed;
@@ -40,7 +48,7 @@ public sealed class ZooKeeperWatch : IAsyncDisposable
     /// <summary>Gets the logical registration mode.</summary>
     public ZooKeeperWatchMode Mode { get; }
 
-    /// <summary>Reads at most one event; ending enumeration removes this logical watch locally.</summary>
+    /// <summary>Reads ordered invalidations; one-shot streams end after one event. Ending enumeration removes the handle locally.</summary>
     public async IAsyncEnumerable<ZooKeeperWatchEvent> ReadEventsAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default
     )

@@ -50,6 +50,43 @@ internal sealed partial class SessionManager
         }
     }
 
+    internal (ZooKeeperWatch Watch, Task<WireReply> Reply) AddWatch(
+        string path,
+        PersistentWatchMode mode,
+        CancellationToken token
+    )
+    {
+        if (!Enum.IsDefined(mode))
+            throw new ArgumentOutOfRangeException(nameof(mode));
+        var logical =
+            mode == PersistentWatchMode.Persistent
+                ? ZooKeeperWatchMode.Persistent
+                : ZooKeeperWatchMode.PersistentRecursive;
+        var info = new ZooKeeperRequestInfo(ZooKeeperOperation.AddWatch, path: path);
+        lock (_gate)
+        {
+            var intent = _watches.Begin(path, logical, info);
+            try
+            {
+                return (
+                    intent.Watch,
+                    Scheduler.Submit(
+                        new WatchRequest(ZooKeeperOperation.AddWatch, path, (int)mode),
+                        info,
+                        token,
+                        intent,
+                        watchOperation: true
+                    )
+                );
+            }
+            catch
+            {
+                _watches.Abandon(intent.Watch);
+                throw;
+            }
+        }
+    }
+
     internal void WatchReadFailed(ZooKeeperWatch watch)
     {
         lock (_gate)
@@ -61,11 +98,16 @@ internal sealed partial class SessionManager
         }
     }
 
-    internal Task<WireReply> SubmitWatchRemoval(WatchRequest request, CancellationToken token) =>
+    internal Task<WireReply> SubmitWatchRemoval(
+        WatchRequest request,
+        IRequestObserver observer,
+        CancellationToken token
+    ) =>
         Scheduler.Submit(
             request,
             new ZooKeeperRequestInfo(ZooKeeperOperation.RemoveWatches, path: request.Path),
             token,
+            observer,
             watchOperation: true
         );
 

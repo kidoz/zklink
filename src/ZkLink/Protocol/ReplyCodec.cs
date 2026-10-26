@@ -65,9 +65,19 @@ internal static class ReplyCodec
             12 => new StringsResult(ReadChildren(ref reader), reader.ReadStat()),
             104 => ReadCount(ref reader),
             107 => ReadIdentities(ref reader),
-            2 or 11 or 13 or 17 or 18 or 100 or 101 or 105 or 106 or -11 => new EmptyResult(),
+            (int)ZooKeeperOperation.AddWatch => ReadWatchAcknowledgment(ref reader),
+            2 or 11 or 13 or 17 or 18 or 100 or 101 or 105 or -11 => new EmptyResult(),
             _ => throw new InvalidDataException("Unsupported response shape or opcode."),
         };
+
+    private static EmptyResult ReadWatchAcknowledgment(ref JuteReader reader)
+    {
+        // FinalRequestProcessor returns ErrorResponse(OK) even though Java registers
+        // addWatch with no response record. It is a real success body on both pins.
+        if (reader.ReadInt32() != ZkLink.Watches.WatchProtocol.Success)
+            throw new InvalidDataException("Invalid add-watch acknowledgment status.");
+        return new EmptyResult();
+    }
 
     private static CountResult ReadCount(ref JuteReader reader)
     {

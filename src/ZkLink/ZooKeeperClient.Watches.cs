@@ -36,6 +36,34 @@ public sealed partial class ZooKeeperClient
         return WatchedAsync(ReadChildrenAsync(pending.Reply), pending.Watch);
     }
 
+    /// <summary>Registers a buffered persistent watch at a path, optionally including descendants. Reconnect gaps require rereading state.</summary>
+    public Task<ZooKeeperWatch> AddWatchAsync(
+        string path,
+        PersistentWatchMode mode,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var pending = _session.AddWatch(path, mode, cancellationToken);
+        return AddedWatchAsync(pending.Reply, pending.Watch);
+    }
+
+    private async Task<ZooKeeperWatch> AddedWatchAsync(
+        Task<ZkLink.Protocol.WireReply> task,
+        ZooKeeperWatch watch
+    )
+    {
+        try
+        {
+            await task.ConfigureAwait(false);
+            return watch;
+        }
+        catch
+        {
+            _session.WatchReadFailed(watch);
+            throw;
+        }
+    }
+
     private async Task<WatchedResult<T>> WatchedAsync<T>(Task<T> task, ZooKeeperWatch watch)
     {
         try

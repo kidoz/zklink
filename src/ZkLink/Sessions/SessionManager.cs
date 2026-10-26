@@ -250,6 +250,11 @@ internal sealed partial class SessionManager : IAsyncDisposable
                         {
                             break;
                         }
+                        if (!_watches.Reconnected())
+                        {
+                            FaultOverflow();
+                            break;
+                        }
                         Scheduler.Attach(_generation, endpoint);
                         _connectionReady.TrySetResult();
                         _initialReady.TrySetResult();
