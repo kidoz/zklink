@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
@@ -9,6 +10,9 @@ internal sealed class WatchReconnectProxy : IAsyncDisposable
 {
     private const int BufferBytes = 16 * 1024;
     private const int DefaultPort = 2181;
+    private const int MaximumFrameBytes = 1_048_575;
+    private const int ReplyHeaderBytes = sizeof(int) + sizeof(long) + sizeof(int);
+    private const int WatchResetXid = -8;
     private readonly object _gate = new();
     private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
     private readonly CancellationTokenSource _stop;
@@ -17,7 +21,29 @@ internal sealed class WatchReconnectProxy : IAsyncDisposable
     private TaskCompletionSource _resume = Completed();
     private TcpClient? _client;
     private TcpClient? _upstream;
+    private bool _holdNextRestore;
+    private readonly TaskCompletionSource _restoreHeld = new(
+        TaskCreationOptions.RunContinuationsAsynchronously
+    );
+    private readonly TaskCompletionSource _dropRestore = new(
+        TaskCreationOptions.RunContinuationsAsynchronously
+    );
+    private int _restoreReplies;
+    internal Task RestoreReplyHeld => _restoreHeld.Task;
+    internal int RestoreReplies => Volatile.Read(ref _restoreReplies);
     internal string Endpoint { get; }
+
+    internal void HoldNextRestoreReply()
+    {
+        lock (_gate)
+        {
+            if (_holdNextRestore || _restoreHeld.Task.IsCompleted)
+                throw new InvalidOperationException("Only one restore interruption is supported.");
+            _holdNextRestore = true;
+        }
+    }
+
+    internal void DropHeldRestoreReplyAndPause() => _dropRestore.TrySetResult();
 
     internal WatchReconnectProxy(string connection, CancellationToken token)
     {
@@ -100,10 +126,69 @@ internal sealed class WatchReconnectProxy : IAsyncDisposable
     {
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
         var outgoing = PumpAsync(client, upstream, lifetime.Token);
-        var incoming = PumpAsync(upstream, client, lifetime.Token);
+        var incoming = ForwardServerFramesAsync(upstream, client, lifetime.Token);
         await Task.WhenAny(outgoing, incoming).ConfigureAwait(false);
         await lifetime.CancelAsync().ConfigureAwait(false);
         await Task.WhenAll(outgoing, incoming).ConfigureAwait(false);
+    }
+
+    private async Task ForwardServerFramesAsync(
+        Stream source,
+        Stream destination,
+        CancellationToken token
+    )
+    {
+        var header = new byte[sizeof(int)];
+        try
+        {
+            while (true)
+            {
+                if (await source.ReadAsync(header.AsMemory(0, 1), token).ConfigureAwait(false) == 0)
+                    return;
+                await source.ReadExactlyAsync(header.AsMemory(1), token).ConfigureAwait(false);
+                int length = BinaryPrimitives.ReadInt32BigEndian(header);
+                if (length is <= 0 or > MaximumFrameBytes)
+                    throw new InvalidDataException("Proxy frame bound exceeded.");
+                var packet = new byte[length];
+                try
+                {
+                    await source.ReadExactlyAsync(packet, token).ConfigureAwait(false);
+                    if (
+                        length >= ReplyHeaderBytes
+                        && BinaryPrimitives.ReadInt32BigEndian(packet) == WatchResetXid
+                    )
+                    {
+                        Interlocked.Increment(ref _restoreReplies);
+                        bool hold;
+                        lock (_gate)
+                        {
+                            hold = _holdNextRestore;
+                            _holdNextRestore = false;
+                        }
+                        if (hold)
+                        {
+                            _restoreHeld.TrySetResult();
+                            await _dropRestore.Task.WaitAsync(token).ConfigureAwait(false);
+                            DropAndPause();
+                            return;
+                        }
+                    }
+                    await destination.WriteAsync(header, token).ConfigureAwait(false);
+                    await destination.WriteAsync(packet, token).ConfigureAwait(false);
+                }
+                finally
+                {
+                    CryptographicOperations.ZeroMemory(packet);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (IOException) { }
+        catch (ObjectDisposedException) { }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(header);
+        }
     }
 
     private static async Task PumpAsync(Stream source, Stream destination, CancellationToken token)

@@ -63,7 +63,8 @@ internal sealed class LiveZooKeeperFixture : IAsyncLifetime
         bool authenticated = true,
         string? chroot = null,
         string? connectionString = null,
-        bool enableTtlNodes = false
+        bool enableTtlNodes = false,
+        TimeSpan? sessionTimeout = null
     )
     {
         using var credentials = ZooKeeperAuthentication.Digest(_user, _password);
@@ -76,6 +77,7 @@ internal sealed class LiveZooKeeperFixture : IAsyncLifetime
             EnableTtlNodes = enableTtlNodes,
             CompatibilityProfile = CompatibilityProfile,
             Authentication = authenticated ? [credentials] : [],
+            SessionTimeout = sessionTimeout ?? TimeSpan.FromSeconds(30),
             InitialConnectTimeout = TimeSpan.FromSeconds(5),
             ConnectAttemptTimeout = TimeSpan.FromSeconds(2),
             OperationTimeout = TimeSpan.FromSeconds(5),
