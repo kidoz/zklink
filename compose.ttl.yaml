@@ -1,0 +1,16 @@
+# Test-only cleanup cadence; TTL remains an eventual deletion policy.
+x-ttl-environment: &ttl-environment
+  JVMFLAGS: >-
+    -Dzookeeper.extendedTypesEnabled=true
+    -Dznode.container.checkIntervalMs=1000
+
+services:
+  zoo1:
+    environment:
+      <<: *ttl-environment
+  zoo2:
+    environment:
+      <<: *ttl-environment
+  zoo3:
+    environment:
+      <<: *ttl-environment

@@ -12,6 +12,7 @@ x-zookeeper: &zookeeper
     ZOO_ADMINSERVER_ENABLED: "false"
     ZOO_INIT_LIMIT: "10"
     ZOO_SYNC_LIMIT: "5"
+    JVMFLAGS: "-Dzookeeper.extendedTypesEnabled=false"
   volumes:
     - ./dev/zookeeper-healthcheck.sh:/opt/zklink/zookeeper-healthcheck.sh:ro
   healthcheck:
