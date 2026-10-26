@@ -4,8 +4,8 @@ ZkLink is a managed C# client for Apache ZooKeeper under development, targeting
 .NET 10. You can build the library, connect a session, authenticate, sync a path and
 close with acknowledgment, use node/ACL operations and typed transactions, and
 query session ephemerals, descendant counts and authenticated identities.
-One-shot watched reads are available; persistent/recursive watches remain
-unimplemented, and no NuGet package is available.
+One-shot watched reads and persistent/recursive subscriptions with reconnect
+gap reporting are available. No NuGet package is available.
 
 The documentation follows [Diátaxis](https://diataxis.fr/), with four sections
 organized around what you need to do.
@@ -23,7 +23,8 @@ before planning an integration. To exercise the client, follow
 [Connect a session](tutorials/connect-a-session.md), then
 [Create, read, update and delete a node](tutorials/use-node-operations.md), then
 [Execute a transaction](tutorials/use-transactions.md) and
-[Watch a node once](tutorials/watch-a-node.md). The
+[Watch a node once](tutorials/watch-a-node.md), then
+[Watch repeated changes](tutorials/watch-repeated-changes.md). The
 [auxiliary reference](reference/auxiliary-operations.md) includes a runnable
 ephemeral/count/identity example.
 

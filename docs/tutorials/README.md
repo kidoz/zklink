@@ -16,6 +16,9 @@ Learn through a guided exercise with a concrete result.
 - [Watch a node once](watch-a-node.md) — observe a value and create a buffered
   watch, then read one invalidation and release its handle.
 
+- [Watch repeated changes](watch-repeated-changes.md) — keep a persistent or
+  recursive subscription and reread state after reconnect gaps.
+
 See [current capabilities](../reference/current-capabilities.md) for the available scope.
 
 [Documentation home](../README.md)

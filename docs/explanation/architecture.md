@@ -4,7 +4,8 @@ ZkLink aims to implement the ZooKeeper client TCP protocol in managed C#.
 The client owns one explicit session and at most one active transport, with
 a serialized writer and ordered reader. Session management, bounded request
 scheduling, TCP/TLS, node/ACL operations, typed transactions and auxiliary queries
-and one-shot watches are implemented; persistent/recursive watches remain planned.
+and one-shot/persistent/recursive watches are implemented. Watch delivery is
+bounded, and persistent streams report reconnect gaps before application readiness.
 
 ## Wire records and public results serve different lifetimes
 

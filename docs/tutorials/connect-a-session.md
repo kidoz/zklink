@@ -102,7 +102,7 @@ auth/sync/close, and cleans up its own servers. For behavior after disconnection
 cancellation and close failure, read the [connection reference](../reference/connections.md).
 Continue with [Create, read, update and delete a node](use-node-operations.md).
 Continue with [Execute a transaction](use-transactions.md) and
-[Watch a node once](watch-a-node.md). Persistent and recursive watches remain
-unimplemented.
+[Watch a node once](watch-a-node.md), then
+[Watch repeated changes](watch-repeated-changes.md).
 
 [Tutorials](README.md) · [Documentation home](../README.md)

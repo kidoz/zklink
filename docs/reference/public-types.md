@@ -1,7 +1,7 @@
 # Supporting public types
 
 All types below are in namespace `ZkLink`. They are implemented supporting
-contracts and have not shipped in a package. The current client exposes connection/session, node/ACL, transaction, auxiliary and one-shot watch methods. Node result wrappers are returned by the
+contracts and have not shipped in a package. The current client exposes connection/session, node/ACL, transaction, auxiliary and watch methods. Node result wrappers are returned by the
 [node operations](nodes.md).
 
 Exact signatures and nullable annotations are in the
@@ -110,8 +110,9 @@ Explicit property inspection can still expose those values.
 `WatchedResult<T>` returns `Value` and an owned `ZooKeeperWatch`. Handles expose
 registration identity/path/mode, a single-consumer event stream, explicit removal
 and asynchronous disposal. `ZooKeeperWatchEvent` has immutable registration ID,
-kind, client-relative path and optional zxid. See [one-shot watches](watches.md)
-for ownership, cancellation, event budgets and restoration. Persistent and
-recursive watch registration remains unimplemented.
+kind, client-relative path, optional zxid and connection generation.
+`PersistentWatchMode` selects exact-path or recursive registration in
+`AddWatchAsync`. See [watches](watches.md) for ownership, cancellation, event
+budgets, restoration and explicit reconnect gaps.
 
 [Reference](README.md) · [Documentation home](../README.md)

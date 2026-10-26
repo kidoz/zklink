@@ -24,7 +24,7 @@ client, except that endpoint updates affect future connection attempts.
 | `Authentication` | Empty; at most 32 digest entries, each frame-bounded; combined credentials at most 32 MiB |
 | `AllowUnsafePlaintextDigest` | False; explicit opt-in required for digest over plaintext |
 | `EnableTtlNodes` | False; operator assertion that every endpoint enables extended node types; required for TTL creation |
-| `CompatibilityProfile` | `ZooKeeper38`; `ZooKeeper39` is an operator assertion, not negotiated discovery |
+| `CompatibilityProfile` | `ZooKeeper38`; `ZooKeeper39` enables independent watch modes at one path; assert all endpoints qualify, without negotiated discovery |
 | `SessionTimeout` | 30 seconds requested; actual negotiated timeout governs liveness |
 | `InitialConnectTimeout` | 30 seconds across endpoint attempts |
 | `ConnectAttemptTimeout` | 5 seconds for an attempt, including auth and watch restoration; reduced by remaining initial/recovery time |
@@ -75,7 +75,7 @@ They never expose the session password.
 
 | State | Meaning |
 | --- | --- |
-| `Connecting`, `Authenticating`, `Restoring` | Establishment before application readiness; acknowledged one-shot watches are restored before readiness |
+| `Connecting`, `Authenticating`, `Restoring` | Establishment before application readiness; acknowledged watches are restored before readiness |
 | `Connected` | Application admission is open |
 | `Disconnected` | Admission is revoked while the same session is being recovered |
 | `Expired` | Server-confirmed expiry; terminal |

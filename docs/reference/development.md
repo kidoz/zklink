@@ -35,7 +35,7 @@ notation; omit the brackets when invoking a command.
 | `just zk-logs [version]` | Print server logs |
 | `just zk-down [version]` | Remove the selected ensemble and its volumes |
 | `just zk-ttl-matrix` | Verify single/atomic TTL creates with enabled and disabled servers on both versions |
-| `just zk-operations-matrix` | Run live node/ACL/transaction/auxiliary/one-shot watch tests and examples on both versions; requires Docker, .NET, Bash and OpenSSL |
+| `just zk-operations-matrix` | Run live node/ACL/transaction/auxiliary/watch tests and examples on both versions; requires Docker, .NET, Bash and OpenSSL |
 | `just zk-driver-matrix` | Run the fixture matrix plus managed session/auth/sync/close on each node; requires .NET and OpenSSL |
 | `just zk-matrix` | Smoke-test both pinned versions with isolated projects, retained logs, and cleanup; requires Bash |
 

@@ -11,10 +11,11 @@ dotnet run --project samples/ZkLink.Samples.Basic -c Release -- \
 
 The sample watches a unique missing path, creates an authenticated ephemeral,
 reads exactly one buffered creation event, observes stream completion, deletes
-the node and closes with acknowledgment. Expected output includes:
+the node, then checks each persistent mode before closing with acknowledgment.
+Expected output includes:
 
 ```text
-Missing-node watch, buffered creation event and stream completion verified.
+One-shot, persistent and recursive watch delivery, removal and stream completion verified.
 ```
 
 The same pattern with an already connected, authenticated `client` is:
@@ -44,7 +45,8 @@ the missing existence case, missing data/children reads throw `NoNode` and retur
 no handle.
 
 `just zk-operations-matrix` runs the live tests and this sample on both pinned
-versions, with retained logs and cleanup. See the [watch reference](../reference/watches.md)
+versions, with retained logs and cleanup. Continue with [Watch repeated changes](watch-repeated-changes.md) for persistent
+subscriptions. See the [watch reference](../reference/watches.md)
 for removal, cancellation, reconnect and queue limits. After the local exercise,
 use `just zk-down` with the same selected version.
 

@@ -1,7 +1,6 @@
 # Current capabilities
 
-This describes the checkout as of **2026-10-26**. No package has been released,
-and persistent/recursive watch registration remains unavailable.
+This describes the checkout as of **2026-10-26**. No package has been released.
 
 ## Code and verification
 
@@ -9,9 +8,9 @@ and persistent/recursive watch registration remains unavailable.
 | --- | --- | --- |
 | Build | .NET 10, C# 14, deterministic builds, locked dependencies, warnings as errors, MIT license | Release package metadata and package qualification |
 | Protocol | Internal codecs for all 27 implemented opcodes, handshake/multi/framing, path/chroot translation and Gradle-managed Java fixtures | Remaining live qualification |
-| Public types | Immutable snapshots, endpoints, create options, ACLs, versions, request failures, one-shot watch handles/events and removal results; contract tests | Persistent/recursive watch contracts |
-| Sessions and operations | Connect/authenticate/sync, snapshots/subscriptions, heartbeat, same-session recovery, cancellation, close, node/ACL methods, typed transactions, auxiliary queries opt-in TTL creation and one-shot watches | Persistent/recursive watches and broader live recovery under faults |
-| Watches | One-shot exists/data/children reads, buffered events, shared removal, cancellation cleanup, bounded delivery and restoration | Persistent/recursive registrations and their reconnect gaps |
+| Public types | Immutable snapshots, endpoints, create options, ACLs, versions, request failures, watch handles/events and removal results; contract tests | Package consumer qualification |
+| Sessions and operations | Connect/authenticate/sync, snapshots/subscriptions, heartbeat, same-session recovery, cancellation, close, node/ACL methods, typed transactions, auxiliary queries, opt-in TTL creation and watches | Broader live recovery under faults |
+| Watches | One-shot reads, persistent/recursive subscriptions, buffered events, shared removal, cancellation cleanup, bounded restoration and explicit reconnect gaps | Broader fault and concurrency qualification |
 | Security | TCP/TLS, optional custom roots/client certificates, digest replay, explicit plaintext override and live ACL tests | Live secure ZooKeeper, additional identity schemes and cross-platform security qualification |
 | Local servers | Pinned three-node Compose fixtures for 3.8.7 and 3.9.6 | Secure server and broader fault fixtures |
 | Native AOT | Planned requirement | Publish and direct execution evidence for consumers |
@@ -32,8 +31,8 @@ remote workflow results remain unverified. Proposed Native AOT targets are
 
 | ZooKeeper version | Intended role | Fixture settings | Driver compatibility |
 | --- | --- | --- | --- |
-| 3.8.7 | Required qualification target | [Version settings](../../dev/zookeeper-3.8.7.env) | Connection, node/ACL, transaction, auxiliary, TTL and one-shot watch tests passed |
-| 3.9.6 | Required qualification target and development default | [Version settings](../../dev/zookeeper-3.9.6.env) | Connection, node/ACL, transaction, auxiliary, TTL and one-shot watch tests passed |
+| 3.8.7 | Required qualification target | [Version settings](../../dev/zookeeper-3.8.7.env) | Connection, node/ACL, transaction, auxiliary, TTL and watch tests passed |
+| 3.9.6 | Required qualification target and development default | [Version settings](../../dev/zookeeper-3.9.6.env) | Connection, node/ACL, transaction, auxiliary, TTL and watch tests passed |
 
 The [project overview](../../README.md#local-zookeeper-testing) records fixture
 smoke checks on 2026-10-25 for both versions: three-node startup, exact-version
@@ -54,7 +53,10 @@ protection and eventual cleanup. See [TTL node creation](ttl-nodes.md).
 
 One-shot watches have controlled-peer race/overflow and 10,000-path restoration
 evidence. Live tests cover event types, sharing, removal, chroot, close and a real
-connection cut followed by same-session restoration. The `--watches` sample runs
+connection cut followed by same-session restoration. Persistent/recursive checks
+add repeated delivery, chroot and explicit reconnect gaps. The default 3.8
+profile rejects conflicting modes at one path; the 3.9 profile additionally
+verifies independent categories at the same path. The `--watches` sample runs
 on every node. See the [watch reference](watches.md).
 
 TLS is required by default. Loopback tests cover trusted/custom roots, wrong

@@ -53,7 +53,7 @@ consumes/drops a real transaction reply, then allows reconnect so tests can chec
 actual commitment, session identity and exactly one transmitted write. Auxiliary
 cases verify textual-prefix session ephemeral queries, chroot, nested counts,
 READ permissions and authenticated/anonymous identities. Broader live
-recovery, persistent/recursive watches and TLS/mTLS ZooKeeper fixtures remain unverified.
+recovery and TLS/mTLS ZooKeeper fixtures remain unverified.
 
 One-shot watch tests cover reader ordering, missing-node registration, shared
 removal, cancellation/timeouts, global event overflow, unknown lost-response
@@ -61,7 +61,11 @@ intents, and restoration of 10,000 long Unicode paths in bounded frames. The
 live suite checks events, sharing/removal, chroot, close and same-session recovery
 through a full-duplex proxy. A dedicated pause permits mutation and local disposal
 while disconnected before restoration is allowed. These observations do not
-qualify a general network/quorum fault matrix.
+qualify a general network/quorum fault matrix. Persistent/recursive tests also
+check repeated delivery, path boundaries, compatibility-profile restrictions,
+independent removal on 3.9 and explicit
+reconnect gaps after a missed create/delete interval. Controlled peers cover
+gap publication before admission and global overflow, including gap fan-out.
 
 `just zk-ttl-matrix` separately starts TTL-disabled and TTL-enabled fixtures for
 each patch. It checks opt-in, maximum TTL, single/atomic creation, close

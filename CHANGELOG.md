@@ -6,13 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ZkLink is in initial development. No version has been released, so the entries
-below describe work in progress rather than supported behavior. Persistent/recursive watches, a NuGet package, Native AOT validation and runtime performance data
+below describe work in progress rather than supported behavior. A NuGet package, Native AOT validation and runtime performance data
 remain unavailable. See
 [README.md](README.md) for the current status and verified scope.
 
 ## [Unreleased]
 
 ### Added
+
+- Persistent and recursive `AddWatchAsync` subscriptions with repeated buffered
+  delivery, profile-aware shared removal and bounded extended restoration.
+- Explicit `ReconnectedWithGap` events with connection generations, controlled
+  cancellation/overflow checks and live reconnect tests on both pinned patches.
+- Safe common-profile watch ownership for 3.8 servers, with independent modes
+  at one path enabled by the existing 3.9 compatibility profile.
+- Correct successful add-watch decoding and a Java-generated acknowledgment fixture.
 
 - One-shot existence/data/children watched reads with owned handles, immutable
   events, single-consumer streams and reader-ordered registration.
