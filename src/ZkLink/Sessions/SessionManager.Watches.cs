@@ -188,10 +188,25 @@ internal sealed partial class SessionManager
                     {
                         if (notification.State != WatchProtocol.ServerConnected)
                             throw new ZooKeeperConnectionException(
-                                notification.State == (int)ZooKeeperErrorCode.SessionExpired
-                                    ? ZooKeeperConnectionFailure.SessionRejected
-                                    : ZooKeeperConnectionFailure.Unreachable,
-                                transport.Endpoint
+                                notification.State switch
+                                {
+                                    (int)ZooKeeperErrorCode.SessionExpired =>
+                                        ZooKeeperConnectionFailure.SessionRejected,
+                                    WatchProtocol.ServerAuthFailed =>
+                                        ZooKeeperConnectionFailure.Authentication,
+                                    WatchProtocol.ServerDisconnected =>
+                                        ZooKeeperConnectionFailure.Unreachable,
+                                    _ => ZooKeeperConnectionFailure.Protocol,
+                                },
+                                transport.Endpoint,
+                                notification.State switch
+                                {
+                                    (int)ZooKeeperErrorCode.SessionExpired => (int)
+                                        ZooKeeperErrorCode.SessionExpired,
+                                    WatchProtocol.ServerAuthFailed => (int)
+                                        ZooKeeperErrorCode.AuthFailed,
+                                    _ => null,
+                                }
                             );
                     }
                     else
@@ -219,19 +234,26 @@ internal sealed partial class SessionManager
                 _lastInbound = _time.GetTimestamp();
                 if (reply.Header.Error != WatchProtocol.Success)
                     throw new ZooKeeperConnectionException(
-                        reply.Header.Error
-                                is (int)ZooKeeperErrorCode.ConnectionLoss
-                                    or (int)ZooKeeperErrorCode.SessionMoved
-                                ? ZooKeeperConnectionFailure.Unreachable
-                            : reply.Header.Error == (int)ZooKeeperErrorCode.SessionExpired
-                                ? ZooKeeperConnectionFailure.SessionRejected
-                            : ZooKeeperConnectionFailure.Protocol,
+                        reply.Header.Error switch
+                        {
+                            (int)ZooKeeperErrorCode.ConnectionLoss
+                            or (int)ZooKeeperErrorCode.OperationTimeout
+                            or (int)ZooKeeperErrorCode.UnknownSession
+                            or (int)ZooKeeperErrorCode.SessionMoved
+                            or (int)ZooKeeperErrorCode.RequestTimeout =>
+                                ZooKeeperConnectionFailure.Unreachable,
+                            (int)ZooKeeperErrorCode.SessionExpired =>
+                                ZooKeeperConnectionFailure.SessionRejected,
+                            (int)ZooKeeperErrorCode.AuthFailed
+                            or (int)ZooKeeperErrorCode.SessionClosedRequiresSaslAuth =>
+                                ZooKeeperConnectionFailure.Authentication,
+                            _ => ZooKeeperConnectionFailure.Protocol,
+                        },
                         transport.Endpoint,
                         reply.Header.Error
                     );
                 break;
             }
         }
-        _watches.Restored();
     }
 }

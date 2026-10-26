@@ -11,6 +11,8 @@ internal static class WatchProtocol
     internal const int NotificationXid = -1;
     internal const int SessionEvent = -1;
     internal const int ServerConnected = 3;
+    internal const int ServerDisconnected = 0;
+    internal const int ServerAuthFailed = 4;
     internal const int Success = 0;
     internal const int RestoreTargetBytes = 128 * 1024;
     internal const int RestoreFrameOverhead = 28;

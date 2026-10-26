@@ -245,6 +245,9 @@ internal sealed partial class SessionManager : IAsyncDisposable
                         {
                             break;
                         }
+                        // Commit restoration and readiness under one gate so disposal
+                        // cannot fall between clearing the snapshot and becoming Connected.
+                        _watches.Restored();
                         _active = runtime;
                         if (!PublishState(ZooKeeperSessionState.Connected))
                         {
@@ -312,6 +315,16 @@ internal sealed partial class SessionManager : IAsyncDisposable
                                     ? ZooKeeperSessionState.Expired
                                 : ZooKeeperSessionState.Faulted;
                             _serverExpired = state == ZooKeeperSessionState.Expired;
+                            if (
+                                _initialReady.Task.IsCompletedSuccessfully
+                                && state
+                                    is ZooKeeperSessionState.Expired
+                                        or ZooKeeperSessionState.AuthFailed
+                            )
+                                _terminalCause = new ZooKeeperSessionException(
+                                    state,
+                                    _terminalCode
+                                );
                             PublishTerminal(state);
                         }
                         break;
