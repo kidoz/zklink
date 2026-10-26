@@ -17,6 +17,7 @@ internal sealed class LiveZooKeeperFixture : IAsyncLifetime
     private bool _created;
     internal ZooKeeperClient Client => _client!;
     internal string ConnectionString => _connection;
+    internal string User => _user;
 
     public async ValueTask InitializeAsync()
     {
