@@ -17,7 +17,7 @@ This describes the checkout as of **2026-10-28**. No package has been released.
 | Local servers | Pinned three-node plaintext/TLS/mTLS fixtures for 3.8.7 and 3.9.6, expired-certificate negative control | Broader fault fixtures |
 | Observability | BCL traces and metrics, bounded asynchronous diagnostic delivery, finite tags, listener isolation and redaction checks | Exporter integration, sustained-load and cross-platform qualification |
 | Native AOT | Planned requirement | Publish and direct execution evidence for consumers |
-| Performance | Initial small GetData codec allocation check | Session/load benchmarks and runtime performance evidence |
+| Performance | Protocol/framing BenchmarkDotNet suite and measured allocation gates for get/set, children and transactions | Live concurrency, watch/recovery benchmarks and controlled-runner performance qualification |
 
 See [Tracing and metrics](telemetry.md) for instrument names, timing, privacy and
 best-effort delivery semantics.

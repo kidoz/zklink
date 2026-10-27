@@ -35,6 +35,8 @@ notation; omit the brackets when invoking a command.
 | `just zk-status [version]` | Show health and host ports |
 | `just zk-logs [version]` | Print server logs |
 | `just zk-down [version]` | Remove the selected ensemble and its volumes |
+| `just bench [args…]` | Run server-free protocol/framing benchmarks and retain raw results; requires pinned .NET SDK |
+| `just bench-allocations [output]` | Check measured allocation budgets; requires pinned .NET SDK |
 | `just zk-soak [seconds] [seed]` | Run seeded churn/recovery and resource checks on both versions, default 120 seconds each; requires Docker, pinned .NET and Python 3 |
 | `just zk-watch-pressure-faults` | Verify slow watch consumers, shared-buffer overflow and counter/capacity cleanup on both versions; requires Docker, pinned .NET and Python 3 |
 | `just zk-peer-partition-faults` | Isolate leader and follower peer interfaces separately, verify election, majority progress and recovery on both versions; requires Docker/Compose gateway priority, pinned .NET and Python 3 |

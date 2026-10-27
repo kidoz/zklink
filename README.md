@@ -44,6 +44,8 @@ Install [just](https://just.systems/) and .NET SDK **10.0.403**. Docker with Com
 | `just zk-down [version]` | Remove the selected ensemble and its data volumes |
 | `just zk-matrix` | Smoke-test both pinned server versions and clean up |
 | `just zk-driver-matrix` | Also connect/authenticate/sync/close using ZkLink on every node |
+| `just bench [args…]` | Run protocol/framing benchmarks with retained raw results |
+| `just bench-allocations [output]` | Check measured allocation budgets without timing thresholds |
 | `just zk-soak [seconds] [seed]` | Run seeded client churn, CRUD, cancellation, recovery and resource checkpoints on both versions (default two minutes each) |
 | `just zk-watch-pressure-faults` | Verify unread watch queues, heartbeat progress, shared event overflow and resource cleanup on both versions |
 | `just zk-peer-partition-faults` | Isolate leader and follower peer interfaces separately and verify election, majority progress and recovery on both versions |
@@ -155,4 +157,4 @@ choices; release-duration qualification requires separate executed evidence.
 
 ## Not yet available
 
-A NuGet package, Native AOT validation and runtime performance data are not available. Client TLS/mTLS has scoped live evidence on both pinned versions with a macOS arm64 client. Revocation services, certificate rotation, quorum TLS and cross-platform security qualification remain open.
+A NuGet package and Native AOT validation are not available. Initial [protocol/framing benchmarks](docs/how-to/run-benchmarks.md) and allocation gates are available; live driver performance remains unmeasured. Client TLS/mTLS has scoped live evidence on both pinned versions with a macOS arm64 client. Revocation services, certificate rotation, quorum TLS and cross-platform security qualification remain open.

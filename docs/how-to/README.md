@@ -8,6 +8,8 @@ Complete a specific task in an existing checkout.
   three-node fixture, collect logs, and remove its disposable data.
 - [Run a seeded soak](run-seeded-soak.md) — combine client churn, cancellation,
   watch recovery and resource checkpoints with a reproducible workload.
+- [Run benchmarks](run-benchmarks.md) — measure protocol/framing allocations and
+  timings, retain raw results and check allocation budgets.
 - [Verify watch pressure](verify-watch-pressure.md) — hold watch events unread,
   verify heartbeat progress, overflow, event order and resource cleanup.
 - [Verify peer partition recovery](verify-peer-partition-recovery.md) — isolate a

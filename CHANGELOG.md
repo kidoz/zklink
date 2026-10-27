@@ -45,6 +45,10 @@ remain unavailable. See
 
 ### Added
 
+- A server-free BenchmarkDotNet suite for protocol encoding/decoding and framing,
+  with raw results, environment metadata, reviewed allocation budgets and a
+  separate allocation CI job. Run `just bench` or `just bench-allocations`.
+
 - `just zk-soak [seconds] [seed]` runs a bounded seeded workload on both pinned
   versions, combining concurrent CRUD, client churn, cancellation and same-session
   watch recovery with streaming resource evidence, growth thresholds and a

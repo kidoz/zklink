@@ -191,6 +191,14 @@ The harness streams resource samples and seed/outcome totals, with explicit
 retained-heap and thread-growth bounds after initial rounds. See
 [Run a seeded soak](../how-to/run-seeded-soak.md) for duration, scope and thresholds.
 
+The server-free [benchmark suite](../how-to/run-benchmarks.md) measures request
+encoding, owned reply decoding and synchronous in-memory framing. Its allocation
+gate uses the same workloads, with reviewed per-case byte limits and retained
+numeric observations. BenchmarkDotNet also records raw timing/allocation/GC data
+and machine metadata. These measurements do not qualify live driver throughput,
+request latency, concurrent load or recovery performance. CI gates allocations;
+shared-runner timings remain informational.
+
 ## Release claims need consumer evidence
 
 The build workflow defines checks on Linux, Windows, and macOS. A workflow file
