@@ -22,6 +22,13 @@ remain unavailable. See
   preserving cleanup when disposal races the final acknowledgment.
 - Close now rejects unsent watch maintenance instead of allowing it onto the wire
   after `closeSession`.
+- Meter construction now uses the same listener-failure isolation as instrument
+  registration.
+
+### Changed
+
+- Removed telemetry gauge observation from scheduler paths that cannot change
+  request, byte, or tombstone pressure.
 
 ### Added
 

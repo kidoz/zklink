@@ -121,7 +121,6 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
-            using var pressure = new PressureObservation(this);
             return _generation != 0 && _generation == value;
         }
     }
@@ -130,7 +129,6 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
-            using var pressure = new PressureObservation(this);
             _nextXid = value > 0 ? value : throw new ArgumentOutOfRangeException(nameof(value));
         }
     }
@@ -139,7 +137,6 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
-            using var pressure = new PressureObservation(this);
             _generation = value;
             _endpoint = target;
             _accepting = true;
@@ -153,7 +150,6 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
-            using var pressure = new PressureObservation(this);
             _accepting = false;
         }
     }
@@ -162,7 +158,6 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
-            using var pressure = new PressureObservation(this);
             return _preparersDrained.Task;
         }
     }
@@ -417,7 +412,6 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
-            using var pressure = new PressureObservation(this);
             if (_accepting && !_pingSent)
             {
                 _pingQueued = true;
@@ -430,7 +424,6 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
-            using var pressure = new PressureObservation(this);
             if (value != _generation)
             {
                 return false;
@@ -512,7 +505,6 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
-            using var pressure = new PressureObservation(this);
             if (value != _generation || _generation == 0)
             {
                 return (null, false);
@@ -573,7 +565,6 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
-            using var pressure = new PressureObservation(this);
             if (value != _generation)
             {
                 return null;
@@ -590,7 +581,6 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
-            using var pressure = new PressureObservation(this);
             var pending = Expected(value, xid);
             shape = pending?.Shape;
             return pending;
@@ -685,7 +675,6 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
-            using var pressure = new PressureObservation(this);
             return
                 _sent.TryPeek(out var pending)
                 && pending.Info.Operation != ZooKeeperOperation.CloseSession

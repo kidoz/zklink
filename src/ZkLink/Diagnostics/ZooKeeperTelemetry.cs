@@ -131,94 +131,101 @@ internal static class ZooKeeperTelemetry
     private static void InitializeInstruments()
     {
         Publish(() => Source = new ActivitySource(Name, Version));
-        Meter = new Meter(Name, Version);
-        Publish(() => Duration = Meter.CreateHistogram<double>("zklink.operation.duration", "s"));
-        Publish(() => Lifecycle = Meter.CreateHistogram<double>("zklink.lifecycle.duration", "s"));
-        Publish(() => Heartbeat = Meter.CreateHistogram<double>("zklink.heartbeat.roundtrip", "s"));
+        Meter? meter = null;
+        Publish(() => meter = new Meter(Name, Version));
+        if (meter is null)
+        {
+            _initialized = true;
+            return;
+        }
+        Meter = meter;
+        Publish(() => Duration = meter.CreateHistogram<double>("zklink.operation.duration", "s"));
+        Publish(() => Lifecycle = meter.CreateHistogram<double>("zklink.lifecycle.duration", "s"));
+        Publish(() => Heartbeat = meter.CreateHistogram<double>("zklink.heartbeat.roundtrip", "s"));
         Publish(() =>
-            Disconnected = Meter.CreateHistogram<double>(
+            Disconnected = meter.CreateHistogram<double>(
                 "zklink.session.disconnected.duration",
                 "s"
             )
         );
         Publish(() =>
-            Negotiated = Meter.CreateHistogram<double>("zklink.session.negotiated_timeout", "s")
+            Negotiated = meter.CreateHistogram<double>("zklink.session.negotiated_timeout", "s")
         );
         Publish(() =>
-            Meter.CreateObservableCounter("zklink.operation.count", ObserveCounts, "{operation}")
+            meter.CreateObservableCounter("zklink.operation.count", ObserveCounts, "{operation}")
         );
         Publish(() =>
-            Meter.CreateObservableCounter(
+            meter.CreateObservableCounter(
                 "zklink.operation.unknown",
                 () => Interlocked.Read(ref _unknown),
                 "{operation}"
             )
         );
         Publish(() =>
-            Meter.CreateObservableCounter(
+            meter.CreateObservableCounter(
                 "zklink.reconnect.attempts",
                 () => Interlocked.Read(ref _reconnects),
                 "{attempt}"
             )
         );
         Publish(() =>
-            Meter.CreateObservableCounter(
+            meter.CreateObservableCounter(
                 "zklink.event.overflows",
                 () => Interlocked.Read(ref _overflows),
                 "{overflow}"
             )
         );
         Publish(() =>
-            Meter.CreateObservableCounter(
+            meter.CreateObservableCounter(
                 "zklink.telemetry.dropped",
                 () => Interlocked.Read(ref _dropped),
                 "{record}"
             )
         );
         Publish(() =>
-            Meter.CreateObservableCounter(
+            meter.CreateObservableCounter(
                 "zklink.telemetry.listener_errors",
                 () => Interlocked.Read(ref _listenerErrors),
                 "{error}"
             )
         );
         Publish(() =>
-            Meter.CreateObservableUpDownCounter(
+            meter.CreateObservableUpDownCounter(
                 "zklink.requests.outstanding",
                 () => Interlocked.Read(ref Requests),
                 "{request}"
             )
         );
         Publish(() =>
-            Meter.CreateObservableUpDownCounter(
+            meter.CreateObservableUpDownCounter(
                 "zklink.requests.bytes",
                 () => Interlocked.Read(ref Bytes),
                 "By"
             )
         );
         Publish(() =>
-            Meter.CreateObservableUpDownCounter(
+            meter.CreateObservableUpDownCounter(
                 "zklink.requests.tombstones",
                 () => Interlocked.Read(ref Tombstones),
                 "{request}"
             )
         );
         Publish(() =>
-            Meter.CreateObservableUpDownCounter(
+            meter.CreateObservableUpDownCounter(
                 "zklink.watches.active",
                 () => Interlocked.Read(ref Watches),
                 "{watch}"
             )
         );
         Publish(() =>
-            Meter.CreateObservableUpDownCounter(
+            meter.CreateObservableUpDownCounter(
                 "zklink.events.backlog",
                 () => Interlocked.Read(ref Backlog),
                 "{event}"
             )
         );
         Publish(() =>
-            Meter.CreateObservableUpDownCounter(
+            meter.CreateObservableUpDownCounter(
                 "zklink.sessions.disconnected",
                 () => Interlocked.Read(ref DisconnectedSessions),
                 "{session}"
