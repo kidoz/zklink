@@ -45,6 +45,11 @@ remain unavailable. See
 
 ### Added
 
+- `just zk-watch-pressure-faults` verifies slow watch consumers, actual heartbeat
+  progress, shared state/watch event limits, explicit overflow with buffered FIFO
+  delivery, unread-handle disposal and repeated capacity/counter cleanup on both
+  pinned versions, with a separate CI selection and failed-run cleanup checks.
+
 - Leader peer-isolation cases extend `just zk-peer-partition-faults` to separate
   leader and follower cases on both pinned versions, verifying replacement
   election, majority progress, session/watch recovery, no replay and old-leader

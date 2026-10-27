@@ -173,6 +173,16 @@ after the replacement majority is serving and must return as a follower. See
 [Verify peer partition recovery](../how-to/verify-peer-partition-recovery.md).
 Asymmetric peer traffic loss, simultaneous network faults and sustained load remain separate work.
 
+`just zk-watch-pressure-faults` holds events unread while observing real
+heartbeats, acknowledged pings and ordinary reads. Two shared persistent handles
+and one recursive handle exercise logical fan-out against the global event budget.
+A separate case fills that budget with state and watch entries, then requires an
+explicit terminal overflow after retaining the earlier buffered entries in order.
+Repeated rounds check full handle-capacity reuse, unread-handle disposal and
+quiescent resource counters. See [Verify watch pressure](../how-to/verify-watch-pressure.md).
+These checks provide bounded ownership evidence; long-running resource/load
+qualification remains open.
+
 ## Release claims need consumer evidence
 
 The build workflow defines checks on Linux, Windows, and macOS. A workflow file

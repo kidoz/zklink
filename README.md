@@ -43,6 +43,7 @@ Install [just](https://just.systems/) and .NET SDK **10.0.403**. Docker with Com
 | `just zk-down [version]` | Remove the selected ensemble and its data volumes |
 | `just zk-matrix` | Smoke-test both pinned server versions and clean up |
 | `just zk-driver-matrix` | Also connect/authenticate/sync/close using ZkLink on every node |
+| `just zk-watch-pressure-faults` | Verify unread watch queues, heartbeat progress, shared event overflow and resource cleanup on both versions |
 | `just zk-peer-partition-faults` | Isolate leader and follower peer interfaces separately and verify election, majority progress and recovery on both versions |
 | `just zk-partition-faults` | Discard each direction of client traffic independently and verify recovery or local loss on both versions |
 | `just zk-quorum-faults` | Stop two voters and verify valid-session recovery or local loss, no replay and cleanup on both versions |
@@ -140,6 +141,10 @@ leader or follower's peer interface while preserving its process and client netw
 Both pinned versions verify replacement election when the leader is isolated,
 majority progress, same-session/watch recovery, no replay and consistent data
 across all members after healing. The old leader rejoins as a follower.
+
+[Watch-pressure checks](docs/how-to/verify-watch-pressure.md) verify heartbeat
+and request progress with unread events, explicit shared-budget overflow,
+buffered event order and repeated handle/counter cleanup on both versions.
 
 ## Not yet available
 

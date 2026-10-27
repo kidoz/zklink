@@ -6,6 +6,8 @@ Complete a specific task in an existing checkout.
   dependencies, public contracts, and protocol bytes after a change.
 - [Run a local ZooKeeper ensemble](run-local-zookeeper.md) — start a pinned
   three-node fixture, collect logs, and remove its disposable data.
+- [Verify watch pressure](verify-watch-pressure.md) — hold watch events unread,
+  verify heartbeat progress, overflow, event order and resource cleanup.
 - [Verify peer partition recovery](verify-peer-partition-recovery.md) — isolate a
   leader or follower’s peer network and verify election, writes, recovery and healing.
 - [Verify one-way traffic recovery](verify-partition-recovery.md) — discard incoming

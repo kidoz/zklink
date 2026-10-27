@@ -191,4 +191,9 @@ quorum faults and release/AOT qualification remain open. The separate
 [security matrix](../how-to/verify-secure-connections.md) checks selected one-shot
 and persistent restoration over end-to-end client TLS/mTLS on both versions.
 
+[Live watch-pressure checks](../how-to/verify-watch-pressure.md) verify slow
+consumers, explicit shared-buffer overflow, buffered event order and repeated
+capacity/counter cleanup on both pinned versions. The bounded workload includes
+actual heartbeat acknowledgments and unread-handle disposal.
+
 [Reference](README.md) · [Documentation home](../README.md)
