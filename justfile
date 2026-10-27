@@ -89,3 +89,7 @@ zk-quorum-faults:
 # Discard each direction of client traffic independently and verify recovery or local loss.
 zk-partition-faults:
     bash dev/test-zookeeper-partition-faults.sh
+
+# Isolate an attached follower from its voting peers and verify majority recovery.
+zk-peer-partition-faults:
+    bash dev/test-zookeeper-peer-partition-faults.sh

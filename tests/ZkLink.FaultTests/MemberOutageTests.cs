@@ -15,6 +15,8 @@ public sealed class MemberOutageTests : IAsyncLifetime
     private static readonly TimeSpan RollbackGuard = TimeSpan.FromSeconds(50);
     private static readonly TimeSpan ShortSession = TimeSpan.FromSeconds(8);
     private static readonly TimeSpan QuorumReadGuard = TimeSpan.FromSeconds(35);
+    private static readonly TimeSpan PeerOperationGuard = TimeSpan.FromSeconds(35);
+    private static readonly TimeSpan MinorityWriteGuard = TimeSpan.FromSeconds(3);
     private readonly LiveZooKeeperFixture _fixture = new();
 
     public ValueTask InitializeAsync()
@@ -92,13 +94,17 @@ public sealed class MemberOutageTests : IAsyncLifetime
                 connectionString: source.Endpoint,
                 sessionTimeout: expectLost ? ShortSession : null,
                 connectAttemptTimeout: RecoveryAttempt,
-                operationTimeout: OperationGuard
+                operationTimeout: fault.Role == MemberControl.Peer
+                    ? PeerOperationGuard
+                    : OperationGuard
             )
             .ConfigureAwait(true);
         await using var ownerLifetime = owner.ConfigureAwait(true);
         string oncePath = _fixture.Root + "/once";
         string persistentPath = _fixture.Root + "/persistent";
         string ephemeralPath = _fixture.Root + "/lease";
+        string majorityPath = _fixture.Root + "/majority-progress";
+        string minorityPath = _fixture.Root + "/minority-probe";
         foreach (string path in new[] { oncePath, persistentPath })
         {
             await control
@@ -120,7 +126,9 @@ public sealed class MemberOutageTests : IAsyncLifetime
             .ConfigureAwait(true);
         await using var persistentLifetime = persistent.ConfigureAwait(true);
         TimeSpan restorationGuard =
-            fault.Role == MemberControl.Quorum && !expectLost ? QuorumReadGuard : EventGuard;
+            fault.Role is MemberControl.Quorum or MemberControl.Peer && !expectLost
+                ? QuorumReadGuard
+                : EventGuard;
         var events = new EventProbe<ZooKeeperWatchEvent>(
             persistent.ReadEventsAsync(token),
             token,
@@ -130,7 +138,8 @@ public sealed class MemberOutageTests : IAsyncLifetime
         var nextGap = events.MoveNextAsync();
         var onceEvents = new EventProbe<ZooKeeperWatchEvent>(
             oneShot.Watch.ReadEventsAsync(token),
-            token
+            token,
+            fault.Role == MemberControl.Peer ? QuorumReadGuard : EventGuard
         );
         await using var onceEventsLifetime = onceEvents.ConfigureAwait(true);
         Task<bool>? nextOnce =
@@ -164,9 +173,28 @@ public sealed class MemberOutageTests : IAsyncLifetime
             .ConfigureAwait(true);
         Task<CreateResult>? uncertain = null;
         ZooKeeperClient? recoveredControl = null;
+        ZooKeeperClient? minorityProbe = null;
+        bool majorityCommitted = false;
         string? replacement = null;
         try
         {
+            if (fault.Role == MemberControl.Peer)
+            {
+                minorityProbe = await _fixture
+                    .ConnectAsync(
+                        connectionString: fault.Endpoint,
+                        operationTimeout: MinorityWriteGuard
+                    )
+                    .ConfigureAwait(true);
+                await control
+                    .CreateAsync(
+                        minorityPath,
+                        new byte[] { 1 },
+                        LiveZooKeeperFixture.OwnerCreate,
+                        token
+                    )
+                    .ConfigureAwait(true);
+            }
             source.ArmCreateReply();
             uncertain = owner.CreateAsync(
                 _fixture.Root + "/" + AttemptPrefix,
@@ -189,10 +217,66 @@ public sealed class MemberOutageTests : IAsyncLifetime
                 static child => child.StartsWith(AttemptPrefix, StringComparison.Ordinal)
             );
             Step("committed-reply-withheld");
-            Step(fault.Role + "-stop-requested");
-            await fault.StopAsync(token).ConfigureAwait(true);
-            Step(fault.Role + "-stopped");
-            await source.ServerClosed.WaitAsync(EventGuard, token).ConfigureAwait(true);
+            Step(
+                fault.Role == MemberControl.Peer
+                    ? "peer-isolation-requested"
+                    : fault.Role + "-stop-requested"
+            );
+            if (fault.Role == MemberControl.Peer)
+            {
+                await fault.PartitionPeerAsync(token).ConfigureAwait(true);
+                Step("peer-interface-isolated");
+                await control
+                    .CreateAsync(
+                        majorityPath,
+                        new byte[] { 3 },
+                        LiveZooKeeperFixture.OwnerCreate,
+                        token
+                    )
+                    .ConfigureAwait(true);
+                majorityCommitted = true;
+                await control.SyncAsync(_fixture.Root, token).ConfigureAwait(true);
+                var minorityFailure = await Assert
+                    .ThrowsAnyAsync<ZooKeeperException>(() =>
+                        minorityProbe!.SetDataAsync(
+                            minorityPath,
+                            new byte[] { 2 },
+                            ZNodeVersion.Any,
+                            token
+                        )
+                    )
+                    .ConfigureAwait(true);
+                Assert.True(
+                    minorityFailure.Outcome is RequestOutcome.Unknown or RequestOutcome.NotSent
+                );
+                await control.SyncAsync(_fixture.Root, token).ConfigureAwait(true);
+                Assert.Equal(
+                    (byte)1,
+                    Assert.Single(
+                        (
+                            await control.GetDataAsync(minorityPath, token).ConfigureAwait(true)
+                        ).Data!.Value.ToArray()
+                    )
+                );
+                Step("majority-committed-minority-write-" + minorityFailure.Outcome);
+                await minorityProbe!.DisposeAsync().ConfigureAwait(true);
+                minorityProbe = null;
+            }
+            else
+            {
+                await fault.StopAsync(token).ConfigureAwait(true);
+                Step(fault.Role + "-stopped");
+            }
+            if (fault.Role == MemberControl.Peer)
+            {
+                // A live isolated server may race its close with the client's outgoing pump.
+                await WaitStateAsync(stateReader, ZooKeeperSessionState.Disconnected, token)
+                    .ConfigureAwait(true);
+            }
+            else
+            {
+                await source.ServerClosed.WaitAsync(EventGuard, token).ConfigureAwait(true);
+            }
             var error = await Assert
                 .ThrowsAsync<ZooKeeperException>(async () =>
                 {
@@ -207,8 +291,11 @@ public sealed class MemberOutageTests : IAsyncLifetime
                 replacement = await fault.WaitForReplacementLeaderAsync(token).ConfigureAwait(true);
                 Step("replacement-leader-" + replacement);
             }
-            await WaitStateAsync(stateReader, ZooKeeperSessionState.Disconnected, token)
-                .ConfigureAwait(true);
+            if (fault.Role != MemberControl.Peer)
+            {
+                await WaitStateAsync(stateReader, ZooKeeperSessionState.Disconnected, token)
+                    .ConfigureAwait(true);
+            }
             var ready = owner.WaitForConnectionAsync(token);
             if (fault.Role == MemberControl.Quorum)
             {
@@ -396,6 +483,25 @@ public sealed class MemberOutageTests : IAsyncLifetime
             try
             {
                 await fault.RestoreAsync(rollback.Token).ConfigureAwait(true);
+                if (fault.Role == MemberControl.Peer && majorityCommitted)
+                {
+                    foreach (string endpoint in _fixture.ConnectionString.Split(','))
+                    {
+                        var replica = await _fixture
+                            .ConnectAsync(
+                                connectionString: endpoint,
+                                cancellationToken: rollback.Token
+                            )
+                            .ConfigureAwait(true);
+                        await using var replicaLifetime = replica.ConfigureAwait(true);
+                        await replica.SyncAsync(_fixture.Root, rollback.Token).ConfigureAwait(true);
+                        var data = await replica
+                            .GetDataAsync(majorityPath, rollback.Token)
+                            .ConfigureAwait(true);
+                        Assert.Equal((byte)3, Assert.Single(data.Data!.Value.ToArray()));
+                    }
+                    Step("peer-healed-all-replicas-consistent");
+                }
                 if (replacement is not null)
                 {
                     Assert.Equal(
@@ -417,6 +523,10 @@ public sealed class MemberOutageTests : IAsyncLifetime
             finally
             {
                 await owner.DisposeAsync().ConfigureAwait(true);
+                if (minorityProbe is not null)
+                {
+                    await minorityProbe.DisposeAsync().ConfigureAwait(true);
+                }
                 if (recoveredControl is not null)
                 {
                     await recoveredControl.DisposeAsync().ConfigureAwait(true);

@@ -2,17 +2,19 @@ using System.Diagnostics;
 
 namespace ZkLink.FaultTests;
 
-// Only the runner's labeled, nonce-named disposable target can be stopped/started.
+// Only the runner's labeled, nonce-named disposable fixture can be controlled.
 internal sealed class MemberControl
 {
     private static readonly TimeSpan ActionGuard = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan ReadyGuard = TimeSpan.FromSeconds(25);
     private static readonly TimeSpan ReadyPoll = TimeSpan.FromMilliseconds(250);
     private static readonly TimeSpan EnsembleGuard = TimeSpan.FromSeconds(40);
+    private static readonly TimeSpan PeerActionGuard = TimeSpan.FromSeconds(20);
     internal const string Leader = "leader";
     internal const string Follower = "follower";
     internal const string Quorum = "quorum";
     internal const string Partition = "partition";
+    internal const string Peer = "peer";
     internal const string Brief = "brief";
     internal const string UntilLost = "lost";
     internal const string Incoming = "incoming";
@@ -38,9 +40,10 @@ internal sealed class MemberControl
     internal MemberControl()
     {
         _targets = Role == Quorum ? [Service, Required("ZKLINK_FAULT_SECOND_SERVICE")] : [Service];
+        string? peerState = Environment.GetEnvironmentVariable("ZKLINK_PEER_STATE_FILE");
         const int RunIdLength = 32;
         if (
-            Role is not (Leader or Follower or Quorum or Partition)
+            Role is not (Leader or Follower or Quorum or Partition or Peer)
             || _version is not ("3.8.7" or "3.9.6")
             || _runId.Length != RunIdLength
             || !_runId.All(char.IsAsciiHexDigit)
@@ -52,6 +55,17 @@ internal sealed class MemberControl
             || (Role == Partition && Direction is not (Incoming or Outgoing))
             || !Path.IsPathFullyQualified(_root)
             || !File.Exists(Path.Combine(_root, "compose.fault.yaml"))
+            || (
+                Role == Peer
+                && (
+                    peerState is null
+                    || !Path.IsPathFullyQualified(peerState)
+                    || Path.GetFileName(Path.GetDirectoryName(peerState))
+                        ?.StartsWith("zklink-peer-faults.", StringComparison.Ordinal) != true
+                    || !File.Exists(Path.Combine(_root, "compose.peer-fault.yaml"))
+                    || !File.Exists(Path.Combine(_root, "dev", "zookeeper-peer-network.py"))
+                )
+            )
         )
         {
             throw new InvalidOperationException(
@@ -63,7 +77,7 @@ internal sealed class MemberControl
     internal static string Required(string name) =>
         Environment.GetEnvironmentVariable(name)
         ?? throw new InvalidOperationException(
-            "Run the matching just zk-follower-faults, zk-leader-faults, zk-quorum-faults or zk-partition-faults command with its required disposable fixture."
+            "Run the matching just zk-follower-faults, zk-leader-faults, zk-quorum-faults, zk-partition-faults or zk-peer-partition-faults command with its required disposable fixture."
         );
 
     private string[] Compose(params string[] arguments) =>
@@ -78,6 +92,7 @@ internal sealed class MemberControl
                     ? new[] { "-f", Path.Combine(_root, "compose.quorum-fault.yaml") }
                     : []
             ),
+            .. (Role == Peer ? new[] { "-f", Path.Combine(_root, "compose.peer-fault.yaml") } : []),
             "--env-file",
             Path.Combine(_root, $"dev/zookeeper-{_version}.env"),
             "--project-name",
@@ -115,9 +130,9 @@ internal sealed class MemberControl
 
     internal async Task StopAsync(CancellationToken token)
     {
-        if (Role == Partition)
+        if (Role is Partition or Peer)
         {
-            throw new InvalidOperationException("Client partitions must not stop any server.");
+            throw new InvalidOperationException("Partition experiments must not stop any server.");
         }
         foreach (string target in _targets)
         {
@@ -174,6 +189,14 @@ internal sealed class MemberControl
         {
             return;
         }
+        if (Role == Peer)
+        {
+            await RunPeerAsync("heal", token).ConfigureAwait(false);
+            await WaitForEnsembleAsync(requireAll: true, token).ConfigureAwait(false);
+            await RunPeerAsync("verify", token).ConfigureAwait(false);
+            RestoreRequired = false;
+            return;
+        }
         if (Role == Quorum)
         {
             await RecoverQuorumAsync(token).ConfigureAwait(false);
@@ -217,6 +240,39 @@ internal sealed class MemberControl
         throw new TimeoutException(
             "Follower role/readiness did not recover within the rollback guard."
         );
+    }
+
+    internal async Task PartitionPeerAsync(CancellationToken token)
+    {
+        if (Role != Peer)
+        {
+            throw new InvalidOperationException("The owned peer-partition runner is required.");
+        }
+        await VerifyOwnershipAsync(Service, token).ConfigureAwait(false);
+        if (await ReadRoleAsync(Service, token).ConfigureAwait(false) != Follower)
+        {
+            throw new InvalidOperationException(
+                "Only an attached observed follower may be isolated."
+            );
+        }
+        RestoreRequired = true;
+        await RunPeerAsync("isolate", token).ConfigureAwait(false);
+    }
+
+    private async Task RunPeerAsync(string action, CancellationToken token)
+    {
+        var (code, output) = await RunAsync(
+                [Path.Combine(_root, "dev/zookeeper-peer-network.py"), action],
+                token,
+                executable: "python3",
+                actionGuard: PeerActionGuard
+            )
+            .ConfigureAwait(false);
+        TestContext.Current.TestOutputHelper?.WriteLine(output);
+        if (code != 0)
+        {
+            throw new InvalidOperationException("Owned peer-network control failed.");
+        }
     }
 
     internal async Task RecoverQuorumAsync(CancellationToken token)
@@ -358,10 +414,12 @@ internal sealed class MemberControl
 
     private static async Task<(int Code, string Output)> RunAsync(
         string[] arguments,
-        CancellationToken token
+        CancellationToken token,
+        string executable = "docker",
+        TimeSpan? actionGuard = null
     )
     {
-        var start = new ProcessStartInfo("docker")
+        var start = new ProcessStartInfo(executable)
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -375,7 +433,7 @@ internal sealed class MemberControl
             Process.Start(start)
             ?? throw new InvalidOperationException("Docker control could not start.");
         using var guard = CancellationTokenSource.CreateLinkedTokenSource(token);
-        guard.CancelAfter(ActionGuard);
+        guard.CancelAfter(actionGuard ?? ActionGuard);
         var output = ReadOutputAsync(process.StandardOutput, guard.Token);
         var error = ReadOutputAsync(process.StandardError, guard.Token);
         try

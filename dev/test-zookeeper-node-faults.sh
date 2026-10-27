@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-if [[ $# -ne 1 || ( "$1" != follower && "$1" != leader && "$1" != quorum && "$1" != partition ) ]]; then
-  echo "Usage: $0 follower|leader|quorum|partition" >&2; exit 2
+if [[ $# -ne 1 || ( "$1" != follower && "$1" != leader && "$1" != quorum && "$1" != partition && "$1" != peer ) ]]; then
+  echo "Usage: $0 follower|leader|quorum|partition|peer" >&2; exit 2
 fi
 role="$1"
 export ZKLINK_FAULT_ROLE="${role}"
@@ -29,6 +29,7 @@ target=""
 allocation_network=""
 compose_files=(-f compose.yaml -f compose.fault.yaml)
 if [[ "${role}" == quorum ]]; then compose_files+=(-f compose.quorum-fault.yaml); fi
+if [[ "${role}" == peer ]]; then compose_files+=(-f compose.peer-fault.yaml); fi
 compose() {
   docker compose "${compose_files[@]}" --env-file "dev/zookeeper-${version}.env" --project-name "${project}" "$@"
 }
@@ -44,6 +45,10 @@ cleanup() {
   if [[ -n "${project}" ]]; then
     # A second rollback path survives a crashed or cancelled test process.
     if [[ -n "${target}" ]]; then
+      if [[ "${role}" == peer && -f "${ZKLINK_PEER_STATE_FILE}" ]]; then
+        ZKLINK_FAULT_PROJECT="${project}" ZKLINK_FAULT_SERVICE="${target}" \
+          python3 dev/zookeeper-peer-network.py heal >>"${artifacts}/${evidence_key}-rollback.log" 2>&1 || cleanup_exit=1
+      fi
       compose start >>"${artifacts}/${evidence_key}-rollback.log" 2>&1 || cleanup_exit=1
       compose up -d --wait --wait-timeout "${rollback_guard_seconds}" >>"${artifacts}/${evidence_key}-rollback.log" 2>&1 || cleanup_exit=1
     fi
@@ -73,16 +78,17 @@ for outage in "${outages[@]}"; do
     target=""
     second_target=""
     export ZKLINK_FAULT_OUTAGE="${outage}"
+    export ZKLINK_PEER_STATE_FILE="${artifacts}/${evidence_key}-peer-state.json"
     # Docker can reassign a zero-published host port when its container restarts.
     # Bind candidates together to choose distinct available loopback ports. If
     # another process wins the subsequent bind race, Compose startup must fail.
-    if [[ "${role}" == quorum ]]; then
+    if [[ "${role}" == quorum || "${role}" == peer ]]; then
       allocation_network="${project}-allocation"
-      read -r ZKLINK_FAULT_SUBNET ZKLINK_FAULT_IP_1 ZKLINK_FAULT_IP_2 ZKLINK_FAULT_IP_3 < <(python3 - "${allocation_network}" "${ZKLINK_FAULT_RUN_ID}" <<'NETWORK'
+      read -r ZKLINK_FAULT_SUBNET ZKLINK_FAULT_IP_1 ZKLINK_FAULT_IP_2 ZKLINK_FAULT_IP_3 ZKLINK_FAULT_CLIENT_SUBNET ZKLINK_FAULT_CLIENT_IP_1 ZKLINK_FAULT_CLIENT_IP_2 ZKLINK_FAULT_CLIENT_IP_3 < <(python3 - "${allocation_network}" "${ZKLINK_FAULT_RUN_ID}" "${role}" <<'NETWORK'
 import ipaddress
 import subprocess
 import sys
-name, run_id = sys.argv[1:]
+name, run_id, role = sys.argv[1:]
 COMMAND_TIMEOUT_SECONDS = 10
 FIRST_MEMBER_HOST = 11
 def docker(*args):
@@ -93,16 +99,20 @@ try:
     created = True
     subnet = ipaddress.ip_network(docker("network", "inspect", "--format", "{{(index .IPAM.Config 0).Subnet}}", name))
     assert subnet.version == 4 and subnet.num_addresses > FIRST_MEMBER_HOST + 3
+    client = None
+    if role == "peer":
+        client, subnet = list(subnet.subnets(prefixlen_diff=1))
     addresses = [str(subnet[FIRST_MEMBER_HOST + member]) for member in range(3)]
 finally:
     if created:
         assert docker("network", "inspect", "--format", '{{index .Labels "org.zklink.fault-run"}}', name) == run_id
         docker("network", "rm", name)
-print(str(subnet), *addresses)
+extra = [str(client), *(str(client[FIRST_MEMBER_HOST + member]) for member in range(3))] if client else []
+print(str(subnet), *addresses, *extra)
 NETWORK
 )
       allocation_network=""
-      export ZKLINK_FAULT_SUBNET ZKLINK_FAULT_IP_1 ZKLINK_FAULT_IP_2 ZKLINK_FAULT_IP_3
+      export ZKLINK_FAULT_SUBNET ZKLINK_FAULT_IP_1 ZKLINK_FAULT_IP_2 ZKLINK_FAULT_IP_3 ZKLINK_FAULT_CLIENT_SUBNET ZKLINK_FAULT_CLIENT_IP_1 ZKLINK_FAULT_CLIENT_IP_2 ZKLINK_FAULT_CLIENT_IP_3
       read -r ZOOKEEPER_PORT_1 ZOOKEEPER_PORT_2 ZOOKEEPER_PORT_3 < <(python3 - <<'PORTS'
 import socket
 with socket.socket() as first, socket.socket() as second, socket.socket() as third:
@@ -128,7 +138,7 @@ PORTS
       if grep -Fxq 'Mode: follower' "${artifacts}/${evidence_key}-${service}-role-before.txt"; then
         followers=$((followers + 1))
         if [[ "${role}" == quorum && -z "${second_target}" ]]; then second_target="${service}"; fi
-        if [[ "${role}" == follower && -z "${target}" ]]; then target="${service}"; fi
+        if [[ ( "${role}" == follower || "${role}" == peer ) && -z "${target}" ]]; then target="${service}"; fi
       elif grep -Fxq 'Mode: leader' "${artifacts}/${evidence_key}-${service}-role-before.txt"; then
         leaders=$((leaders + 1))
         if [[ ( "${role}" == leader || "${role}" == quorum || "${role}" == partition ) && -z "${target}" ]]; then target="${service}"; fi
@@ -138,6 +148,7 @@ PORTS
     done
     if [[ "${leaders}" -ne 1 || "${followers}" -ne 2 ]]; then echo "No healthy voting ensemble" >&2; exit 1; fi
     selection="first observed ${role}"
+    if [[ "${role}" == peer ]]; then selection="first observed follower for peer isolation"; fi
     if [[ "${role}" == partition ]]; then selection="observed leader as the client proxy target"; fi
     if [[ "${role}" == quorum ]]; then selection="observed leader and first observed follower"; fi
     printf 'Selection: %s in zoo1/zoo2/zoo3 order\nTarget: %s\n' "${selection}" "${target}" >"${artifacts}/${evidence_key}-selection.txt"

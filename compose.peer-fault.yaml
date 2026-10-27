@@ -1,0 +1,47 @@
+# Client and peer interfaces are separate so only quorum/election connectivity
+# is removed. Literal fixed peer addresses avoid DNS changes during healing.
+x-peer-environment: &peer-environment
+  ZOO_SERVERS: >-
+    server.1=${ZKLINK_FAULT_IP_1:?Peer runner required}:2888:3888;2181
+    server.2=${ZKLINK_FAULT_IP_2:?Peer runner required}:2888:3888;2181
+    server.3=${ZKLINK_FAULT_IP_3:?Peer runner required}:2888:3888;2181
+
+services:
+  zoo1:
+    environment: *peer-environment
+    networks:
+      default:
+        ipv4_address: ${ZKLINK_FAULT_CLIENT_IP_1:?Peer runner required}
+        gw_priority: 1
+      peer:
+        ipv4_address: ${ZKLINK_FAULT_IP_1:?Peer runner required}
+  zoo2:
+    environment: *peer-environment
+    networks:
+      default:
+        ipv4_address: ${ZKLINK_FAULT_CLIENT_IP_2:?Peer runner required}
+        gw_priority: 1
+      peer:
+        ipv4_address: ${ZKLINK_FAULT_IP_2:?Peer runner required}
+  zoo3:
+    environment: *peer-environment
+    networks:
+      default:
+        ipv4_address: ${ZKLINK_FAULT_CLIENT_IP_3:?Peer runner required}
+        gw_priority: 1
+      peer:
+        ipv4_address: ${ZKLINK_FAULT_IP_3:?Peer runner required}
+
+networks:
+  default:
+    labels:
+      org.zklink.fault-run: ${ZKLINK_FAULT_RUN_ID:?Peer runner required}
+    ipam:
+      config:
+        - subnet: ${ZKLINK_FAULT_CLIENT_SUBNET:?Peer runner required}
+  peer:
+    labels:
+      org.zklink.fault-run: ${ZKLINK_FAULT_RUN_ID:?Peer runner required}
+    ipam:
+      config:
+        - subnet: ${ZKLINK_FAULT_SUBNET:?Peer runner required}
