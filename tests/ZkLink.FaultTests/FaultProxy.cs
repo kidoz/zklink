@@ -10,6 +10,7 @@ namespace ZkLink.FaultTests;
 // can hold a real watch-reset acknowledgment until the readiness assertions finish.
 internal sealed class FaultProxy : IAsyncDisposable
 {
+    internal const int Success = 0;
     private const int MaximumFrameBytes = 1_048_575;
     private const int HeaderBytes = sizeof(int) + sizeof(long) + sizeof(int);
     private const int ResetXid = -8;
@@ -44,7 +45,9 @@ internal sealed class FaultProxy : IAsyncDisposable
             || !IPAddress.IsLoopback(address)
             || _target.Port <= 0
         )
+        {
             throw new ArgumentException("A loopback fixture target is required.", nameof(endpoint));
+        }
         _holdRestore = holdRestore;
         _stop = CancellationTokenSource.CreateLinkedTokenSource(token);
         _stop.CancelAfter(LifetimeGuard);
@@ -58,7 +61,9 @@ internal sealed class FaultProxy : IAsyncDisposable
         lock (_gate)
         {
             if (_armed)
+            {
                 throw new InvalidOperationException("Only one create may be withheld.");
+            }
             _armed = true;
         }
     }
@@ -75,9 +80,18 @@ internal sealed class FaultProxy : IAsyncDisposable
                     .AcceptTcpClientAsync(_stop.Token)
                     .ConfigureAwait(false);
                 using var upstream = new TcpClient();
-                await upstream
-                    .ConnectAsync(_target.Host, _target.Port, _stop.Token)
-                    .ConfigureAwait(false);
+                try
+                {
+                    await upstream
+                        .ConnectAsync(_target.Host, _target.Port, _stop.Token)
+                        .ConfigureAwait(false);
+                }
+                catch (SocketException)
+                {
+                    // The member can temporarily close its client port during election.
+                    // Close this downstream attempt and accept the driver's next attempt.
+                    continue;
+                }
                 client.NoDelay = true;
                 upstream.NoDelay = true;
                 lock (_gate)
@@ -138,13 +152,17 @@ internal sealed class FaultProxy : IAsyncDisposable
                 if (await source.ReadAsync(prefix.AsMemory(0, 1), token).ConfigureAwait(false) == 0)
                 {
                     if (incoming)
+                    {
                         _serverClosed.TrySetResult();
+                    }
                     return;
                 }
                 await source.ReadExactlyAsync(prefix.AsMemory(1), token).ConfigureAwait(false);
                 int length = BinaryPrimitives.ReadInt32BigEndian(prefix);
                 if (length is <= 0 or > MaximumFrameBytes)
+                {
                     throw new InvalidDataException("Fault proxy frame bound exceeded.");
+                }
                 var packet = new byte[length];
                 try
                 {
@@ -169,7 +187,9 @@ internal sealed class FaultProxy : IAsyncDisposable
                                 lock (_gate)
                                 {
                                     if (_armed && _selectedXid is null)
+                                    {
                                         _selectedXid = xid;
+                                    }
                                 }
                             }
                         }
@@ -177,7 +197,9 @@ internal sealed class FaultProxy : IAsyncDisposable
                         {
                             bool discard;
                             lock (_gate)
+                            {
                                 discard = _selectedXid == xid;
+                            }
                             if (discard)
                             {
                                 WithheldError = BinaryPrimitives.ReadInt32BigEndian(
@@ -186,7 +208,13 @@ internal sealed class FaultProxy : IAsyncDisposable
                                 _withheld.TrySetResult();
                                 continue;
                             }
-                            if (_holdRestore && xid == ResetXid)
+                            if (
+                                _holdRestore
+                                && xid == ResetXid
+                                && BinaryPrimitives.ReadInt32BigEndian(
+                                    packet.AsSpan(sizeof(int) + sizeof(long))
+                                ) == Success
+                            )
                             {
                                 _restoreHeld.TrySetResult();
                                 await _restoreRelease.Task.WaitAsync(token).ConfigureAwait(false);
@@ -207,7 +235,9 @@ internal sealed class FaultProxy : IAsyncDisposable
         catch (IOException)
         {
             if (incoming && !token.IsCancellationRequested)
+            {
                 _serverClosed.TrySetResult();
+            }
         }
         catch (ObjectDisposedException) when (token.IsCancellationRequested) { }
         finally

@@ -77,3 +77,7 @@ zk-security-concurrency:
 # Stop one observed follower and verify same-session recovery on both pinned versions.
 zk-follower-faults:
     bash dev/test-zookeeper-follower-faults.sh
+
+# Stop the observed leader and verify election plus session/watch recovery on both versions.
+zk-leader-faults:
+    bash dev/test-zookeeper-leader-faults.sh
