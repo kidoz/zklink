@@ -4,7 +4,7 @@
 
 | Setting | Value | Source |
 | --- | --- | --- |
-| SDK | 10.0.402; roll-forward disabled | [global.json](../../global.json) |
+| SDK | 10.0.403; roll-forward disabled | [global.json](../../global.json) |
 | Target and language | `net10.0`, C# 14 | [Directory.Build.props](../../Directory.Build.props) |
 | Compiler policy | Nullable enabled; warnings as errors | [Directory.Build.props](../../Directory.Build.props) |
 | Formatter | CSharpier 1.3.0 | [Local tool manifest](../../dotnet-tools.json) |

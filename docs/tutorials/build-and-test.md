@@ -6,7 +6,7 @@ machine. This exercise requires no ZooKeeper server or Java installation.
 
 ## Before you begin
 
-Have a local checkout of this repository, .NET SDK **10.0.402**, and `just`
+Have a local checkout of this repository, .NET SDK **10.0.403**, and `just`
 installed. Open a terminal at the repository root, which contains `ZkLink.slnx`.
 The first restore needs access to the configured NuGet feed.
 
@@ -19,7 +19,7 @@ dotnet --version
 just --list
 ```
 
-The SDK output should be `10.0.402`. The recipe list includes `restore`, `build`,
+The SDK output should be `10.0.403`. The recipe list includes `restore`, `build`,
 and `test`. The repository pins the SDK with roll-forward disabled.
 
 ## 2. Restore tools and dependencies

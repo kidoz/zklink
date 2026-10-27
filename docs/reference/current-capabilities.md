@@ -24,7 +24,7 @@ best-effort delivery semantics.
 
 ## Frameworks and platforms
 
-The current target framework is `net10.0`; the pinned SDK is `10.0.402`. The core
+The current target framework is `net10.0`; the pinned SDK is `10.0.403`. The core
 has no third-party runtime dependencies. Public API declarations are checked
 against shipped/unshipped baseline files; the shipped baseline is empty.
 

@@ -1,7 +1,7 @@
 # ZkLink
 
 [![Language](https://img.shields.io/badge/language-C%23-512BD4)](https://learn.microsoft.com/dotnet/csharp/)
-[![.NET SDK](https://img.shields.io/badge/.NET%20SDK-10.0.402-512BD4)](https://github.com/kidoz/zklink/blob/main/global.json)
+[![.NET SDK](https://img.shields.io/badge/.NET%20SDK-10.0.403-512BD4)](https://github.com/kidoz/zklink/blob/main/global.json)
 [![License](https://img.shields.io/badge/license-MIT-green)](https://github.com/kidoz/zklink/blob/main/LICENSE)
 
 ZkLink is a managed .NET client for Apache ZooKeeper: a first-class C# implementation of the ZooKeeper client TCP protocol, targeting .NET 10. Native AOT compatibility is a planned, separately tested requirement, not a current capability.
@@ -14,14 +14,14 @@ ZkLink is a managed .NET client for Apache ZooKeeper: a first-class C# implement
 - **Target:** `net10.0`, C# 14, nullable reference types, and warnings as errors.
 - **Code:** checked protocol encoding/decoding for node, ACL, transaction and control messages; bounded asynchronous framing; new/resume handshake records; connection-string parsing and namespace translation. Public supporting types include immutable results, create options and failure/removal contracts. One explicit session per client, negotiated-timeout heartbeats, endpoint rotation, same-session reconnect, cancellation outcomes and close cleanup are implemented. Sent application requests are never replayed automatically.
 - **Tests:** xUnit suites cover Apache Java fixtures for all implemented opcodes, transaction success/error shapes, every reply split and truncation, all UTF-16 path code units, chroot boundaries and supporting public contracts. A bounded scripted stream and loopback fake server exercise delayed delivery, partial writes, dropped replies and handshake exchanges. Virtual-time tests exercise session and request lifecycles. Loopback TLS tests check chain/name validation, certificate expiry and mutual authentication. The managed connection sample has passed digest auth, sync and acknowledged close on every node of both pinned versions. Live .NET tests cover CRUD, versions, null/empty and 1,000,000-byte data, create modes, chroot, ACL authorization and acknowledged-close ephemeral deletion on both pinned versions. Live transaction tests verify atomic success/rollback, independent read errors, and committed writes whose replies are dropped, followed by same-session resume without replay. Auxiliary tests verify session-scoped textual ephemeral prefixes, chroot, recursive counts, permissions and server identities. One-shot watch tests cover events, sharing/removal, chroot, re-registration and same-session restoration after a connection cut. Persistent/recursive watch tests cover repeated delivery, profile-specific removal and reconnect gaps. Broader live faults remain unverified.
-- **Build:** SDK 10.0.402 is pinned, with central dependency versions and lock files; core has no third-party runtime dependencies. Public API changes are checked against nullable baselines. The [build workflow](.github/workflows/build.yml) defines Linux/Windows/macOS checks and separate Gradle-based Apache Java verification. Only local macOS arm64 execution has been verified; remote runs and Native AOT remain unverified.
+- **Build:** SDK 10.0.403 is pinned, with central dependency versions and lock files; core has no third-party runtime dependencies. Public API changes are checked against nullable baselines. The [build workflow](.github/workflows/build.yml) defines Linux/Windows/macOS checks and separate Gradle-based Apache Java verification. Only local macOS arm64 execution has been verified; remote runs and Native AOT remain unverified.
 - **Distribution:** no package has been released. The project is [MIT-licensed](LICENSE); remaining release packaging and qualification remain open. See the [dependency inventory](THIRD-PARTY-NOTICES.md).
 
 The library lives in `src/`; `tests/` contains public-contract tests, protocol tests and an optional Java oracle. The [basic sample](samples/ZkLink.Samples.Basic) can connect, exercise CRUD with `--nodes`, run transactions with `--transactions`, and query ephemerals/counts/identities with `--auxiliary`, and exercise one-shot, persistent and recursive watches with `--watches`; benchmarks are not yet available.
 
 ## Development commands
 
-Install [just](https://just.systems/) and .NET SDK **10.0.402**. Docker with Compose is required for the ZooKeeper fixture. Run `just` to list shortcuts.
+Install [just](https://just.systems/) and .NET SDK **10.0.403**. Docker with Compose is required for the ZooKeeper fixture. Run `just` to list shortcuts.
 
 | Command | Purpose |
 | --- | --- |
