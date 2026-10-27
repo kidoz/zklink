@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using ZkLink.Configuration;
+using ZkLink.Diagnostics;
 using ZkLink.Protocol;
 using ZkLink.Sessions;
 
@@ -50,6 +51,7 @@ internal sealed class PendingRequest
     internal bool Writing;
     internal bool Completed;
     internal bool Released;
+    internal bool Tombstone;
     internal CancellationTokenRegistration Cancellation;
     internal ITimer? Timer;
     internal RequestOutcome Outcome => Sent ? RequestOutcome.Unknown : RequestOutcome.NotSent;
@@ -59,9 +61,11 @@ internal sealed class RequestScheduler(
     object gate,
     ClientOptionsSnapshot options,
     TimeProvider timeProvider,
-    AsyncPulse work
+    AsyncPulse work,
+    TelemetryState? telemetry = null
 )
 {
+    private readonly TelemetryState? _telemetry = telemetry;
     private readonly LinkedList<PendingRequest> _queued = [];
     private readonly Queue<PendingRequest> _sent = [];
     private readonly HashSet<int> _xids = [];
@@ -70,6 +74,8 @@ internal sealed class RequestScheduler(
     private int _bytes;
     private int _inFlight;
     private int _preparing;
+    private int _tombstones;
+    private long _pingStarted;
     private int _nextXid = 1;
     private bool _accepting;
     private bool _pingQueued;
@@ -115,6 +121,7 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
+            using var pressure = new PressureObservation(this);
             return _generation != 0 && _generation == value;
         }
     }
@@ -123,6 +130,7 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
+            using var pressure = new PressureObservation(this);
             _nextXid = value > 0 ? value : throw new ArgumentOutOfRangeException(nameof(value));
         }
     }
@@ -131,6 +139,7 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
+            using var pressure = new PressureObservation(this);
             _generation = value;
             _endpoint = target;
             _accepting = true;
@@ -144,6 +153,7 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
+            using var pressure = new PressureObservation(this);
             _accepting = false;
         }
     }
@@ -152,7 +162,32 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
+            using var pressure = new PressureObservation(this);
             return _preparersDrained.Task;
+        }
+    }
+
+    internal Task<WireReply> Submit(
+        WireRequest request,
+        ZooKeeperRequestInfo info,
+        CancellationToken cancellationToken,
+        IRequestObserver? observer = null,
+        bool watchOperation = false,
+        bool maintenance = false
+    )
+    {
+        var span = ZooKeeperTelemetry.Begin(timeProvider, TelemetryKind.Operation, info.Operation);
+        try
+        {
+            return ZooKeeperTelemetry.ObserveAsync(
+                SubmitCore(request, info, cancellationToken, observer, watchOperation, maintenance),
+                span
+            );
+        }
+        catch (Exception error)
+        {
+            span.Complete(error);
+            throw;
         }
     }
 
@@ -161,7 +196,7 @@ internal sealed class RequestScheduler(
         "CA1031",
         Justification = "Preparation exceptions complete the caller Task after returning reserved capacity; they are not swallowed."
     )]
-    internal Task<WireReply> Submit(
+    private Task<WireReply> SubmitCore(
         WireRequest request,
         ZooKeeperRequestInfo info,
         CancellationToken cancellationToken,
@@ -193,6 +228,7 @@ internal sealed class RequestScheduler(
         PendingRequest pending;
         lock (gate)
         {
+            using var pressure = new PressureObservation(this);
             if (!_accepting)
             {
                 return Task.FromException<WireReply>(
@@ -247,6 +283,7 @@ internal sealed class RequestScheduler(
         }
         lock (gate)
         {
+            using var pressure = new PressureObservation(this);
             pending.Packet = packet;
             pending.Shape = shape;
             pending.Preparing = false;
@@ -346,6 +383,7 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
+            using var pressure = new PressureObservation(this);
             if (pending.Completed || pending.Completion.Task.IsCompleted)
             {
                 return;
@@ -358,7 +396,11 @@ internal sealed class RequestScheduler(
                     pending.Token
                 );
             pending.Observer?.Canceled(pending);
-            pending.Completion.TrySetException(error);
+            if (pending.Completion.TrySetException(error) && pending.Sent)
+            {
+                pending.Tombstone = true;
+                _tombstones++;
+            }
             pending.Cancellation.Unregister();
             pending.Timer?.Dispose();
             if (!pending.Sent)
@@ -375,6 +417,7 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
+            using var pressure = new PressureObservation(this);
             if (_accepting && !_pingSent)
             {
                 _pingQueued = true;
@@ -387,6 +430,7 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
+            using var pressure = new PressureObservation(this);
             if (value != _generation)
             {
                 return false;
@@ -396,6 +440,7 @@ internal sealed class RequestScheduler(
                 throw new InvalidDataException("Unexpected ping acknowledgment.");
             }
             _pingSent = false;
+            ZooKeeperTelemetry.RecordHeartbeat(timeProvider.GetElapsedTime(_pingStarted));
             return true;
         }
     }
@@ -404,6 +449,7 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
+            using var pressure = new PressureObservation(this);
             if (_generation == 0)
             {
                 throw new ZooKeeperCloseException(
@@ -419,9 +465,15 @@ internal sealed class RequestScheduler(
             }
             foreach (var pending in _sent)
             {
-                pending.Completion.TrySetException(
-                    new ZooKeeperException(pending.Info, RequestOutcome.Unknown)
-                );
+                if (
+                    pending.Completion.TrySetException(
+                        new ZooKeeperException(pending.Info, RequestOutcome.Unknown)
+                    )
+                )
+                {
+                    pending.Tombstone = true;
+                    _tombstones++;
+                }
                 pending.Cancellation.Unregister();
                 pending.Timer?.Dispose();
             }
@@ -453,6 +505,7 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
+            using var pressure = new PressureObservation(this);
             if (value != _generation || _generation == 0)
             {
                 return (null, false);
@@ -462,6 +515,7 @@ internal sealed class RequestScheduler(
             {
                 _pingQueued = false;
                 _pingSent = true;
+                _pingStarted = timeProvider.GetTimestamp();
                 return (null, true);
             }
             if (
@@ -502,6 +556,7 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
+            using var pressure = new PressureObservation(this);
             pending.Writing = false;
             Release(pending);
         }
@@ -511,6 +566,7 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
+            using var pressure = new PressureObservation(this);
             if (value != _generation)
             {
                 return null;
@@ -527,6 +583,7 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
+            using var pressure = new PressureObservation(this);
             var pending = Expected(value, xid);
             shape = pending?.Shape;
             return pending;
@@ -537,6 +594,7 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
+            using var pressure = new PressureObservation(this);
             if (value != _generation)
             {
                 return false;
@@ -550,6 +608,11 @@ internal sealed class RequestScheduler(
             if (ReferenceEquals(_maintenance, pending))
                 _maintenance = null;
             _sent.Dequeue();
+            if (pending.Tombstone)
+            {
+                pending.Tombstone = false;
+                _tombstones--;
+            }
             _xids.Remove(pending.Info.RequestId!.Value);
             if (!pending.Control)
             {
@@ -615,6 +678,7 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
+            using var pressure = new PressureObservation(this);
             return
                 _sent.TryPeek(out var pending)
                 && pending.Info.Operation != ZooKeeperOperation.CloseSession
@@ -629,6 +693,7 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
+            using var pressure = new PressureObservation(this);
             _accepting = false;
             _generation = 0;
             _pingQueued = false;
@@ -662,6 +727,7 @@ internal sealed class RequestScheduler(
             _sent.Clear();
             _xids.Clear();
             _inFlight = 0;
+            _tombstones = 0;
         }
         work.Set();
     }
@@ -703,6 +769,19 @@ internal sealed class RequestScheduler(
         pending.Packet = null;
         pending.Shape = null;
         _bytes -= pending.ReservedBytes;
+    }
+
+    private readonly struct PressureObservation(RequestScheduler owner) : IDisposable
+    {
+        public void Dispose() =>
+            owner._telemetry?.Requests(
+                owner._queued.Count
+                    + owner._sent.Count
+                    + (owner._maintenance is { Sent: false } ? 1 : 0)
+                    + (owner._close is { Sent: false, Completed: false } ? 1 : 0),
+                owner._bytes,
+                owner._tombstones
+            );
     }
 
     private int AllocateXid()

@@ -1,4 +1,5 @@
 using ZkLink.Configuration;
+using ZkLink.Diagnostics;
 using ZkLink.Protocol;
 using ZkLink.Sessions;
 using ZkLink.Transport;
@@ -56,6 +57,8 @@ public sealed partial class ZooKeeperClient : IAsyncDisposable
         CancellationToken cancellationToken
     )
     {
+        var span = ZooKeeperTelemetry.Begin(time, TelemetryKind.Connect);
+        Exception? failure = null;
         SessionManager? manager = null;
         var transferred = false;
         try
@@ -67,8 +70,11 @@ public sealed partial class ZooKeeperClient : IAsyncDisposable
             transferred = true;
             return result;
         }
-        catch
+        catch (Exception error)
         {
+            failure = cancellationToken.IsCancellationRequested
+                ? new OperationCanceledException(cancellationToken)
+                : error;
             cancellationToken.ThrowIfCancellationRequested();
             throw;
         }
@@ -83,6 +89,7 @@ public sealed partial class ZooKeeperClient : IAsyncDisposable
             {
                 options.Dispose();
             }
+            span.Complete(failure);
         }
     }
 

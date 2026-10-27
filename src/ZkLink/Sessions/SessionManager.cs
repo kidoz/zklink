@@ -1,6 +1,7 @@
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using ZkLink.Configuration;
+using ZkLink.Diagnostics;
 using ZkLink.Protocol;
 using ZkLink.Requests;
 using ZkLink.Transport;
@@ -10,6 +11,7 @@ namespace ZkLink.Sessions;
 
 internal sealed partial class SessionManager : IAsyncDisposable
 {
+    internal TelemetryState Telemetry { get; } = new();
     private readonly object _gate = new();
     private readonly ClientOptionsSnapshot _options;
     private readonly TimeProvider _time;
@@ -48,15 +50,16 @@ internal sealed partial class SessionManager : IAsyncDisposable
         SessionRandom random
     )
     {
+        ZooKeeperTelemetry.Initialize();
         this._options = options;
         this._time = time;
         this._connector = connector;
         this._random = random;
         _endpoints = new EndpointProvider(_options.Endpoints, _random);
-        var events = new EventBudget(_options.Settings.MaxBufferedEvents);
+        var events = new EventBudget(_options.Settings.MaxBufferedEvents, Telemetry);
         _watches = new WatchManager(_gate, _options, events, this);
         _states = new StateHub(_gate, events, BuildSnapshot(ZooKeeperSessionState.Connecting));
-        Scheduler = new RequestScheduler(_gate, _options, _time, _work);
+        Scheduler = new RequestScheduler(_gate, _options, _time, _work, Telemetry);
     }
 
     internal Task Completion => _run;
@@ -225,8 +228,17 @@ internal sealed partial class SessionManager : IAsyncDisposable
                 TransportConnection? transport = null;
                 try
                 {
-                    transport = await _connector
-                        .ConnectAsync(endpoint, _options, attempt.Token)
+                    if (_sessionId != 0)
+                        ZooKeeperTelemetry.Reconnect();
+                    var transportSpan = ZooKeeperTelemetry.Begin(
+                        _time,
+                        TelemetryKind.TransportConnect
+                    );
+                    transport = await ZooKeeperTelemetry
+                        .ObserveAsync(
+                            _connector.ConnectAsync(endpoint, _options, attempt.Token),
+                            transportSpan
+                        )
                         .ConfigureAwait(false);
                     await EstablishAsync(transport, attempt.Token).ConfigureAwait(false);
                     var runtime = new ConnectionRuntime(
@@ -498,6 +510,7 @@ internal sealed partial class SessionManager : IAsyncDisposable
             {
                 _sessionId = handshake.SessionId;
                 _negotiated = TimeSpan.FromMilliseconds(handshake.TimeoutMilliseconds);
+                ZooKeeperTelemetry.RecordNegotiated(_negotiated.Value);
                 CryptographicOperations.ZeroMemory(_password);
                 handshake.Password.Span.CopyTo(_password);
                 _generation = checked(_generation + 1);
@@ -519,81 +532,93 @@ internal sealed partial class SessionManager : IAsyncDisposable
             cancellationToken,
             deadline.Token
         );
-        foreach (var credentials in _options.Authentication)
+        var authSpan = ZooKeeperTelemetry.Begin(_time, TelemetryKind.Authenticate);
+        try
         {
-            var request = new AuthRequest("digest", credentials);
-            var encoded = new byte[RequestCodec.Measure(-4, request, _options.Limits)];
-            try
+            foreach (var credentials in _options.Authentication)
             {
-                RequestCodec.Encode(encoded, -4, request, _options.Limits);
-                await transport
-                    .Writer.WriteAsync(encoded, authentication.Token)
-                    .ConfigureAwait(false);
-            }
-            finally
-            {
-                CryptographicOperations.ZeroMemory(encoded);
-            }
-            while (true)
-            {
-                var reply =
-                    await transport.Reader.ReadAsync(authentication.Token).ConfigureAwait(false)
-                    ?? throw new EndOfStreamException();
-                var reader = new JuteReader(reply, _options.Limits);
-                var header = reader.ReadReplyHeader();
-                if (header.Xid == -1)
+                var request = new AuthRequest("digest", credentials);
+                var encoded = new byte[RequestCodec.Measure(-4, request, _options.Limits)];
+                try
                 {
-                    var notification = ReplyCodec.DecodeNotification(reply, _options.Limits);
-                    if (notification.Type == -1 && notification.State == -112)
+                    RequestCodec.Encode(encoded, -4, request, _options.Limits);
+                    await transport
+                        .Writer.WriteAsync(encoded, authentication.Token)
+                        .ConfigureAwait(false);
+                }
+                finally
+                {
+                    CryptographicOperations.ZeroMemory(encoded);
+                }
+                while (true)
+                {
+                    var reply =
+                        await transport.Reader.ReadAsync(authentication.Token).ConfigureAwait(false)
+                        ?? throw new EndOfStreamException();
+                    var reader = new JuteReader(reply, _options.Limits);
+                    var header = reader.ReadReplyHeader();
+                    if (header.Xid == -1)
+                    {
+                        var notification = ReplyCodec.DecodeNotification(reply, _options.Limits);
+                        if (notification.Type == -1 && notification.State == -112)
+                        {
+                            throw new ZooKeeperConnectionException(
+                                ZooKeeperConnectionFailure.SessionRejected,
+                                transport.Endpoint
+                            );
+                        }
+                        if (notification.Type == -1 && notification.State == 4)
+                        {
+                            throw new ZooKeeperConnectionException(
+                                ZooKeeperConnectionFailure.Authentication,
+                                transport.Endpoint
+                            );
+                        }
+                        if (notification.Type != -1 || notification.State != 3)
+                        {
+                            throw new InvalidDataException(
+                                "Unexpected authentication notification."
+                            );
+                        }
+                        _lastInbound = _time.GetTimestamp();
+                        continue;
+                    }
+                    var acknowledgment = ReplyCodec.Decode(reply, -4, request, _options.Limits);
+                    _lastInbound = _time.GetTimestamp();
+                    if (acknowledgment.Header.Error == -112)
                     {
                         throw new ZooKeeperConnectionException(
                             ZooKeeperConnectionFailure.SessionRejected,
-                            transport.Endpoint
+                            transport.Endpoint,
+                            acknowledgment.Header.Error
                         );
                     }
-                    if (notification.Type == -1 && notification.State == 4)
+                    if (acknowledgment.Header.Error is -4 or -7 or -12 or -118 or -122)
+                    {
+                        throw new ZooKeeperConnectionException(
+                            ZooKeeperConnectionFailure.Unreachable,
+                            transport.Endpoint,
+                            acknowledgment.Header.Error
+                        );
+                    }
+                    if (acknowledgment.Header.Error != 0)
                     {
                         throw new ZooKeeperConnectionException(
                             ZooKeeperConnectionFailure.Authentication,
-                            transport.Endpoint
+                            transport.Endpoint,
+                            acknowledgment.Header.Error
                         );
                     }
-                    if (notification.Type != -1 || notification.State != 3)
-                    {
-                        throw new InvalidDataException("Unexpected authentication notification.");
-                    }
-                    _lastInbound = _time.GetTimestamp();
-                    continue;
+                    break;
                 }
-                var acknowledgment = ReplyCodec.Decode(reply, -4, request, _options.Limits);
-                _lastInbound = _time.GetTimestamp();
-                if (acknowledgment.Header.Error == -112)
-                {
-                    throw new ZooKeeperConnectionException(
-                        ZooKeeperConnectionFailure.SessionRejected,
-                        transport.Endpoint,
-                        acknowledgment.Header.Error
-                    );
-                }
-                if (acknowledgment.Header.Error is -4 or -7 or -12 or -118 or -122)
-                {
-                    throw new ZooKeeperConnectionException(
-                        ZooKeeperConnectionFailure.Unreachable,
-                        transport.Endpoint,
-                        acknowledgment.Header.Error
-                    );
-                }
-                if (acknowledgment.Header.Error != 0)
-                {
-                    throw new ZooKeeperConnectionException(
-                        ZooKeeperConnectionFailure.Authentication,
-                        transport.Endpoint,
-                        acknowledgment.Header.Error
-                    );
-                }
-                break;
             }
         }
+        catch (Exception error)
+        {
+            authSpan.Complete(error);
+            throw;
+        }
+        authSpan.Complete();
         lock (_gate)
         {
             PublishState(ZooKeeperSessionState.Restoring);
@@ -786,7 +811,11 @@ internal sealed partial class SessionManager : IAsyncDisposable
             {
                 PublishState(ZooKeeperSessionState.Closing);
             }
-            _closeTask = CloseCoreAsync(_time.GetTimestamp(), cancellationToken);
+            var closeSpan = ZooKeeperTelemetry.Begin(_time, TelemetryKind.Close);
+            _closeTask = ZooKeeperTelemetry.ObserveAsync(
+                CloseCoreAsync(_time.GetTimestamp(), cancellationToken),
+                closeSpan
+            );
             return _closeTask;
         }
     }
@@ -908,11 +937,14 @@ internal sealed partial class SessionManager : IAsyncDisposable
         {
             _options.Dispose();
             _stop.Dispose();
+            lock (_gate)
+                Telemetry.Dispose(_time);
         }
     }
 
     private bool PublishState(ZooKeeperSessionState state, bool detachOnOverflow = true)
     {
+        Telemetry.State(state, _time);
         if (_states.Publish(BuildSnapshot(state), Session.State != state))
         {
             return true;
@@ -923,6 +955,9 @@ internal sealed partial class SessionManager : IAsyncDisposable
 
     private void FaultOverflow(bool detach = true)
     {
+        if (_terminalCause is not ZooKeeperEventOverflowException)
+            ZooKeeperTelemetry.Overflow();
+        Telemetry.State(ZooKeeperSessionState.Faulted, _time);
         _terminalCause = new ZooKeeperEventOverflowException();
         _watches.Finish(_terminalCause);
         Scheduler.StopAdmission();

@@ -176,13 +176,21 @@ internal sealed class WatchManager(
             Release(watch);
         }
         else
-            watch.Active = true;
+            SetActive(watch, true);
+    }
+
+    private void SetActive(ZooKeeperWatch watch, bool active)
+    {
+        if (watch.Active == active)
+            return;
+        watch.Active = active;
+        session.Telemetry.WatchDelta(active ? 1 : -1);
     }
 
     private void Suppress(ZooKeeperWatch watch)
     {
         watch.Suppressed = true;
-        watch.Active = false;
+        SetActive(watch, false);
         while (watch.Queue.Reader.TryRead(out _))
             budget.Release(1);
         watch.Queue.Writer.TryComplete();
@@ -432,7 +440,7 @@ internal sealed class WatchManager(
             bool complete =
                 !watch.Persistent || kind == ZooKeeperWatchEventKind.PersistentWatchRemoved;
             if (complete)
-                watch.Active = false;
+                SetActive(watch, false);
             Publish(watch, kind, path, notification.Zxid);
             if (complete)
                 watch.Queue.Writer.TryComplete();
@@ -674,7 +682,7 @@ internal sealed class WatchManager(
         _finished = true;
         foreach (var watch in _handles)
         {
-            watch.Active = false;
+            SetActive(watch, false);
             watch.Queue.Writer.TryComplete(error);
         }
     }

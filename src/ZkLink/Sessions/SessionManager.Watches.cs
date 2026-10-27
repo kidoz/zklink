@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using ZkLink.Diagnostics;
 using ZkLink.Protocol;
 using ZkLink.Requests;
 using ZkLink.Transport;
@@ -152,7 +153,16 @@ internal sealed partial class SessionManager
         _watches.Detached();
     }
 
-    private async Task RestoreWatchesAsync(TransportConnection transport, CancellationToken token)
+    private Task RestoreWatchesAsync(TransportConnection transport, CancellationToken token)
+    {
+        var span = ZooKeeperTelemetry.Begin(_time, TelemetryKind.Restore);
+        return ZooKeeperTelemetry.ObserveAsync(RestoreWatchesCoreAsync(transport, token), span);
+    }
+
+    private async Task RestoreWatchesCoreAsync(
+        TransportConnection transport,
+        CancellationToken token
+    )
     {
         IReadOnlyList<RestoreRequest> batches;
         lock (_gate)
