@@ -41,6 +41,8 @@ jobs:
         run: dotnet test --project tests/ZkLink.Tests -c Release --no-build --no-restore
       - name: Test protocol
         run: dotnet test --project tests/ZkLink.Protocol.Tests -c Release --no-build --no-restore
+      - name: Test dependency injection
+        run: dotnet test --project tests/ZkLink.Extensions.DependencyInjection.Tests -c Release --no-build --no-restore
 
   operations:
     name: Live node, ACL, transaction, auxiliary and watch operations
