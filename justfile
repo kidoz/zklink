@@ -85,3 +85,7 @@ zk-leader-faults:
 # Lose quorum and verify retained sessions or local loss on both pinned versions.
 zk-quorum-faults:
     bash dev/test-zookeeper-quorum-faults.sh
+
+# Block incoming client traffic and verify recovery or local loss on both versions.
+zk-partition-faults:
+    bash dev/test-zookeeper-partition-faults.sh

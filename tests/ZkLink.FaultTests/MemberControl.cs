@@ -12,6 +12,7 @@ internal sealed class MemberControl
     internal const string Leader = "leader";
     internal const string Follower = "follower";
     internal const string Quorum = "quorum";
+    internal const string Partition = "partition";
     internal const string Brief = "brief";
     internal const string UntilLost = "lost";
     private static readonly string[] Services = ["zoo1", "zoo2", "zoo3"];
@@ -26,7 +27,7 @@ internal sealed class MemberControl
     internal string Role { get; } = Required("ZKLINK_FAULT_ROLE");
     internal string Service { get; } = Required("ZKLINK_FAULT_SERVICE");
     internal string Endpoint { get; } = Required("ZKLINK_FAULT_ENDPOINT");
-    internal string? Outage { get; } = Environment.GetEnvironmentVariable("ZKLINK_QUORUM_OUTAGE");
+    internal string? Outage { get; } = Environment.GetEnvironmentVariable("ZKLINK_FAULT_OUTAGE");
     private readonly string[] _targets;
     internal bool RestoreRequired { get; private set; }
 
@@ -35,7 +36,7 @@ internal sealed class MemberControl
         _targets = Role == Quorum ? [Service, Required("ZKLINK_FAULT_SECOND_SERVICE")] : [Service];
         const int RunIdLength = 32;
         if (
-            Role is not (Leader or Follower or Quorum)
+            Role is not (Leader or Follower or Quorum or Partition)
             || _version is not ("3.8.7" or "3.9.6")
             || _runId.Length != RunIdLength
             || !_runId.All(char.IsAsciiHexDigit)
@@ -43,7 +44,7 @@ internal sealed class MemberControl
             || !Services.Contains(Service, StringComparer.Ordinal)
             || _targets.Any(target => !Services.Contains(target, StringComparer.Ordinal))
             || _targets.Distinct(StringComparer.Ordinal).Count() != _targets.Length
-            || (Role == Quorum && Outage is not (Brief or UntilLost))
+            || (Role is Quorum or Partition && Outage is not (Brief or UntilLost))
             || !Path.IsPathFullyQualified(_root)
             || !File.Exists(Path.Combine(_root, "compose.fault.yaml"))
         )
@@ -57,7 +58,7 @@ internal sealed class MemberControl
     internal static string Required(string name) =>
         Environment.GetEnvironmentVariable(name)
         ?? throw new InvalidOperationException(
-            "Run just zk-follower-faults, just zk-leader-faults or just zk-quorum-faults with its required disposable fixture."
+            "Run the matching just zk-follower-faults, zk-leader-faults, zk-quorum-faults or zk-partition-faults command with its required disposable fixture."
         );
 
     private string[] Compose(params string[] arguments) =>
@@ -109,6 +110,10 @@ internal sealed class MemberControl
 
     internal async Task StopAsync(CancellationToken token)
     {
+        if (Role == Partition)
+        {
+            throw new InvalidOperationException("Client partitions must not stop any server.");
+        }
         foreach (string target in _targets)
         {
             await VerifyOwnershipAsync(target, token).ConfigureAwait(false);

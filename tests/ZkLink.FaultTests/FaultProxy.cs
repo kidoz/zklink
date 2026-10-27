@@ -5,15 +5,18 @@ using System.Security.Cryptography;
 
 namespace ZkLink.FaultTests;
 
-// Discards one selected create response without cutting the transport. Only an
-// upstream EOF from the real server stop closes that connection. Survivor proxies
-// can hold a real watch-reset acknowledgment until the readiness assertions finish.
+// Forwards bounded frames and consumes one selected create reply. Incoming-frame
+// suppression leaves outgoing traffic and TCP intact; restore acknowledgments can
+// be held separately for readiness checks. Discarded frames are never queued.
 internal sealed class FaultProxy : IAsyncDisposable
 {
     internal const int Success = 0;
     private const int MaximumFrameBytes = 1_048_575;
     private const int HeaderBytes = sizeof(int) + sizeof(long) + sizeof(int);
     private const int ResetXid = -8;
+    private const int PingXid = -2;
+    private const int PingOperation = 11;
+    private const int RequestHeaderBytes = sizeof(int) + sizeof(int);
     private static readonly TimeSpan LifetimeGuard = TimeSpan.FromSeconds(75);
     private readonly object _gate = new();
     private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
@@ -25,6 +28,10 @@ internal sealed class FaultProxy : IAsyncDisposable
     private TcpClient? _client;
     private TcpClient? _upstream;
     private bool _armed;
+    private bool _replyDiscarded;
+    private int _incomingPartition;
+    private int _droppedIncomingFrames;
+    private int _forwardedPings;
     private int? _selectedXid;
     private int _creates;
     private int _connectionAttempts;
@@ -43,6 +50,23 @@ internal sealed class FaultProxy : IAsyncDisposable
     internal int CreateTransmissions => Volatile.Read(ref _creates);
     internal int ConnectionAttempts => Volatile.Read(ref _connectionAttempts);
     internal string Endpoint { get; }
+    internal bool IncomingPartitionActive => Volatile.Read(ref _incomingPartition) != 0;
+    internal int DroppedIncomingFrames => Volatile.Read(ref _droppedIncomingFrames);
+    internal int ForwardedPings => Volatile.Read(ref _forwardedPings);
+    internal bool HasOpenConnection
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _client is not null;
+            }
+        }
+    }
+
+    internal void BlockIncoming() => Volatile.Write(ref _incomingPartition, 1);
+
+    internal void HealIncoming() => Volatile.Write(ref _incomingPartition, 0);
 
     internal FaultProxy(string endpoint, bool holdRestore, CancellationToken token)
     {
@@ -183,6 +207,19 @@ internal sealed class FaultProxy : IAsyncDisposable
                         );
                         Interlocked.Increment(ref _handshakeReplies);
                     }
+                    if (incoming && IncomingPartitionActive)
+                    {
+                        Interlocked.Increment(ref _droppedIncomingFrames);
+                        handshake = false;
+                        continue;
+                    }
+                    bool ping =
+                        !incoming
+                        && !handshake
+                        && length == RequestHeaderBytes
+                        && BinaryPrimitives.ReadInt32BigEndian(packet) == PingXid
+                        && BinaryPrimitives.ReadInt32BigEndian(packet.AsSpan(sizeof(int)))
+                            == PingOperation;
                     if (!handshake && length >= HeaderBytes)
                     {
                         int xid = BinaryPrimitives.ReadInt32BigEndian(packet);
@@ -214,7 +251,11 @@ internal sealed class FaultProxy : IAsyncDisposable
                             bool discard;
                             lock (_gate)
                             {
-                                discard = _selectedXid == xid;
+                                discard = _selectedXid == xid && !_replyDiscarded;
+                                if (discard)
+                                {
+                                    _replyDiscarded = true;
+                                }
                             }
                             if (discard)
                             {
@@ -240,6 +281,10 @@ internal sealed class FaultProxy : IAsyncDisposable
                     handshake = false;
                     await destination.WriteAsync(prefix, token).ConfigureAwait(false);
                     await destination.WriteAsync(packet, token).ConfigureAwait(false);
+                    if (ping)
+                    {
+                        Interlocked.Increment(ref _forwardedPings);
+                    }
                 }
                 finally
                 {

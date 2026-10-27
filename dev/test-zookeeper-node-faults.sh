@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-if [[ $# -ne 1 || ( "$1" != follower && "$1" != leader && "$1" != quorum ) ]]; then
-  echo "Usage: $0 follower|leader|quorum" >&2; exit 2
+if [[ $# -ne 1 || ( "$1" != follower && "$1" != leader && "$1" != quorum && "$1" != partition ) ]]; then
+  echo "Usage: $0 follower|leader|quorum|partition" >&2; exit 2
 fi
 role="$1"
 export ZKLINK_FAULT_ROLE="${role}"
@@ -56,16 +56,18 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 outages=(member)
-if [[ "${role}" == quorum ]]; then outages=(brief lost); fi
+test_fixture=MemberFault
+if [[ "${role}" == partition ]]; then test_fixture=PartitionFault; fi
+if [[ "${role}" == quorum || "${role}" == partition ]]; then outages=(brief lost); fi
 for outage in "${outages[@]}"; do
   for version in 3.8.7 3.9.6; do
     evidence_key="${version}"
-    if [[ "${role}" == quorum ]]; then evidence_key="${version}-${outage}"; fi
+    if [[ "${role}" == quorum || "${role}" == partition ]]; then evidence_key="${version}-${outage}"; fi
     export ZKLINK_FAULT_RUN_ID="$(python3 -c 'import uuid; print(uuid.uuid4().hex)')"
     project="zklink-${role}-fault-${version//./-}-${ZKLINK_FAULT_RUN_ID}"
     target=""
     second_target=""
-    export ZKLINK_QUORUM_OUTAGE="${outage}"
+    export ZKLINK_FAULT_OUTAGE="${outage}"
     # Docker can reassign a zero-published host port when its container restarts.
     # Bind candidates together to choose distinct available loopback ports. If
     # another process wins the subsequent bind race, Compose startup must fail.
@@ -122,19 +124,22 @@ PORTS
         if [[ "${role}" == follower && -z "${target}" ]]; then target="${service}"; fi
       elif grep -Fxq 'Mode: leader' "${artifacts}/${evidence_key}-${service}-role-before.txt"; then
         leaders=$((leaders + 1))
-        if [[ ( "${role}" == leader || "${role}" == quorum ) && -z "${target}" ]]; then target="${service}"; fi
+        if [[ ( "${role}" == leader || "${role}" == quorum || "${role}" == partition ) && -z "${target}" ]]; then target="${service}"; fi
       else
         echo "Unrecognized initial role; aborting ${version}" >&2; exit 1
       fi
     done
     if [[ "${leaders}" -ne 1 || "${followers}" -ne 2 ]]; then echo "No healthy voting ensemble" >&2; exit 1; fi
-    printf 'Selection: first observed %s in zoo1/zoo2/zoo3 order\nTarget: %s\n' "${role}" "${target}" >"${artifacts}/${evidence_key}-selection.txt"
+    selection="first observed ${role}"
+    if [[ "${role}" == partition ]]; then selection="observed leader as the client proxy target"; fi
+    if [[ "${role}" == quorum ]]; then selection="observed leader and first observed follower"; fi
+    printf 'Selection: %s in zoo1/zoo2/zoo3 order\nTarget: %s\n' "${selection}" "${target}" >"${artifacts}/${evidence_key}-selection.txt"
     if [[ "${role}" == quorum ]]; then printf 'Second stopped member: %s\nOutage: %s\n' "${second_target}" "${outage}" >>"${artifacts}/${evidence_key}-selection.txt"; fi
     endpoints="$(compose port zoo1 2181),$(compose port zoo2 2181),$(compose port zoo3 2181)"
     ZKLINK_TEST_CONNECTION_STRING="${endpoints}" ZKLINK_TEST_SERVER_VERSION="${version}" \
       ZKLINK_FAULT_SECOND_SERVICE="${second_target}" ZKLINK_FAULT_PROJECT="${project}" ZKLINK_FAULT_SERVICE="${target}" ZKLINK_FAULT_ENDPOINT="$(compose port "${target}" 2181)" \
       dotnet test --project tests/ZkLink.FaultTests -c Release --no-build --no-restore \
-      --output Detailed --show-stdout All --show-live-output on --timeout "${runner_guard}" \
+      --filter-trait "Fixture=${test_fixture}" --output Detailed --show-stdout All --show-live-output on --timeout "${runner_guard}" \
       --results-directory "${artifacts}/${evidence_key}-results" >"${artifacts}/${evidence_key}-tests.txt" 2>&1 || {
         cat "${artifacts}/${evidence_key}-tests.txt"; exit 1;
       }
@@ -148,6 +153,6 @@ PORTS
     compose down --volumes >"${artifacts}/${evidence_key}-cleanup.log" 2>&1
     project=""
     target=""
-    echo "ZooKeeper ${version}: PASS (${role}/${outage} stop, expected session outcome, no replay, restoration, rollback and cleanup)"
+    echo "ZooKeeper ${version}: PASS (${role}/${outage} fault, expected session outcome, no replay, restoration, rollback and cleanup)"
   done
 done

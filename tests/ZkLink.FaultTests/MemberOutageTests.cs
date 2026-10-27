@@ -4,6 +4,7 @@ using ZkLink.Testing;
 
 namespace ZkLink.FaultTests;
 
+[Trait("Fixture", "MemberFault")]
 public sealed class MemberOutageTests : IAsyncLifetime
 {
     private const int TestTimeoutMilliseconds = 90_000;
@@ -18,7 +19,13 @@ public sealed class MemberOutageTests : IAsyncLifetime
 
     public ValueTask InitializeAsync()
     {
-        _ = new MemberControl(); // Reject missing/foreign fixture metadata before opening any client.
+        var fault = new MemberControl(); // Reject missing/foreign fixture metadata before opening any client.
+        if (fault.Role == MemberControl.Partition)
+        {
+            throw new InvalidOperationException(
+                "The member fault selection must exclude partition cases."
+            );
+        }
         return _fixture.InitializeAsync();
     }
 
