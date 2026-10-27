@@ -36,6 +36,8 @@ remain unavailable. See
   request, byte, or tombstone pressure.
 - Added debug-only assertions for caller-held session-gate contracts in request,
   watch, and shared event-budget bookkeeping.
+- Extracted per-attempt handshake, authentication, and watch-restoration
+  sequencing from the session orchestrator without changing session ownership.
 
 ### Added
 

@@ -240,7 +240,17 @@ internal sealed partial class SessionManager : IAsyncDisposable
                             transportSpan
                         )
                         .ConfigureAwait(false);
-                    await EstablishAsync(transport, attempt.Token).ConfigureAwait(false);
+                    await new SessionEstablisher(
+                        this,
+                        transport,
+                        _options,
+                        _time,
+                        _sessionId,
+                        _lastZxid,
+                        _password
+                    )
+                        .RunAsync(attempt.Token)
+                        .ConfigureAwait(false);
                     var runtime = new ConnectionRuntime(
                         this,
                         transport,
@@ -456,174 +466,6 @@ internal sealed partial class SessionManager : IAsyncDisposable
             CryptographicOperations.ZeroMemory(_password);
             _options.Dispose();
         }
-    }
-
-    private async Task EstablishAsync(
-        TransportConnection transport,
-        CancellationToken cancellationToken
-    )
-    {
-        var packet = new byte[45];
-        try
-        {
-            var length =
-                _sessionId == 0
-                    ? HandshakeCodec.EncodeNew(
-                        packet,
-                        checked((int)_options.Settings.SessionTimeout.TotalMilliseconds),
-                        _options.Limits
-                    )
-                    : HandshakeCodec.Encode(
-                        packet,
-                        checked((int)_options.Settings.SessionTimeout.TotalMilliseconds),
-                        _sessionId,
-                        _lastZxid,
-                        _password,
-                        _options.Limits
-                    );
-            await transport
-                .Writer.WriteAsync(packet.AsMemory(0, length), cancellationToken)
-                .ConfigureAwait(false);
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(packet);
-        }
-        var response =
-            await transport.Reader.ReadAsync(cancellationToken).ConfigureAwait(false)
-            ?? throw new EndOfStreamException();
-        try
-        {
-            using var handshake = HandshakeCodec.Decode(response, _options.Limits);
-            if (!handshake.Accepted)
-            {
-                throw new ZooKeeperConnectionException(
-                    ZooKeeperConnectionFailure.SessionRejected,
-                    transport.Endpoint
-                );
-            }
-            if (_sessionId != 0 && _sessionId != handshake.SessionId)
-            {
-                throw new InvalidDataException("Peer replaced an owned session.");
-            }
-            lock (_gate)
-            {
-                _sessionId = handshake.SessionId;
-                _negotiated = TimeSpan.FromMilliseconds(handshake.TimeoutMilliseconds);
-                ZooKeeperTelemetry.RecordNegotiated(_negotiated.Value);
-                CryptographicOperations.ZeroMemory(_password);
-                handshake.Password.Span.CopyTo(_password);
-                _generation = checked(_generation + 1);
-                _lastInbound = _time.GetTimestamp();
-                PublishState(ZooKeeperSessionState.Authenticating);
-            }
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(response);
-        }
-        var authBudget = _negotiated!.Value - InboundSilence;
-        if (authBudget <= TimeSpan.Zero)
-        {
-            throw new OperationCanceledException(cancellationToken);
-        }
-        using var deadline = new CancellationTokenSource(authBudget, _time);
-        using var authentication = CancellationTokenSource.CreateLinkedTokenSource(
-            cancellationToken,
-            deadline.Token
-        );
-        var authSpan = ZooKeeperTelemetry.Begin(_time, TelemetryKind.Authenticate);
-        try
-        {
-            foreach (var credentials in _options.Authentication)
-            {
-                var request = new AuthRequest("digest", credentials);
-                var encoded = new byte[RequestCodec.Measure(-4, request, _options.Limits)];
-                try
-                {
-                    RequestCodec.Encode(encoded, -4, request, _options.Limits);
-                    await transport
-                        .Writer.WriteAsync(encoded, authentication.Token)
-                        .ConfigureAwait(false);
-                }
-                finally
-                {
-                    CryptographicOperations.ZeroMemory(encoded);
-                }
-                while (true)
-                {
-                    var reply =
-                        await transport.Reader.ReadAsync(authentication.Token).ConfigureAwait(false)
-                        ?? throw new EndOfStreamException();
-                    var reader = new JuteReader(reply, _options.Limits);
-                    var header = reader.ReadReplyHeader();
-                    if (header.Xid == -1)
-                    {
-                        var notification = ReplyCodec.DecodeNotification(reply, _options.Limits);
-                        if (notification.Type == -1 && notification.State == -112)
-                        {
-                            throw new ZooKeeperConnectionException(
-                                ZooKeeperConnectionFailure.SessionRejected,
-                                transport.Endpoint
-                            );
-                        }
-                        if (notification.Type == -1 && notification.State == 4)
-                        {
-                            throw new ZooKeeperConnectionException(
-                                ZooKeeperConnectionFailure.Authentication,
-                                transport.Endpoint
-                            );
-                        }
-                        if (notification.Type != -1 || notification.State != 3)
-                        {
-                            throw new InvalidDataException(
-                                "Unexpected authentication notification."
-                            );
-                        }
-                        _lastInbound = _time.GetTimestamp();
-                        continue;
-                    }
-                    var acknowledgment = ReplyCodec.Decode(reply, -4, request, _options.Limits);
-                    _lastInbound = _time.GetTimestamp();
-                    if (acknowledgment.Header.Error == -112)
-                    {
-                        throw new ZooKeeperConnectionException(
-                            ZooKeeperConnectionFailure.SessionRejected,
-                            transport.Endpoint,
-                            acknowledgment.Header.Error
-                        );
-                    }
-                    if (acknowledgment.Header.Error is -4 or -7 or -12 or -118 or -122)
-                    {
-                        throw new ZooKeeperConnectionException(
-                            ZooKeeperConnectionFailure.Unreachable,
-                            transport.Endpoint,
-                            acknowledgment.Header.Error
-                        );
-                    }
-                    if (acknowledgment.Header.Error != 0)
-                    {
-                        throw new ZooKeeperConnectionException(
-                            ZooKeeperConnectionFailure.Authentication,
-                            transport.Endpoint,
-                            acknowledgment.Header.Error
-                        );
-                    }
-                    break;
-                }
-            }
-        }
-        catch (Exception error)
-        {
-            authSpan.Complete(error);
-            throw;
-        }
-        authSpan.Complete();
-        lock (_gate)
-        {
-            PublishState(ZooKeeperSessionState.Restoring);
-        }
-        await RestoreWatchesAsync(transport, authentication.Token).ConfigureAwait(false);
     }
 
     internal void Inbound(long value, ReplyHeader? reply)
