@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IsPackable>true</IsPackable>
+    <PackageId>ZkLink.Analyzers</PackageId>
+    <Title>ZkLink.Analyzers</Title>
+    <Description>Roslyn analyzers for secure and asynchronous ZkLink usage.</Description>
+    <PackageTags>zookeeper;zklink;roslyn;analyzers;security</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <IncludeSymbols>false</IncludeSymbols>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <None
+      Include="$(OutputPath)$(AssemblyName).dll"
+      Pack="true"
+      PackagePath="analyzers/dotnet/cs"
+      Visible="false"
+    />
+    <AdditionalFiles Include="ReleaseTracking/AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="ReleaseTracking/AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+</Project>

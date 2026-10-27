@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/ZkLink/ZkLink.csproj" />
+    <PackageReference Include="ZkLink.Analyzers" Version="0.0.0-local" />
+  </ItemGroup>
+</Project>

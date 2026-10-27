@@ -8,6 +8,15 @@ The resolved dependency graphs and integrity hashes are in the project `packages
 | --- | --- | --- | --- |
 | CSharpier | 1.3.0 | Local formatting tool | MIT |
 | Microsoft.CodeAnalysis.PublicApiAnalyzers | 5.6.0 | Build analyzer only; private assets | MIT |
+| Microsoft.CodeAnalysis.Analyzers, Microsoft.CodeAnalysis.CSharp | 5.9.0 | ZkLink analyzer build/tests; private assets | MIT |
+| Microsoft.CodeAnalysis.Common | 5.9.0 | Transitive analyzer build/tests | MIT |
+| NETStandard.Library | 2.0.3 | Analyzer target build only | MIT |
+| Microsoft.NETCore.Platforms | 1.1.0 | Transitive analyzer target build only | MIT |
+| System.Buffers, System.Numerics.Vectors | 4.6.1 | Transitive analyzer build/tests | MIT |
+| System.Memory, System.Threading.Tasks.Extensions | 4.6.3 | Transitive analyzer build/tests | MIT |
+| System.Collections.Immutable, System.Reflection.Metadata | 10.0.1 | Transitive analyzer build/tests | MIT |
+| System.Runtime.CompilerServices.Unsafe | 6.1.2 | Transitive analyzer build/tests | MIT |
+| System.Text.Encoding.CodePages | 8.0.0 | Transitive analyzer build/tests | MIT |
 | Microsoft.Extensions.DependencyInjection.Abstractions | 10.0.14 | Dependency-injection integration only | MIT |
 | Microsoft.Extensions.Hosting.Abstractions | 10.0.14 | Dependency-injection integration only | MIT |
 | Microsoft.Extensions.Hosting | 10.0.14 | Dependency-injection tests only | MIT |

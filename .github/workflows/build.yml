@@ -43,6 +43,11 @@ jobs:
         run: dotnet test --project tests/ZkLink.Protocol.Tests -c Release --no-build --no-restore
       - name: Test dependency injection
         run: dotnet test --project tests/ZkLink.Extensions.DependencyInjection.Tests -c Release --no-build --no-restore
+      - name: Test analyzers
+        run: dotnet test --project tests/ZkLink.Analyzers.Tests -c Release --no-build --no-restore
+      - name: Verify analyzer package consumer
+        if: runner.os == 'Linux'
+        run: bash dev/test-analyzers-package.sh
 
   operations:
     name: Live node, ACL, transaction, auxiliary and watch operations
