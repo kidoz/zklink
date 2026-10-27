@@ -41,6 +41,8 @@ internal sealed class FaultProxy : IAsyncDisposable
     private int _connectionAttempts;
     private int _handshakeReplies;
     private int _lastNegotiatedMilliseconds;
+    private int _upstreamLocalPort;
+    internal int UpstreamLocalPort => Volatile.Read(ref _upstreamLocalPort);
     internal int HandshakeReplies => Volatile.Read(ref _handshakeReplies);
     internal int LastNegotiatedMilliseconds => Volatile.Read(ref _lastNegotiatedMilliseconds);
     internal string? RunFailure => _run.Exception?.GetBaseException().GetType().Name;
@@ -141,6 +143,10 @@ internal sealed class FaultProxy : IAsyncDisposable
                     // Connected even when it has already created a stream.
                     downstreamStream = client.GetStream();
                     upstreamStream = upstream.GetStream();
+                    Volatile.Write(
+                        ref _upstreamLocalPort,
+                        ((IPEndPoint)upstream.Client.LocalEndPoint!).Port
+                    );
                 }
                 catch (SocketException)
                 {

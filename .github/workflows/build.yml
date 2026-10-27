@@ -47,6 +47,8 @@ jobs:
         run: dotnet test --project tests/ZkLink.Analyzers.Tests -c Release --no-build --no-restore
       - name: Test fault proxy
         run: dotnet test --project tests/ZkLink.FaultTests -c Release --no-build --no-restore --filter-trait Fixture=ProxyUnit
+      - name: Test soak resource observers
+        run: dotnet test --project tests/ZkLink.FaultTests -c Release --no-build --no-restore --filter-trait Fixture=SoakUnit
       - name: Verify analyzer package consumer
         if: runner.os == 'Linux'
         run: bash dev/test-analyzers-package.sh
@@ -83,7 +85,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        role: [follower, leader, quorum, partition, peer, pressure]
+        role: [follower, leader, quorum, partition, peer, pressure, soak]
     steps:
       - name: Check out source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6

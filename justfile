@@ -97,3 +97,7 @@ zk-peer-partition-faults:
 # Verify slow watch consumers, shared event limits and overflow on both versions.
 zk-watch-pressure-faults:
     bash dev/test-zookeeper-watch-pressure-faults.sh
+
+# Run a seeded bounded workload on both versions (30..86400 seconds per version).
+zk-soak seconds="120" seed="1729":
+    bash dev/test-zookeeper-soak.sh "$1" "$2"

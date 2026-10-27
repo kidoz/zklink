@@ -1,12 +1,36 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-if [[ $# -ne 1 || ( "$1" != follower && "$1" != leader && "$1" != quorum && "$1" != partition && "$1" != peer && "$1" != pressure ) ]]; then
-  echo "Usage: $0 follower|leader|quorum|partition|peer|pressure" >&2; exit 2
+if [[ $# -ne 1 || ( "$1" != follower && "$1" != leader && "$1" != quorum && "$1" != partition && "$1" != peer && "$1" != pressure && "$1" != soak ) ]]; then
+  echo "Usage: $0 follower|leader|quorum|partition|peer|pressure|soak" >&2; exit 2
 fi
 role="$1"
 export ZKLINK_FAULT_ROLE="${role}"
 for command in docker dotnet python3; do command -v "${command}" >/dev/null; done
+runner_guard=2m
+if [[ "${role}" == soak ]]; then
+  export ZKLINK_SOAK_DURATION_SECONDS="${ZKLINK_SOAK_DURATION_SECONDS-120}"
+  export ZKLINK_SOAK_SEED="${ZKLINK_SOAK_SEED-1729}"
+  read -r ZKLINK_SOAK_DURATION_SECONDS ZKLINK_SOAK_SEED runner_guard < <(python3 - <<'SETTINGS'
+import os
+import re
+DURATION_MIN_SECONDS = 30
+DURATION_MAX_SECONDS = 86400
+SEED_MAX = 2147483647
+PROCESS_OVERHEAD_SECONDS = 120
+raw_duration = os.environ["ZKLINK_SOAK_DURATION_SECONDS"]
+raw_seed = os.environ["ZKLINK_SOAK_SEED"]
+if not re.fullmatch(r"[0-9]{1,5}", raw_duration) or not re.fullmatch(r"[0-9]{1,10}", raw_seed):
+    raise SystemExit("Soak duration and seed must be decimal integers.")
+duration, seed = int(raw_duration), int(raw_seed)
+if not DURATION_MIN_SECONDS <= duration <= DURATION_MAX_SECONDS or not 0 <= seed <= SEED_MAX:
+    raise SystemExit("Soak duration must be 30..86400 seconds; seed must be 0..2147483647.")
+print(duration, seed, str(duration + PROCESS_OVERHEAD_SECONDS) + "s")
+SETTINGS
+)
+  export ZKLINK_SOAK_DURATION_SECONDS ZKLINK_SOAK_SEED
+fi
+readonly runner_guard
 docker info >/dev/null
 docker compose version >/dev/null
 dotnet restore tests/ZkLink.FaultTests --locked-mode
@@ -23,7 +47,7 @@ git status --short >"${artifacts}/working-tree.txt"
 unset ZOOKEEPER_IMAGE
 export ZOOKEEPER_PORT_1=0 ZOOKEEPER_PORT_2=0 ZOOKEEPER_PORT_3=0
 export ZKLINK_FAULT_REPO_ROOT="$PWD"
-readonly startup_guard_seconds=90 rollback_guard_seconds=60 runner_guard=2m
+readonly startup_guard_seconds=90 rollback_guard_seconds=60
 project=""
 target=""
 allocation_network=""
@@ -55,10 +79,10 @@ cleanup() {
         ZKLINK_FAULT_PROJECT="${project}" ZKLINK_FAULT_SERVICE="${target}" \
           python3 dev/zookeeper-peer-network.py verify >>"${artifacts}/${evidence_key}-rollback.log" 2>&1 || cleanup_exit=1
       fi
-      if [[ "${role}" == pressure ]]; then
+      if [[ "${role}" == pressure || "${role}" == soak ]]; then
         for service in zoo1 zoo2 zoo3; do
           if compose exec -T "${service}" bash /opt/zklink/zookeeper-healthcheck.sh >>"${artifacts}/${evidence_key}-rollback.log" 2>&1; then
-            printf 'pressure-cleanup-authenticated-ready: %s\n' "${service}" >>"${artifacts}/${evidence_key}-rollback.log"
+            printf '%s-cleanup-authenticated-ready: %s\n' "${role}" "${service}" >>"${artifacts}/${evidence_key}-rollback.log"
           else
             cleanup_exit=1
           fi
@@ -77,6 +101,7 @@ outages=(member)
 test_fixture=MemberFault
 if [[ "${role}" == partition ]]; then test_fixture=PartitionFault; fi
 if [[ "${role}" == pressure ]]; then test_fixture=WatchPressure; fi
+if [[ "${role}" == soak ]]; then test_fixture=Soak; fi
 if [[ "${role}" == quorum || "${role}" == partition ]]; then outages=(brief lost); fi
 peer_roles=(none)
 if [[ "${role}" == peer ]]; then peer_roles=(leader follower); fi
@@ -98,6 +123,10 @@ for outage in "${outages[@]}"; do
     second_target=""
     export ZKLINK_FAULT_OUTAGE="${outage}"
     export ZKLINK_PEER_STATE_FILE="${artifacts}/${evidence_key}-peer-state.json"
+    export ZKLINK_SOAK_RESULT_FILE="${artifacts}/${evidence_key}-soak.jsonl"
+    if [[ "${role}" == soak ]]; then
+      printf 'DurationSeconds: %s\nSeed: %s\n' "${ZKLINK_SOAK_DURATION_SECONDS}" "${ZKLINK_SOAK_SEED}" >"${artifacts}/${evidence_key}-soak-settings.txt"
+    fi
     # Docker can reassign a zero-published host port when its container restarts.
     # Bind candidates together to choose distinct available loopback ports. If
     # another process wins the subsequent bind race, Compose startup must fail.
@@ -145,7 +174,9 @@ PORTS
     case_label="${outage}"
     if [[ "${role}" == peer ]]; then case_label="${peer_role}"; fi
     if [[ "${role}" == partition ]]; then case_label="${direction}/${outage}"; fi
-    if [[ "${role}" == pressure ]]; then
+    if [[ "${role}" == soak ]]; then
+      echo "Checking seeded soak on ZooKeeper ${version}: seconds=${ZKLINK_SOAK_DURATION_SECONDS} seed=${ZKLINK_SOAK_SEED}"
+    elif [[ "${role}" == pressure ]]; then
       echo "Checking watch pressure on ZooKeeper ${version}"
     else
       echo "Checking ${role} outage (${case_label}) on ZooKeeper ${version}"
@@ -162,7 +193,7 @@ PORTS
       if grep -Fxq 'Mode: follower' "${artifacts}/${evidence_key}-${service}-role-before.txt"; then
         followers=$((followers + 1))
         if [[ "${role}" == quorum && -z "${second_target}" ]]; then second_target="${service}"; fi
-        if [[ ( "${role}" == follower || "${role}" == pressure || ( "${role}" == peer && "${peer_role}" == follower ) ) && -z "${target}" ]]; then target="${service}"; fi
+        if [[ ( "${role}" == follower || "${role}" == pressure || "${role}" == soak || ( "${role}" == peer && "${peer_role}" == follower ) ) && -z "${target}" ]]; then target="${service}"; fi
       elif grep -Fxq 'Mode: leader' "${artifacts}/${evidence_key}-${service}-role-before.txt"; then
         leaders=$((leaders + 1))
         if [[ ( "${role}" == leader || "${role}" == quorum || "${role}" == partition || ( "${role}" == peer && "${peer_role}" == leader ) ) && -z "${target}" ]]; then target="${service}"; fi
@@ -173,7 +204,7 @@ PORTS
     if [[ "${leaders}" -ne 1 || "${followers}" -ne 2 ]]; then echo "No healthy voting ensemble" >&2; exit 1; fi
     selection="first observed ${role}"
     if [[ "${role}" == peer ]]; then selection="observed ${peer_role} for peer isolation"; fi
-    if [[ "${role}" == pressure ]]; then selection="first observed follower as transparent forwarding target"; fi
+    if [[ "${role}" == pressure || "${role}" == soak ]]; then selection="first observed follower as transparent forwarding target"; fi
     if [[ "${role}" == partition ]]; then selection="observed leader as the client proxy target"; fi
     if [[ "${role}" == quorum ]]; then selection="observed leader and first observed follower"; fi
     printf 'Selection: %s in zoo1/zoo2/zoo3 order\nTarget: %s\n' "${selection}" "${target}" >"${artifacts}/${evidence_key}-selection.txt"
@@ -197,7 +228,9 @@ PORTS
     compose down --volumes >"${artifacts}/${evidence_key}-cleanup.log" 2>&1
     project=""
     target=""
-    if [[ "${role}" == pressure ]]; then
+    if [[ "${role}" == soak ]]; then
+      echo "ZooKeeper ${version}: PASS (seeded churn, CRUD, cancellation, watch/session recovery, resource checkpoints and cleanup)"
+    elif [[ "${role}" == pressure ]]; then
       echo "ZooKeeper ${version}: PASS (slow consumers, heartbeat progress, shared event overflow, FIFO, counter and fixture cleanup)"
     else
       echo "ZooKeeper ${version}: PASS (${role}/${case_label} fault, expected session outcome, no replay, restoration, rollback and cleanup)"
