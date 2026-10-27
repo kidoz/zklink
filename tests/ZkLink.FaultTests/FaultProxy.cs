@@ -121,6 +121,7 @@ internal sealed class FaultProxy : IAsyncDisposable
         {
             while (true)
             {
+                _stop.Token.ThrowIfCancellationRequested();
                 using var client = await _listener
                     .AcceptTcpClientAsync(_stop.Token)
                     .ConfigureAwait(false);
@@ -174,6 +175,7 @@ internal sealed class FaultProxy : IAsyncDisposable
         catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
         catch (SocketException) when (_stop.IsCancellationRequested) { }
         catch (ObjectDisposedException) when (_stop.IsCancellationRequested) { }
+        catch (InvalidOperationException) when (_stop.IsCancellationRequested) { }
         finally
         {
             _listener.Stop();
