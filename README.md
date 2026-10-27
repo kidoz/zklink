@@ -43,7 +43,7 @@ Install [just](https://just.systems/) and .NET SDK **10.0.403**. Docker with Com
 | `just zk-down [version]` | Remove the selected ensemble and its data volumes |
 | `just zk-matrix` | Smoke-test both pinned server versions and clean up |
 | `just zk-driver-matrix` | Also connect/authenticate/sync/close using ZkLink on every node |
-| `just zk-peer-partition-faults` | Isolate a follower’s peer network and verify majority progress, session/watch recovery and healing on both versions |
+| `just zk-peer-partition-faults` | Isolate leader and follower peer interfaces separately and verify election, majority progress and recovery on both versions |
 | `just zk-partition-faults` | Discard each direction of client traffic independently and verify recovery or local loss on both versions |
 | `just zk-quorum-faults` | Stop two voters and verify valid-session recovery or local loss, no replay and cleanup on both versions |
 | `just zk-leader-faults` | Stop the observed leader and verify replacement election, session/watch recovery and rollback on both versions |
@@ -136,9 +136,10 @@ and terminal local loss after a longer interruption.
 directions independently, with accurate request outcomes, no delayed forwarding
 or replay, and recovery or terminal local loss.
 [Peer partition checks](docs/how-to/verify-peer-partition-recovery.md) isolate a
-follower's peer interface while preserving its process and client network. Both
-pinned versions verify majority progress, same-session/watch recovery, no replay
-and consistent data across all members after healing.
+leader or follower's peer interface while preserving its process and client network.
+Both pinned versions verify replacement election when the leader is isolated,
+majority progress, same-session/watch recovery, no replay and consistent data
+across all members after healing. The old leader rejoins as a follower.
 
 ## Not yet available
 

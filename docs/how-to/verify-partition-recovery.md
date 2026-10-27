@@ -106,7 +106,7 @@ Local checks cover both directions and outcomes on both pinned versions with a m
 client. CI selects partition cases independently from server-outage cases;
 remote execution remains unobserved. The fixture uses plaintext with the explicit
 development digest override.
-[Follower peer isolation](verify-peer-partition-recovery.md) has its own check.
+[Peer isolation](verify-peer-partition-recovery.md) has its own check.
 Broader network faults, secure connections under this fault and sustained load
 require separate evidence.
 

@@ -36,10 +36,12 @@ directions independently, with valid-session recovery or terminal local loss.
 Outgoing cases verify incoming watch delivery and server absence of discarded
 writes without delayed forwarding or replay.
 [Peer partition checks](../how-to/verify-peer-partition-recovery.md) detach only an
-observed follower's peer interface on both patches, preserving its process and
-client network. They verify majority writes, minority write failure, retained
-session/watch recovery, no replay and replica consistency after healing.
-Leader/majority isolation and broader network fault qualification remain unverified.
+observed leader or follower's peer interface in separate cases on both patches,
+preserving its process and client network. Leader cases require a replacement
+election and old-leader return as a follower; follower cases retain the existing
+leader. Both verify majority writes, minority write failure, retained session/watch
+recovery, no replay and replica consistency after healing. Asymmetric peer traffic
+loss, simultaneous network faults and broader qualification remain unverified.
 
 ## Frameworks and platforms
 

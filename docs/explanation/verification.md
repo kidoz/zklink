@@ -159,17 +159,19 @@ watches; longer silence must produce terminal local `Lost`, with no replay or
 owner replacement after healing. A separate probe verifies authentication and
 acknowledged close through the healed proxy. This is application-frame loss with
 live TCP control traffic. See [Verify one-way traffic recovery](../how-to/verify-partition-recovery.md).
-`just zk-peer-partition-faults` detaches an observed follower's peer interface
-from a separate Docker bridge on each pinned version. Bidirectional peer TCP
-probes must fail while the majority retains its leader and commits a protected
-write. The selected process and client network remain intact; ZooKeeper may
+`just zk-peer-partition-faults` detaches an observed leader or follower's peer
+interface in separate fixtures on each pinned version. Bidirectional peer TCP
+probes must fail while the majority commits a protected write. Follower cases
+retain the existing leader; leader cases require replacement election before
+majority progress. The selected process and client network remain intact; ZooKeeper may
 close its client listener after detecting quorum loss. An independent minority
 write cannot acknowledge success, and the owner must recover its session,
 ephemeral and watches through the majority without replaying an uncertain create.
 Healing verifies original process/client identities, full readiness and consistent
-majority data through every member. See
+majority data through every member. An isolated old leader is reattached only
+after the replacement majority is serving and must return as a follower. See
 [Verify peer partition recovery](../how-to/verify-peer-partition-recovery.md).
-Leader/majority isolation, other network faults and sustained load remain separate work.
+Asymmetric peer traffic loss, simultaneous network faults and sustained load remain separate work.
 
 ## Release claims need consumer evidence
 

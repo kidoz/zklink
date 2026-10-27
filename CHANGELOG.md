@@ -45,6 +45,11 @@ remain unavailable. See
 
 ### Added
 
+- Leader peer-isolation cases extend `just zk-peer-partition-faults` to separate
+  leader and follower cases on both pinned versions, verifying replacement
+  election, majority progress, session/watch recovery, no replay and old-leader
+  return as a follower, with role-specific artifacts and guarded healing.
+
 - `just zk-peer-partition-faults` isolates an observed follower's peer interface
   on both pinned versions, preserving process/client identities and verifying
   majority progress, minority write failure, same-session/watch recovery,
