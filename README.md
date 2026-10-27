@@ -116,6 +116,10 @@ node, digest and X.509 ACL distinctions, transactions, watch restoration and
 certificate rejection. Run `just zk-security-matrix`; see
 [Verify secure connections](docs/how-to/verify-secure-connections.md).
 
+Built-in [tracing and metrics](docs/reference/telemetry.md) report lifecycle and
+operation outcomes, request pressure, heartbeat and watch/event state. Diagnostic
+delivery is bounded and asynchronous, with redaction and listener-isolation checks.
+
 ## Not yet available
 
 A NuGet package, Native AOT validation and runtime performance data are not available. Client TLS/mTLS has scoped live evidence on both pinned versions with a macOS arm64 client. Revocation services, certificate rotation, quorum TLS and cross-platform security qualification remain open.

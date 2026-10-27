@@ -8,6 +8,8 @@ Look up the repository's current code, tooling, and verification scope.
   settings, and repository layout.
 - [Analyzer rules](../../src/ZkLink.Analyzers/README.md) — ZKL0001–ZKL0006,
   security/async usage checks, consumption and verification scope.
+- [Tracing and metrics](telemetry.md) — activity names, instruments, outcomes,
+  redaction and bounded diagnostic delivery.
 - [Connection and session reference](connections.md) — configuration, state,
   cancellation, recovery and close behavior.
 - [Node and ACL operations](nodes.md) — methods, create modes, versions, errors

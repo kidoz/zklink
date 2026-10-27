@@ -118,6 +118,17 @@ observed macOS arm64 platform, without qualifying revocation, rotation, quorum
 TLS, SASL, Native AOT or other client operating systems. See
 [Verify secure connections](../how-to/verify-secure-connections.md).
 
+## Telemetry listeners verify observable behavior
+
+Controlled listeners check caller outcomes, monotonic durations, parent correlation,
+redaction, retained tombstones and gauge cleanup. A blocked listener fills the
+bounded diagnostic queue while actual driver operations and acknowledged close
+continue; throwing activity and histogram callbacks are isolated and counted.
+Live checks on both pinned versions observe CRUD, ACL rejection and same-session
+watch restoration. Secure rejection cases also observe TLS failure activities.
+See [Tracing and metrics](../reference/telemetry.md) for delivery limits and names.
+These checks do not provide benchmark or sustained-load evidence.
+
 ## Release claims need consumer evidence
 
 The build workflow defines checks on Linux, Windows, and macOS. A workflow file

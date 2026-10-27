@@ -15,8 +15,12 @@ This describes the checkout as of **2026-10-27**. No package has been released.
 | Dependency injection | Optional `AddZkLink` registration with one host-owned singleton and asynchronous startup/shutdown | Installed-package and DI-specific Native AOT qualification |
 | Analyzers | Six optional ZKL diagnostics, Roslyn compilation tests and a local packed-package consumer check | Released package and cross-platform qualification |
 | Local servers | Pinned three-node plaintext/TLS/mTLS fixtures for 3.8.7 and 3.9.6, expired-certificate negative control | Broader fault fixtures |
+| Observability | BCL traces and metrics, bounded asynchronous diagnostic delivery, finite tags, listener isolation and redaction checks | Exporter integration, sustained-load and cross-platform qualification |
 | Native AOT | Planned requirement | Publish and direct execution evidence for consumers |
 | Performance | Initial small GetData codec allocation check | Session/load benchmarks and runtime performance evidence |
+
+See [Tracing and metrics](telemetry.md) for instrument names, timing, privacy and
+best-effort delivery semantics.
 
 ## Frameworks and platforms
 

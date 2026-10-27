@@ -23,6 +23,11 @@ remain unavailable. See
 
 ### Added
 
+- BCL tracing and metrics for connections, operations, recovery, heartbeat and
+  watch pressure, with bounded diagnostic delivery and sensitive-data exclusion.
+- Controlled listener tests and live telemetry verification on both pinned
+  ZooKeeper versions, including secure connection rejection.
+
 - Disposable client TLS/mTLS ensembles, generated certificates, certificate
   rejection and secure node/transaction/watch recovery tests on both pinned patches.
 - Distinct digest and X.509 ACL checks, trusted connections on every secure node,
