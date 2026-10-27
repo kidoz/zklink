@@ -1,11 +1,26 @@
 # Third-party dependency inventory
 
-Snapshot: 2026-10-26. The core library has **no third-party runtime dependencies**. No source from another driver was copied. The project is [MIT-licensed](LICENSE); package publication remains pending, and this inventory does not relicense upstream material.
+Snapshot: 2026-10-28. The core library has **no third-party runtime dependencies**. No source from another driver was copied. The project is [MIT-licensed](LICENSE); package publication remains pending, and this inventory does not relicense upstream material.
 
 The resolved dependency graphs and integrity hashes are in the project `packages.lock.json` files. License expressions below were read from the restored NuGet package manifests. NuGet packages retain their upstream license/notice files in the package cache; they are not redistributed by this source change.
 
 | Dependency | Pinned version | Scope | License |
 | --- | --- | --- | --- |
+| BenchmarkDotNet, BenchmarkDotNet.Annotations | 0.15.8 | Benchmark executable only | MIT |
+| CommandLineParser | 2.9.1 | Transitive benchmark tooling | MIT |
+| Gee.External.Capstone | 2.3.0 | Transitive benchmark tooling | MIT |
+| Iced | 1.21.0 | Transitive benchmark tooling | MIT |
+| Microsoft.CodeAnalysis.Common, Microsoft.CodeAnalysis.CSharp | 4.14.0 | Transitive benchmark tooling | MIT |
+| Microsoft.CodeAnalysis.Analyzers | 3.11.0 | Transitive benchmark tooling | MIT |
+| Microsoft.Diagnostics.NETCore.Client | 0.2.510501 | Transitive benchmark tooling | MIT |
+| Microsoft.Diagnostics.Runtime | 3.1.512801 | Transitive benchmark tooling | MIT |
+| Microsoft.Diagnostics.Tracing.TraceEvent | 3.1.21 | Transitive benchmark tooling | MIT |
+| Microsoft.DotNet.PlatformAbstractions | 3.1.6 | Transitive benchmark tooling | MIT |
+| Microsoft.Extensions.DependencyInjection, DependencyInjection.Abstractions, Logging, Logging.Abstractions, Options, Primitives | 6.0.0 | Transitive benchmark tooling | MIT |
+| Perfolizer | 0.6.1 | Transitive benchmark tooling | MIT |
+| Pragmastat | 3.2.4 | Transitive benchmark tooling | MIT |
+| System.CodeDom, System.Management | 9.0.5 | Transitive benchmark tooling | MIT |
+| System.Reflection.TypeExtensions | 4.7.0 | Transitive benchmark tooling | MIT |
 | CSharpier | 1.3.0 | Local formatting tool | MIT |
 | Microsoft.CodeAnalysis.PublicApiAnalyzers | 5.6.0 | Build analyzer only; private assets | MIT |
 | Microsoft.CodeAnalysis.Analyzers, Microsoft.CodeAnalysis.CSharp | 5.9.0 | ZkLink analyzer build/tests; private assets | MIT |

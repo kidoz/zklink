@@ -1,0 +1,22 @@
+{
+  "GetSmall.Encode": 1,
+  "GetSmall.Decode": 256,
+  "GetLarge.Encode": 1,
+  "GetLarge.Decode": 66000,
+  "SetSmall.Encode": 1,
+  "SetSmall.Decode": 192,
+  "SetLarge.Encode": 1,
+  "SetLarge.Decode": 192,
+  "ChildrenSmall.Encode": 1,
+  "ChildrenSmall.Decode": 768,
+  "ChildrenLarge.Encode": 1,
+  "ChildrenLarge.Decode": 65536,
+  "MultiSmall.Encode": 96,
+  "MultiSmall.Decode": 768,
+  "MultiLarge.Encode": 96,
+  "MultiLarge.Decode": 5120,
+  "Frame32.Read": 192,
+  "Frame32.Write": 1,
+  "Frame65536.Read": 66000,
+  "Frame65536.Write": 1
+}

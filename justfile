@@ -20,6 +20,14 @@ build configuration="Release":
 test project:
     dotnet test --project "$1" --configuration Release
 
+# Run protocol/framing benchmarks and retain raw results (Short job by default).
+bench *args:
+    bash dev/run-benchmarks.sh "$@"
+
+# Check the measured allocation budgets without a timing gate.
+bench-allocations output="artifacts/benchmarks/allocations.json":
+    dotnet run --project benchmarks/ZkLink.Benchmarks -c Release -- --allocations "$1"
+
 # Format C# and project XML with the pinned CSharpier tool.
 format: tools
     dotnet csharpier format .

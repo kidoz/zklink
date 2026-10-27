@@ -53,6 +53,37 @@ jobs:
         if: runner.os == 'Linux'
         run: bash dev/test-analyzers-package.sh
 
+  allocations:
+    name: Protocol and framing allocation budgets
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install pinned SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      - name: Restore locked benchmark dependencies
+        run: dotnet restore benchmarks/ZkLink.Benchmarks --locked-mode
+      - name: Record allocation environment
+        run: |
+          mkdir -p artifacts/benchmarks
+          dotnet --info > artifacts/benchmarks/dotnet-info.txt
+          git rev-parse HEAD > artifacts/benchmarks/revision.txt
+          cp benchmarks/ZkLink.Benchmarks/allocation-budgets.json artifacts/benchmarks/allocation-budgets.json
+      - name: Check allocation budgets
+        run: dotnet run --project benchmarks/ZkLink.Benchmarks -c Release --no-restore -- --allocations artifacts/benchmarks/allocations.json
+      - name: Retain allocation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: allocation-results
+          path: artifacts/benchmarks
+          if-no-files-found: error
+
   operations:
     name: Live node, ACL, transaction, auxiliary and watch operations
     runs-on: ubuntu-latest

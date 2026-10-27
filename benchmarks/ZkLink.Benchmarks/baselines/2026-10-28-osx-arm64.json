@@ -1,0 +1,513 @@
+{
+  "ObservedOn": "2026-10-28",
+  "Revision": "9a2bca98ca800ff38babcd7710f2fe1a4141a25b",
+  "WorkingTree": "Initial benchmark changes uncommitted; see input hashes.",
+  "Scope": "Synthetic Jute codec and synchronous MemoryStream framing only; no server or network.",
+  "Job": "ShortRun; one launch, three warmup and three measured iterations; timing observations are provisional.",
+  "Host": {
+    "BenchmarkDotNetCaption": "BenchmarkDotNet",
+    "BenchmarkDotNetVersion": "0.15.8",
+    "OsVersion": "macOS 27.0.1 (26A434) [Darwin 27.0.0]",
+    "ProcessorName": "Apple M4 Max",
+    "PhysicalProcessorCount": 1,
+    "PhysicalCoreCount": 16,
+    "LogicalCoreCount": 16,
+    "RuntimeVersion": ".NET 10.0.14 (10.0.14, 10.0.1426.52326)",
+    "Architecture": "Arm64",
+    "HasAttachedDebugger": false,
+    "HasRyuJit": true,
+    "Configuration": "RELEASE",
+    "DotNetCliVersion": "10.0.403",
+    "ChronometerFrequency": {
+      "Hertz": 1000000000
+    },
+    "HardwareTimerKind": "Unknown"
+  },
+  "InputSHA256": {
+    "benchmarks/ZkLink.Benchmarks/AllocationCheck.cs": "0ae156d87caba38a6c1d667f11c93917bac92dd7dbe6d6aedc3813b77ebe08d3",
+    "benchmarks/ZkLink.Benchmarks/CodecWorkload.cs": "7757ccbadb26510a7cf61d88e3e83e12f5bde824d4efa855e69c7e0c2044bc86",
+    "benchmarks/ZkLink.Benchmarks/FrameWorkload.cs": "7c8bcaf587c4149b823e53f94ce50cf5288ca33bdf26b4eb14aeaaa4539a6546",
+    "benchmarks/ZkLink.Benchmarks/Program.cs": "1c16fa669b1e76944f7b0f97eda7c1d32ac92a676a72178e3e0f7ba607078ee4",
+    "benchmarks/ZkLink.Benchmarks/ProtocolBenchmarks.cs": "2dd1d066121d6c969885b3a9317308e9eb74cbdd315c992398d158f49448d90d",
+    "benchmarks/ZkLink.Benchmarks/allocation-budgets.json": "9321e1c28814e826ff3f108740888a2a4cb5e82c832adc72d303855e41f0f294",
+    "benchmarks/ZkLink.Benchmarks/packages.lock.json": "3ba93229d981bbd01508ed8ab82c70d4df6f530e11081086a8e66ad189ff54af",
+    "benchmarks/ZkLink.Benchmarks/ZkLink.Benchmarks.csproj": "687b76b80414b09f0e67cbd0e49903858e43a0f03cdc22986981f882aeda48d7",
+    "src/ZkLink/ZkLink.csproj": "ae58f1d2cdc85ec1f21b73e1a72e903afb69458bf3aa286331ae24d7734f6ed3",
+    "Directory.Packages.props": "59743356bd7c3310f3ebfcf8faa16dae1c43183548d38c5b38932408f3a6cda3",
+    "HEAD": "9a2bca98ca800ff38babcd7710f2fe1a4141a25b"
+  },
+  "AllocationCheck": {
+    "Runtime": ".NET 10.0.14",
+    "OS": "macOS 27.0.1",
+    "Architecture": "Arm64",
+    "Server": "none; synthetic Jute records and synchronous MemoryStream framing",
+    "WarmupIterations": 2048,
+    "MeasurementIterations": 4096,
+    "TimingGate": false,
+    "Complete": true,
+    "Results": [
+      {
+        "Case": "GetSmall.Encode",
+        "RequestBytes": 28,
+        "ReplyBytes": 120,
+        "BytesPerOperation": 0,
+        "BudgetBytesPerOperation": 1,
+        "Passed": true
+      },
+      {
+        "Case": "GetSmall.Decode",
+        "RequestBytes": 28,
+        "ReplyBytes": 120,
+        "BytesPerOperation": 200,
+        "BudgetBytesPerOperation": 256,
+        "Passed": true
+      },
+      {
+        "Case": "GetLarge.Encode",
+        "RequestBytes": 28,
+        "ReplyBytes": 65624,
+        "BytesPerOperation": 0,
+        "BudgetBytesPerOperation": 1,
+        "Passed": true
+      },
+      {
+        "Case": "GetLarge.Decode",
+        "RequestBytes": 28,
+        "ReplyBytes": 65624,
+        "BytesPerOperation": 65704,
+        "BudgetBytesPerOperation": 66000,
+        "Passed": true
+      },
+      {
+        "Case": "SetSmall.Encode",
+        "RequestBytes": 67,
+        "ReplyBytes": 84,
+        "BytesPerOperation": 0,
+        "BudgetBytesPerOperation": 1,
+        "Passed": true
+      },
+      {
+        "Case": "SetSmall.Decode",
+        "RequestBytes": 67,
+        "ReplyBytes": 84,
+        "BytesPerOperation": 136,
+        "BudgetBytesPerOperation": 192,
+        "Passed": true
+      },
+      {
+        "Case": "SetLarge.Encode",
+        "RequestBytes": 65571,
+        "ReplyBytes": 84,
+        "BytesPerOperation": 0,
+        "BudgetBytesPerOperation": 1,
+        "Passed": true
+      },
+      {
+        "Case": "SetLarge.Decode",
+        "RequestBytes": 65571,
+        "ReplyBytes": 84,
+        "BytesPerOperation": 136,
+        "BudgetBytesPerOperation": 192,
+        "Passed": true
+      },
+      {
+        "Case": "ChildrenSmall.Encode",
+        "RequestBytes": 28,
+        "ReplyBytes": 132,
+        "BytesPerOperation": 0,
+        "BudgetBytesPerOperation": 1,
+        "Passed": true
+      },
+      {
+        "Case": "ChildrenSmall.Decode",
+        "RequestBytes": 28,
+        "ReplyBytes": 132,
+        "BytesPerOperation": 624,
+        "BudgetBytesPerOperation": 768,
+        "Passed": true
+      },
+      {
+        "Case": "ChildrenLarge.Encode",
+        "RequestBytes": 28,
+        "ReplyBytes": 14356,
+        "BytesPerOperation": 0,
+        "BudgetBytesPerOperation": 1,
+        "Passed": true
+      },
+      {
+        "Case": "ChildrenLarge.Decode",
+        "RequestBytes": 28,
+        "ReplyBytes": 14356,
+        "BytesPerOperation": 57520,
+        "BudgetBytesPerOperation": 65536,
+        "Passed": true
+      },
+      {
+        "Case": "MultiSmall.Encode",
+        "RequestBytes": 289,
+        "ReplyBytes": 333,
+        "BytesPerOperation": 64,
+        "BudgetBytesPerOperation": 96,
+        "Passed": true
+      },
+      {
+        "Case": "MultiSmall.Decode",
+        "RequestBytes": 289,
+        "ReplyBytes": 333,
+        "BytesPerOperation": 640,
+        "BudgetBytesPerOperation": 768,
+        "Passed": true
+      },
+      {
+        "Case": "MultiLarge.Encode",
+        "RequestBytes": 2193,
+        "ReplyBytes": 2489,
+        "BytesPerOperation": 64,
+        "BudgetBytesPerOperation": 96,
+        "Passed": true
+      },
+      {
+        "Case": "MultiLarge.Decode",
+        "RequestBytes": 2193,
+        "ReplyBytes": 2489,
+        "BytesPerOperation": 4224,
+        "BudgetBytesPerOperation": 5120,
+        "Passed": true
+      },
+      {
+        "Case": "Frame32.Read",
+        "RequestBytes": 32,
+        "ReplyBytes": 32,
+        "BytesPerOperation": 128,
+        "BudgetBytesPerOperation": 192,
+        "Passed": true
+      },
+      {
+        "Case": "Frame32.Write",
+        "RequestBytes": 32,
+        "ReplyBytes": 32,
+        "BytesPerOperation": 0,
+        "BudgetBytesPerOperation": 1,
+        "Passed": true
+      },
+      {
+        "Case": "Frame65536.Read",
+        "RequestBytes": 65536,
+        "ReplyBytes": 65536,
+        "BytesPerOperation": 65632,
+        "BudgetBytesPerOperation": 66000,
+        "Passed": true
+      },
+      {
+        "Case": "Frame65536.Write",
+        "RequestBytes": 65536,
+        "ReplyBytes": 65536,
+        "BytesPerOperation": 0,
+        "BudgetBytesPerOperation": 1,
+        "Passed": true
+      }
+    ]
+  },
+  "Benchmarks": [
+    {
+      "Case": "ZkLink.Benchmarks.CodecBenchmarks.Encode(Workload: GetSmall)",
+      "MeanNanoseconds": 35.44175706307093,
+      "MedianNanoseconds": 35.313740372657776,
+      "P95IterationNanoseconds": 35.90707628130912,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 28215305.415598735,
+      "Memory": {
+        "Gen0Collections": 0,
+        "Gen1Collections": 0,
+        "Gen2Collections": 0,
+        "TotalOperations": 16777216,
+        "BytesAllocatedPerOperation": 0
+      }
+    },
+    {
+      "Case": "ZkLink.Benchmarks.CodecBenchmarks.Decode(Workload: GetSmall)",
+      "MeanNanoseconds": 36.861988772948585,
+      "MedianNanoseconds": 36.53010103106499,
+      "P95IterationNanoseconds": 37.432901257276534,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 27128216.173020393,
+      "Memory": {
+        "Gen0Collections": 401,
+        "Gen1Collections": 0,
+        "Gen2Collections": 0,
+        "TotalOperations": 16777216,
+        "BytesAllocatedPerOperation": 200
+      }
+    },
+    {
+      "Case": "ZkLink.Benchmarks.CodecBenchmarks.Encode(Workload: GetLarge)",
+      "MeanNanoseconds": 36.37520428498586,
+      "MedianNanoseconds": 36.1284476518631,
+      "P95IterationNanoseconds": 37.10499081611633,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 27491254.541565765,
+      "Memory": {
+        "Gen0Collections": 0,
+        "Gen1Collections": 0,
+        "Gen2Collections": 0,
+        "TotalOperations": 16777216,
+        "BytesAllocatedPerOperation": 0
+      }
+    },
+    {
+      "Case": "ZkLink.Benchmarks.CodecBenchmarks.Decode(Workload: GetLarge)",
+      "MeanNanoseconds": 1362.9035676320393,
+      "MedianNanoseconds": 1367.034990310669,
+      "P95IterationNanoseconds": 1367.6759309768677,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 733727.6266269067,
+      "Memory": {
+        "Gen0Collections": 4095,
+        "Gen1Collections": 0,
+        "Gen2Collections": 0,
+        "TotalOperations": 524288,
+        "BytesAllocatedPerOperation": 65704
+      }
+    },
+    {
+      "Case": "ZkLink.Benchmarks.CodecBenchmarks.Encode(Workload: SetSmall)",
+      "MeanNanoseconds": 40.33228340744972,
+      "MedianNanoseconds": 40.56106260418892,
+      "P95IterationNanoseconds": 40.86936686635017,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 24794033.848708186,
+      "Memory": {
+        "Gen0Collections": 0,
+        "Gen1Collections": 0,
+        "Gen2Collections": 0,
+        "TotalOperations": 16777216,
+        "BytesAllocatedPerOperation": 0
+      }
+    },
+    {
+      "Case": "ZkLink.Benchmarks.CodecBenchmarks.Decode(Workload: SetSmall)",
+      "MeanNanoseconds": 34.087033281723656,
+      "MedianNanoseconds": 34.18987116217613,
+      "P95IterationNanoseconds": 34.31815451383591,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 29336668.631006002,
+      "Memory": {
+        "Gen0Collections": 272,
+        "Gen1Collections": 0,
+        "Gen2Collections": 0,
+        "TotalOperations": 16777216,
+        "BytesAllocatedPerOperation": 136
+      }
+    },
+    {
+      "Case": "ZkLink.Benchmarks.CodecBenchmarks.Encode(Workload: SetLarge)",
+      "MeanNanoseconds": 933.9560407002767,
+      "MedianNanoseconds": 924.3218908309937,
+      "P95IterationNanoseconds": 960.4390857696533,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 1070714.2054032905,
+      "Memory": {
+        "Gen0Collections": 0,
+        "Gen1Collections": 0,
+        "Gen2Collections": 0,
+        "TotalOperations": 1048576,
+        "BytesAllocatedPerOperation": 0
+      }
+    },
+    {
+      "Case": "ZkLink.Benchmarks.CodecBenchmarks.Decode(Workload: SetLarge)",
+      "MeanNanoseconds": 33.450701961914696,
+      "MedianNanoseconds": 33.36060044169426,
+      "P95IterationNanoseconds": 33.63280442357063,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 29894738.86492876,
+      "Memory": {
+        "Gen0Collections": 272,
+        "Gen1Collections": 0,
+        "Gen2Collections": 0,
+        "TotalOperations": 16777216,
+        "BytesAllocatedPerOperation": 136
+      }
+    },
+    {
+      "Case": "ZkLink.Benchmarks.CodecBenchmarks.Encode(Workload: ChildrenSmall)",
+      "MeanNanoseconds": 37.259257505337395,
+      "MedianNanoseconds": 37.200043588876724,
+      "P95IterationNanoseconds": 37.624257314205174,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 26838967.466186084,
+      "Memory": {
+        "Gen0Collections": 0,
+        "Gen1Collections": 0,
+        "Gen2Collections": 0,
+        "TotalOperations": 16777216,
+        "BytesAllocatedPerOperation": 0
+      }
+    },
+    {
+      "Case": "ZkLink.Benchmarks.CodecBenchmarks.Decode(Workload: ChildrenSmall)",
+      "MeanNanoseconds": 167.85426259040833,
+      "MedianNanoseconds": 167.6132082939148,
+      "P95IterationNanoseconds": 168.31085965633395,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 5957549.034308188,
+      "Memory": {
+        "Gen0Collections": 312,
+        "Gen1Collections": 0,
+        "Gen2Collections": 0,
+        "TotalOperations": 4194304,
+        "BytesAllocatedPerOperation": 624
+      }
+    },
+    {
+      "Case": "ZkLink.Benchmarks.CodecBenchmarks.Encode(Workload: ChildrenLarge)",
+      "MeanNanoseconds": 36.39619796474775,
+      "MedianNanoseconds": 36.49953004717827,
+      "P95IterationNanoseconds": 36.51500194072723,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 27475397.31948292,
+      "Memory": {
+        "Gen0Collections": 0,
+        "Gen1Collections": 0,
+        "Gen2Collections": 0,
+        "TotalOperations": 16777216,
+        "BytesAllocatedPerOperation": 0
+      }
+    },
+    {
+      "Case": "ZkLink.Benchmarks.CodecBenchmarks.Decode(Workload: ChildrenLarge)",
+      "MeanNanoseconds": 17527.553985595703,
+      "MedianNanoseconds": 17694.03839111328,
+      "P95IterationNanoseconds": 17758.132189941407,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 57053.026384731646,
+      "Memory": {
+        "Gen0Collections": 225,
+        "Gen1Collections": 39,
+        "Gen2Collections": 0,
+        "TotalOperations": 32768,
+        "BytesAllocatedPerOperation": 57520
+      }
+    },
+    {
+      "Case": "ZkLink.Benchmarks.CodecBenchmarks.Encode(Workload: MultiSmall)",
+      "MeanNanoseconds": 197.67624123891196,
+      "MedianNanoseconds": 197.11665296554565,
+      "P95IterationNanoseconds": 199.1529324054718,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 5058776.885540826,
+      "Memory": {
+        "Gen0Collections": 16,
+        "Gen1Collections": 0,
+        "Gen2Collections": 0,
+        "TotalOperations": 4194304,
+        "BytesAllocatedPerOperation": 32
+      }
+    },
+    {
+      "Case": "ZkLink.Benchmarks.CodecBenchmarks.Decode(Workload: MultiSmall)",
+      "MeanNanoseconds": 177.07827035586038,
+      "MedianNanoseconds": 175.91990041732788,
+      "P95IterationNanoseconds": 180.4100970506668,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 5647220.282818316,
+      "Memory": {
+        "Gen0Collections": 304,
+        "Gen1Collections": 0,
+        "Gen2Collections": 0,
+        "TotalOperations": 4194304,
+        "BytesAllocatedPerOperation": 608
+      }
+    },
+    {
+      "Case": "ZkLink.Benchmarks.CodecBenchmarks.Encode(Workload: MultiLarge)",
+      "MeanNanoseconds": 1419.9624843597412,
+      "MedianNanoseconds": 1421.9059143066406,
+      "P95IterationNanoseconds": 1423.1183431625366,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 704243.9578612518,
+      "Memory": {
+        "Gen0Collections": 4,
+        "Gen1Collections": 0,
+        "Gen2Collections": 0,
+        "TotalOperations": 524288,
+        "BytesAllocatedPerOperation": 64
+      }
+    },
+    {
+      "Case": "ZkLink.Benchmarks.CodecBenchmarks.Decode(Workload: MultiLarge)",
+      "MeanNanoseconds": 1352.4825706481934,
+      "MedianNanoseconds": 1348.938346862793,
+      "P95IterationNanoseconds": 1359.5225582122803,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 739381.0624271026,
+      "Memory": {
+        "Gen0Collections": 264,
+        "Gen1Collections": 4,
+        "Gen2Collections": 0,
+        "TotalOperations": 524288,
+        "BytesAllocatedPerOperation": 4224
+      }
+    },
+    {
+      "Case": "ZkLink.Benchmarks.FramingBenchmarks.ReadAsync(PayloadBytes: 32)",
+      "MeanNanoseconds": 40.247068206469216,
+      "MedianNanoseconds": 40.25162136554718,
+      "P95IterationNanoseconds": 40.475702011585234,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 24846530.307995513,
+      "Memory": {
+        "Gen0Collections": 256,
+        "Gen1Collections": 0,
+        "Gen2Collections": 0,
+        "TotalOperations": 16777216,
+        "BytesAllocatedPerOperation": 128
+      }
+    },
+    {
+      "Case": "ZkLink.Benchmarks.FramingBenchmarks.WriteAsync(PayloadBytes: 32)",
+      "MeanNanoseconds": 15.921791394551596,
+      "MedianNanoseconds": 15.880654245615005,
+      "P95IterationNanoseconds": 16.061255210638045,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 62807003.00734991,
+      "Memory": {
+        "Gen0Collections": 0,
+        "Gen1Collections": 0,
+        "Gen2Collections": 0,
+        "TotalOperations": 33554432,
+        "BytesAllocatedPerOperation": 0
+      }
+    },
+    {
+      "Case": "ZkLink.Benchmarks.FramingBenchmarks.ReadAsync(PayloadBytes: 65536)",
+      "MeanNanoseconds": 1394.8230749766033,
+      "MedianNanoseconds": 1395.477533340454,
+      "P95IterationNanoseconds": 1396.7923891067503,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 716936.8057785924,
+      "Memory": {
+        "Gen0Collections": 4095,
+        "Gen1Collections": 0,
+        "Gen2Collections": 0,
+        "TotalOperations": 524288,
+        "BytesAllocatedPerOperation": 65632
+      }
+    },
+    {
+      "Case": "ZkLink.Benchmarks.FramingBenchmarks.WriteAsync(PayloadBytes: 65536)",
+      "MeanNanoseconds": 801.6048272450765,
+      "MedianNanoseconds": 766.2678556442261,
+      "P95IterationNanoseconds": 874.4137008666992,
+      "Iterations": 3,
+      "MeanOperationsPerSecond": 1247497.4775747797,
+      "Memory": {
+        "Gen0Collections": 0,
+        "Gen1Collections": 0,
+        "Gen2Collections": 0,
+        "TotalOperations": 1048576,
+        "BytesAllocatedPerOperation": 0
+      }
+    }
+  ]
+}

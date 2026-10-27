@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" />
+    <ProjectReference Include="../../src/ZkLink/ZkLink.csproj" />
+    <None Include="allocation-budgets.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
