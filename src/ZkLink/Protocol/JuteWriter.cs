@@ -44,14 +44,14 @@ internal ref struct JuteWriter : IJuteOutput
         {
             throw new InvalidDataException("Invalid UTF-16 in protocol string.");
         }
-        EnsureCapacity(checked(sizeof(int) + byteCount));
+        EnsureCapacity(sizeof(int) + (long)byteCount);
         WriteInt32(byteCount);
         StrictUtf8.GetBytes(value, Take(byteCount));
     }
 
     public void WriteBuffer(ReadOnlySpan<byte> value)
     {
-        EnsureCapacity(checked(sizeof(int) + value.Length));
+        EnsureCapacity(sizeof(int) + (long)value.Length);
         WriteInt32(value.Length);
         value.CopyTo(Take(value.Length));
     }
@@ -74,7 +74,7 @@ internal ref struct JuteWriter : IJuteOutput
             throw new InvalidDataException("Vector exceeds the configured limit.");
         }
         // Every string requires at least its length prefix.
-        EnsureCapacity(checked(sizeof(int) + checked(values.Count * sizeof(int))));
+        EnsureCapacity(sizeof(int) + (long)values.Count * sizeof(int));
         WriteInt32(values.Count);
         foreach (var value in values)
         {
@@ -111,7 +111,7 @@ internal ref struct JuteWriter : IJuteOutput
         WriteInt32(header.Error);
     }
 
-    private readonly void EnsureCapacity(int count)
+    private readonly void EnsureCapacity(long count)
     {
         if (count < 0 || count > _destination.Length - _position)
         {

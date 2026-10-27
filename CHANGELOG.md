@@ -24,6 +24,8 @@ remain unavailable. See
   after `closeSession`.
 - Meter construction now uses the same listener-failure isolation as instrument
   registration.
+- Protocol writer size calculations can no longer surface checked-integer
+  overflow instead of the documented malformed-record failure.
 
 ### Changed
 
