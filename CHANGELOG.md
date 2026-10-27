@@ -45,6 +45,10 @@ remain unavailable. See
 
 ### Added
 
+- `just zk-partition-faults` checks one-way incoming traffic loss, forwarded
+  heartbeats, session/watch recovery or terminal local loss and healed-proxy
+  cleanup on both pinned server versions.
+
 - `just zk-quorum-faults` checks brief recovery and terminal local loss after
   stopping two voters, with no uncertain-create replay and verified cleanup on
   both pinned server versions.

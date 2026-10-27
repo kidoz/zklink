@@ -149,7 +149,14 @@ and longer-outage local `Lost` on both versions. The tested client is never
 replaced and uncertain creates are never replayed. Independent control sessions
 observe results after all members recover; local loss does not establish
 server-confirmed expiry. See [Verify quorum recovery](../how-to/verify-quorum-recovery.md).
-Partitions and sustained faults remain separate work.
+`just zk-partition-faults` additionally discards incoming client frames while
+forwarding outgoing heartbeats. Short healing must restore a valid session and
+watches; longer silence must produce terminal local `Lost`, with no replay or
+owner replacement after healing. A separate probe verifies authentication and
+acknowledged close through the healed proxy. This is application-frame loss with
+live TCP control traffic. See [Verify incoming-traffic recovery](../how-to/verify-partition-recovery.md).
+Other partition directions, inter-server/kernel faults and sustained load remain
+separate work.
 
 ## Release claims need consumer evidence
 

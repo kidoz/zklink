@@ -77,8 +77,9 @@ leader fault jobs; remote execution remains unobserved.
 
 This check uses plaintext client connections with the explicit development
 digest override. Leader recovery is checked separately by `just zk-leader-faults`.
-[Quorum loss](verify-quorum-recovery.md) also has a separate command. Partitions,
-forced expiry, observer endpoints, secure server outages and sustained load
+[Quorum loss](verify-quorum-recovery.md) also has a separate command.
+[Incoming client-traffic loss](verify-partition-recovery.md) has its own check;
+other partition directions, forced expiry, observer endpoints, secure server outages and sustained load
 require separate evidence.
 
 [How-to guides](README.md) · [Documentation home](../README.md)
