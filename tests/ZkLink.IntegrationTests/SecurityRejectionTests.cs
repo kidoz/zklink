@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using ZkLink.Testing;
+
 namespace ZkLink.IntegrationTests;
 
 [Collection("Security")]
@@ -19,6 +22,7 @@ public sealed class SecurityRejectionTests : IAsyncLifetime
     [Trait("Acceptance", "T20")]
     public async Task RequiredTlsRejectsInvalidServerAndCannotDowngrade(string failure)
     {
+        using var capture = new TelemetryCapture();
         var tls = _fixture.Tls(
             _fixture.Mutual ? _fixture.Certificate : null,
             root: failure == "trust" ? _fixture.UntrustedRoot : null,
@@ -43,6 +47,20 @@ public sealed class SecurityRejectionTests : IAsyncLifetime
         Assert.Equal(ZooKeeperConnectionFailure.Tls, error.Failure);
         TestContext.Current.TestOutputHelper?.WriteLine($"Rejection completed: {error.Failure}.");
         _fixture.AssertSafe(error);
+        await capture
+            .WaitForAsync(
+                static activity =>
+                    activity.Name == "zklink.connect"
+                    && activity.Status == ActivityStatusCode.Error,
+                TestContext.Current.CancellationToken
+            )
+            .ConfigureAwait(true);
+        Assert.Contains(
+            capture.Activities,
+            static activity =>
+                activity.Tags.Any(static tag => tag.Key == "error" && Equals(tag.Value, "Tls"))
+        );
+        capture.AssertRedacted(_fixture.Root, endpoint);
         await _fixture
             .Client.SyncAsync(_fixture.Root, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
