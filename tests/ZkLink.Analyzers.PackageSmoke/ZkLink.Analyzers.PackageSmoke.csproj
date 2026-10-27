@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <!-- Each locally rebuilt candidate has its own content hash. -->
+    <NuGetLockFilePath>$(MSBuildProjectDirectory)/obj/packages.lock.json</NuGetLockFilePath>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/ZkLink/ZkLink.csproj" />

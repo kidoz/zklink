@@ -6,7 +6,10 @@ namespace ZkLink.IntegrationTests;
 internal sealed class SecurityFixture(Action<string>? progress = null) : IAsyncLifetime
 {
     private static readonly TimeSpan ConnectGuard = TimeSpan.FromSeconds(4);
-    private static readonly TimeSpan RejectionGuard = TimeSpan.FromSeconds(1);
+
+    // A cold server TLS pipeline can exceed one second on a shared runner.
+    // Keep certificate failures observable within the enclosing 30-second test.
+    private static readonly TimeSpan RejectionGuard = TimeSpan.FromSeconds(8);
     private static readonly TimeSpan ConnectAttemptGuard = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan OperationGuard = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan CloseGuard = TimeSpan.FromSeconds(2);

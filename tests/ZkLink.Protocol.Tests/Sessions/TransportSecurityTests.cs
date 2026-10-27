@@ -369,7 +369,29 @@ internal sealed class EphemeralCertificates : IDisposable
             expired ? DateTimeOffset.UtcNow.AddHours(-1) : DateTimeOffset.UtcNow.AddDays(1),
             RandomNumberGenerator.GetBytes(16)
         );
-        return publicCertificate.CopyWithPrivateKey(key);
+        var certificate = publicCertificate.CopyWithPrivateKey(key);
+        if (!OperatingSystem.IsWindows())
+        {
+            return certificate;
+        }
+        // Schannel requires a named key container. DefaultKeySet removes the
+        // temporary imported key when the certificate is disposed; do not persist it.
+        using (certificate)
+        {
+            byte[] pkcs12 = certificate.Export(X509ContentType.Pkcs12);
+            try
+            {
+                return X509CertificateLoader.LoadPkcs12(
+                    pkcs12,
+                    null,
+                    X509KeyStorageFlags.DefaultKeySet
+                );
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(pkcs12);
+            }
+        }
     }
 
     // Ephemeral roots have no revocation service. Production defaults remain Online.

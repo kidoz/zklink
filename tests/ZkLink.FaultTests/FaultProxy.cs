@@ -126,11 +126,20 @@ internal sealed class FaultProxy : IAsyncDisposable
                     .ConfigureAwait(false);
                 using var upstream = new TcpClient();
                 Interlocked.Increment(ref _connectionAttempts);
+                NetworkStream downstreamStream;
+                NetworkStream upstreamStream;
                 try
                 {
                     await upstream
                         .ConnectAsync(_target.Host, _target.Port, _stop.Token)
                         .ConfigureAwait(false);
+                    client.NoDelay = true;
+                    upstream.NoDelay = true;
+                    // Capture both streams before forwarding can observe EOF or
+                    // disposal can close the published sockets. GetStream checks
+                    // Connected even when it has already created a stream.
+                    downstreamStream = client.GetStream();
+                    upstreamStream = upstream.GetStream();
                 }
                 catch (SocketException)
                 {
@@ -138,34 +147,22 @@ internal sealed class FaultProxy : IAsyncDisposable
                     // Close this downstream attempt and accept the driver's next attempt.
                     continue;
                 }
-                client.NoDelay = true;
-                upstream.NoDelay = true;
+                catch (InvalidOperationException) when (!client.Connected || !upstream.Connected)
+                {
+                    continue;
+                }
                 lock (_gate)
                 {
                     _client = client;
                     _upstream = upstream;
                 }
-                using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
-                var outgoing = ForwardAsync(
-                    client.GetStream(),
-                    upstream.GetStream(),
-                    false,
-                    lifetime.Token
-                );
-                var incoming = ForwardAsync(
-                    upstream.GetStream(),
-                    client.GetStream(),
-                    true,
-                    lifetime.Token
-                );
                 try
                 {
-                    await Task.WhenAny(outgoing, incoming).ConfigureAwait(false);
+                    await ForwardConnectionAsync(downstreamStream, upstreamStream)
+                        .ConfigureAwait(false);
                 }
                 finally
                 {
-                    await lifetime.CancelAsync().ConfigureAwait(false);
-                    await Task.WhenAll(outgoing, incoming).ConfigureAwait(false);
                     lock (_gate)
                     {
                         _client = null;
@@ -176,9 +173,26 @@ internal sealed class FaultProxy : IAsyncDisposable
         }
         catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
         catch (SocketException) when (_stop.IsCancellationRequested) { }
+        catch (ObjectDisposedException) when (_stop.IsCancellationRequested) { }
         finally
         {
             _listener.Stop();
+        }
+    }
+
+    private async Task ForwardConnectionAsync(Stream downstream, Stream upstream)
+    {
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
+        var outgoing = ForwardAsync(downstream, upstream, false, lifetime.Token);
+        var incoming = ForwardAsync(upstream, downstream, true, lifetime.Token);
+        try
+        {
+            await Task.WhenAny(outgoing, incoming).ConfigureAwait(false);
+        }
+        finally
+        {
+            await lifetime.CancelAsync().ConfigureAwait(false);
+            await Task.WhenAll(outgoing, incoming).ConfigureAwait(false);
         }
     }
 

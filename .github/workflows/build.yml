@@ -45,6 +45,8 @@ jobs:
         run: dotnet test --project tests/ZkLink.Extensions.DependencyInjection.Tests -c Release --no-build --no-restore
       - name: Test analyzers
         run: dotnet test --project tests/ZkLink.Analyzers.Tests -c Release --no-build --no-restore
+      - name: Test fault proxy
+        run: dotnet test --project tests/ZkLink.FaultTests -c Release --no-build --no-restore --filter-trait Fixture=ProxyUnit
       - name: Verify analyzer package consumer
         if: runner.os == 'Linux'
         run: bash dev/test-analyzers-package.sh
@@ -174,7 +176,7 @@ jobs:
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
-          java-version: '25.0.5+8'
+          java-version: '25.0.5+8.0.LTS'
       - name: Verify fixtures and C# requests using Gradle
         run: bash dev/test-jute-oracle.sh
       - name: Retain allocation baseline
