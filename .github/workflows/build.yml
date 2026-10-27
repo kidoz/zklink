@@ -99,6 +99,31 @@ jobs:
           path: artifacts/ttl-tests
           if-no-files-found: error
 
+  security:
+    name: Live client TLS and mutual TLS
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install pinned SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      - name: Verify secure fixtures on both pinned versions
+        env:
+          ZKLINK_MATRIX_ARTIFACT_ROOT: ${{ github.workspace }}/artifacts/security-tests
+        run: bash dev/test-zookeeper-security.sh
+      - name: Retain public security evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: security-matrix
+          path: artifacts/security-tests
+          if-no-files-found: error
+
   java-oracle:
     name: Apache Java protocol verification
     runs-on: ubuntu-latest

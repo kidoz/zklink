@@ -1,0 +1,78 @@
+# Disposable client TLS fixtures. Quorum traffic is not encrypted by this fixture.
+x-security-env: &security-env
+  ZOO_SERVERS: >-
+    server.1=zoo1:2888:3888;2181
+    server.2=zoo2:2888:3888;2181
+    server.3=zoo3:2888:3888;2181
+  ZOO_STANDALONE_ENABLED: "false"
+  ZOO_ADMINSERVER_ENABLED: "false"
+  ZOO_INIT_LIMIT: "10"
+  ZOO_SYNC_LIMIT: "5"
+  ZKLINK_HEALTH_TLS: "true"
+  ZOO_CFG_EXTRA: >-
+    serverCnxnFactory=org.apache.zookeeper.server.NettyServerCnxnFactory
+    secureClientPort=2281
+    ssl.keyStore.location=/opt/zklink/pki/server.p12
+    ssl.keyStore.passwordPath=/opt/zklink/pki/store-password
+    ssl.keyStore.type=PKCS12
+    ssl.trustStore.location=/opt/zklink/pki/trust.p12
+    ssl.trustStore.passwordPath=/opt/zklink/pki/store-password
+    ssl.trustStore.type=PKCS12
+    ssl.clientAuth=${ZKLINK_SERVER_CLIENT_AUTH:?security runner must select client authentication}
+    client.portUnification=false
+    authProvider.x509=org.apache.zookeeper.server.auth.X509AuthenticationProvider
+x-security-server: &security-server
+  image: ${ZOOKEEPER_IMAGE:?security runner must supply the pinned image}
+  restart: "no"
+  environment: *security-env
+  volumes:
+    - ${ZKLINK_SECURITY_SERVER_DIRECTORY:?temporary PKI directory required}:/opt/zklink/pki:ro
+    - ./dev/zookeeper-healthcheck.sh:/opt/zklink/zookeeper-healthcheck.sh:ro
+  healthcheck:
+    test: ["CMD", "bash", "/opt/zklink/zookeeper-healthcheck.sh"]
+    interval: 10s
+    timeout: 15s
+    start_period: 15s
+    retries: 6
+  stop_grace_period: 10s
+services:
+  zoo1:
+    <<: *security-server
+    hostname: zoo1
+    environment:
+      <<: *security-env
+      ZOO_MY_ID: "1"
+    ports:
+      - "127.0.0.1::2281"
+      # Explicit plaintext negative control, never used by secure positive tests.
+      - "127.0.0.1::2181"
+  zoo2:
+    <<: *security-server
+    hostname: zoo2
+    environment:
+      <<: *security-env
+      ZOO_MY_ID: "2"
+    ports: ["127.0.0.1::2281"]
+  zoo3:
+    <<: *security-server
+    hostname: zoo3
+    environment:
+      <<: *security-env
+      ZOO_MY_ID: "3"
+    ports: ["127.0.0.1::2281"]
+  expired:
+    <<: *security-server
+    hostname: expired
+    environment:
+      <<: *security-env
+      ZOO_MY_ID: "1"
+      ZOO_SERVERS: "server.1=localhost:2888:3888;2181"
+      ZOO_STANDALONE_ENABLED: "true"
+      # Its intentionally expired TLS certificate is tested from .NET;
+      # internal plaintext readiness proves this negative target is running.
+      ZKLINK_HEALTH_TLS: "false"
+    volumes:
+      - ${ZKLINK_SECURITY_SERVER_DIRECTORY}:/opt/zklink/pki:ro
+      - ${ZKLINK_SECURITY_SERVER_DIRECTORY}/server-expired.p12:/opt/zklink/pki/server.p12:ro
+      - ./dev/zookeeper-healthcheck.sh:/opt/zklink/zookeeper-healthcheck.sh:ro
+    ports: ["127.0.0.1::2281"]

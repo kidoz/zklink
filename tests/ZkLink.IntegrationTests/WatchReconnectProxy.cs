@@ -29,6 +29,7 @@ internal sealed class WatchReconnectProxy : IAsyncDisposable
         TaskCreationOptions.RunContinuationsAsynchronously
     );
     private int _restoreReplies;
+    private readonly bool _inspectFrames;
     internal Task RestoreReplyHeld => _restoreHeld.Task;
     internal int RestoreReplies => Volatile.Read(ref _restoreReplies);
     internal string Endpoint { get; }
@@ -37,7 +38,7 @@ internal sealed class WatchReconnectProxy : IAsyncDisposable
     {
         lock (_gate)
         {
-            if (_holdNextRestore || _restoreHeld.Task.IsCompleted)
+            if (!_inspectFrames || _holdNextRestore || _restoreHeld.Task.IsCompleted)
                 throw new InvalidOperationException("Only one restore interruption is supported.");
             _holdNextRestore = true;
         }
@@ -46,7 +47,11 @@ internal sealed class WatchReconnectProxy : IAsyncDisposable
     internal void DropHeldRestoreReplyAndPause() => _dropRestore.TrySetResult();
 
     internal WatchReconnectProxy(string connection, CancellationToken token)
+        : this(connection, true, token) { }
+
+    internal WatchReconnectProxy(string connection, bool inspectFrames, CancellationToken token)
     {
+        _inspectFrames = inspectFrames;
         _target = new Uri("tcp://" + connection.Split(',')[0]);
         _stop = CancellationTokenSource.CreateLinkedTokenSource(token);
         _stop.CancelAfter(TimeSpan.FromSeconds(45));
@@ -126,7 +131,9 @@ internal sealed class WatchReconnectProxy : IAsyncDisposable
     {
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
         var outgoing = PumpAsync(client, upstream, lifetime.Token);
-        var incoming = ForwardServerFramesAsync(upstream, client, lifetime.Token);
+        var incoming = _inspectFrames
+            ? ForwardServerFramesAsync(upstream, client, lifetime.Token)
+            : PumpAsync(upstream, client, lifetime.Token);
         await Task.WhenAny(outgoing, incoming).ConfigureAwait(false);
         await lifetime.CancelAsync().ConfigureAwait(false);
         await Task.WhenAll(outgoing, incoming).ConfigureAwait(false);

@@ -104,7 +104,7 @@ for version in 3.8.7 3.9.6; do
       fi
     done
     if [[ "${operations}" == true || "${ttl}" == true ]]; then
-      test_filter=(--filter-not-trait "Fixture=TTL")
+      test_filter=(--filter-not-trait "Fixture=TTL" --filter-not-class "*Security*")
       if [[ "${ttl}" == true ]]; then
         if [[ "${ttl_setting}" == "enabled" ]]; then
           test_filter=(--filter-class "*TtlEnabledTests")

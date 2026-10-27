@@ -66,3 +66,7 @@ zk-operations-matrix:
 # Verify explicit TTL creation with enabled and disabled servers on both pinned versions.
 zk-ttl-matrix:
     bash dev/test-zookeeper-matrix.sh --ttl
+
+# Verify client TLS, mTLS, certificate rejection and secure recovery on both pinned versions.
+zk-security-matrix:
+    bash dev/test-zookeeper-security.sh
