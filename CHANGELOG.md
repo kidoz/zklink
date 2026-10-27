@@ -45,6 +45,12 @@ remain unavailable. See
 
 ### Added
 
+- `just zk-soak [seconds] [seed]` runs a bounded seeded workload on both pinned
+  versions, combining concurrent CRUD, client churn, cancellation and same-session
+  watch recovery with streaming resource evidence, growth thresholds and a
+  separate short CI selection. Durations support two-minute defaults and longer
+  explicit runs with retained seed and outcome counts.
+
 - `just zk-watch-pressure-faults` verifies slow watch consumers, actual heartbeat
   progress, shared state/watch event limits, explicit overflow with buffered FIFO
   delivery, unread-handle disposal and repeated capacity/counter cleanup on both

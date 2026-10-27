@@ -183,6 +183,14 @@ quiescent resource counters. See [Verify watch pressure](../how-to/verify-watch-
 These checks provide bounded ownership evidence; long-running resource/load
 qualification remains open.
 
+`just zk-soak` repeatedly exercises bounded concurrent CRUD, client creation and
+disposal, cancellation before and after transmission, and same-session watch
+restoration with a held acknowledgment. Quiescent checkpoints require zero owned
+watch/event/request state and no remaining owned proxy listeners or live sockets.
+The harness streams resource samples and seed/outcome totals, with explicit
+retained-heap and thread-growth bounds after initial rounds. See
+[Run a seeded soak](../how-to/run-seeded-soak.md) for duration, scope and thresholds.
+
 ## Release claims need consumer evidence
 
 The build workflow defines checks on Linux, Windows, and macOS. A workflow file

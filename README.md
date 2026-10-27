@@ -43,6 +43,7 @@ Install [just](https://just.systems/) and .NET SDK **10.0.403**. Docker with Com
 | `just zk-down [version]` | Remove the selected ensemble and its data volumes |
 | `just zk-matrix` | Smoke-test both pinned server versions and clean up |
 | `just zk-driver-matrix` | Also connect/authenticate/sync/close using ZkLink on every node |
+| `just zk-soak [seconds] [seed]` | Run seeded client churn, CRUD, cancellation, recovery and resource checkpoints on both versions (default two minutes each) |
 | `just zk-watch-pressure-faults` | Verify unread watch queues, heartbeat progress, shared event overflow and resource cleanup on both versions |
 | `just zk-peer-partition-faults` | Isolate leader and follower peer interfaces separately and verify election, majority progress and recovery on both versions |
 | `just zk-partition-faults` | Discard each direction of client traffic independently and verify recovery or local loss on both versions |
@@ -145,6 +146,11 @@ across all members after healing. The old leader rejoins as a follower.
 [Watch-pressure checks](docs/how-to/verify-watch-pressure.md) verify heartbeat
 and request progress with unread events, explicit shared-budget overflow,
 buffered event order and repeated handle/counter cleanup on both versions.
+
+[Seeded soak checks](docs/how-to/run-seeded-soak.md) combine bounded concurrency,
+client churn, cancellation and watch/session recovery with resource checkpoints.
+The command supports configurable durations and records reproducible workload
+choices; release-duration qualification requires separate executed evidence.
 
 ## Not yet available
 

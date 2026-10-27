@@ -1,6 +1,6 @@
 # Current capabilities
 
-This describes the checkout as of **2026-10-27**. No package has been released.
+This describes the checkout as of **2026-10-28**. No package has been released.
 
 ## Code and verification
 
@@ -48,6 +48,13 @@ and recursive fan-out with live heartbeats/requests, explicit shared state/watch
 buffer overflow, retained event order, unread-handle disposal and repeated
 handle/counter reuse on both patches. Longer-running resource and load
 qualification remains open.
+
+[Seeded soak workloads](../how-to/run-seeded-soak.md) combine bounded concurrent
+CRUD, repeated client lifecycles, cancellation outcomes and same-session watch
+recovery. Resource checkpoints check owned counters/connections and compare
+retained managed heap and threads against a recorded baseline. The harness
+supports configurable durations; a passing short run does not establish the
+24-hour release requirement or cross-platform qualification.
 
 ## Frameworks and platforms
 
