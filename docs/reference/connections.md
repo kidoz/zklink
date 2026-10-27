@@ -27,7 +27,7 @@ client, except that endpoint updates affect future connection attempts.
 | `CompatibilityProfile` | `ZooKeeper38`; `ZooKeeper39` enables independent watch modes at one path; assert all endpoints qualify, without negotiated discovery |
 | `SessionTimeout` | 30 seconds requested; actual negotiated timeout governs liveness |
 | `InitialConnectTimeout` | 30 seconds across endpoint attempts |
-| `ConnectAttemptTimeout` | 5 seconds for an attempt, including auth and watch restoration; reduced by remaining initial/recovery time |
+| `ConnectAttemptTimeout` | 5 seconds for DNS, TCP, TLS and the handshake; reduced by remaining initial/recovery time |
 | `OperationTimeout` | 30 seconds from invocation, including queue time |
 | `CloseTimeout` | 5 seconds to obtain acknowledgment before cleanup |
 | `MaxInFlightRequests` | 256; range 1–65,536; canceled sent requests retain their slots |
@@ -38,6 +38,12 @@ client, except that endpoint updates affect future connection attempts.
 | `MaxCollectionElements` | 100,000; range 1–1,000,000, additionally constrained by frame size |
 | `MaxWatches` | 10,000 owned logical handles and bounded cleanup metadata; range 1–1,000,000 |
 | `MaxBufferedEvents` | 4,096 across state and watch queues after fan-out; range 1–1,000,000; also bounds subscription count |
+
+After the handshake is accepted, authentication and watch restoration use the
+negotiated inbound liveness timers. Valid replies refresh those timers, so a
+progressing restore can exceed `ConnectAttemptTimeout` and the negotiated session
+timeout in total. Inbound silence triggers transport recovery at two thirds of
+the negotiated timeout and local session loss at the full timeout.
 
 Timeouts require positive whole milliseconds, at most `int.MaxValue` milliseconds.
 Frame/data limits do not change the server's Jute limits. Chroot is namespace

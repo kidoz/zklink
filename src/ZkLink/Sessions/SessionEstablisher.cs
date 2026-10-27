@@ -17,7 +17,12 @@ internal sealed class SessionEstablisher(
     byte[] password
 )
 {
-    internal async Task RunAsync(CancellationToken cancellationToken)
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Reliability",
+        "CA2025",
+        Justification = "The liveness task is cancelled and awaited in finally before its source is disposed."
+    )]
+    internal async Task RunAsync(Action handshakeAccepted, CancellationToken cancellationToken)
     {
         var packet = new byte[45];
         try
@@ -65,19 +70,43 @@ internal sealed class SessionEstablisher(
         {
             CryptographicOperations.ZeroMemory(response);
         }
-        var authBudget = negotiated - owner.InboundSilence;
-        if (authBudget <= TimeSpan.Zero)
-        {
-            throw new OperationCanceledException(cancellationToken);
-        }
-        using var deadline = new CancellationTokenSource(authBudget, time);
-        using var authentication = CancellationTokenSource.CreateLinkedTokenSource(
-            cancellationToken,
-            deadline.Token
+        handshakeAccepted();
+        using var establishment = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken
         );
-        await AuthenticateAsync(authentication.Token).ConfigureAwait(false);
-        owner.BeginWatchRestoration();
-        await RestoreWatchesAsync(authentication.Token).ConfigureAwait(false);
+        var liveness = MonitorInboundAsync(negotiated, establishment);
+        try
+        {
+            await AuthenticateAsync(establishment.Token).ConfigureAwait(false);
+            owner.BeginWatchRestoration();
+            await RestoreWatchesAsync(establishment.Token).ConfigureAwait(false);
+        }
+        finally
+        {
+            await establishment.CancelAsync().ConfigureAwait(false);
+            await liveness.ConfigureAwait(false);
+        }
+    }
+
+    private async Task MonitorInboundAsync(
+        TimeSpan negotiated,
+        CancellationTokenSource establishment
+    )
+    {
+        try
+        {
+            while (true)
+            {
+                var remaining = TimeSpan.FromTicks(negotiated.Ticks * 2 / 3) - owner.InboundSilence;
+                if (remaining <= TimeSpan.Zero)
+                {
+                    await establishment.CancelAsync().ConfigureAwait(false);
+                    return;
+                }
+                await Task.Delay(remaining, time, establishment.Token).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) when (establishment.IsCancellationRequested) { }
     }
 
     private async Task AuthenticateAsync(CancellationToken cancellationToken)

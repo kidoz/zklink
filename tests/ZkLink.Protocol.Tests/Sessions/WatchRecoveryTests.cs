@@ -53,6 +53,38 @@ public sealed class WatchRecoveryTests : IAsyncLifetime
             peer.Dispose();
     }
 
+    [Fact(Timeout = TestTimeoutMilliseconds)]
+    [Trait("Acceptance", "T26")]
+    [Trait("Acceptance", "T27")]
+    public async Task ProgressingRestoreCanExceedAttemptAndNegotiatedTimeouts()
+    {
+        // Each batch has two paths; total restoration takes longer than T while
+        // every valid reply arrives within the normal inbound silence budget.
+        var watches = new List<ZooKeeperWatch>();
+        for (var i = 0; i < 8; i++)
+        {
+            watches.Add(await RegisterAsync("/path" + i).ConfigureAwait(true));
+        }
+        var second = Peer();
+        _fixture.Connector.Add(second);
+        First.Drop();
+        await NextDuringRecoveryAsync(second).ConfigureAwait(true);
+        var readiness = Client.WaitForConnectionAsync(TestContext.Current.CancellationToken);
+        for (var i = 0; i < 4; i++)
+        {
+            var batch = await NextDuringRecoveryAsync(second).ConfigureAwait(true);
+            Assert.Equal(2, RestorePaths(batch).Length);
+            _fixture.Time.Advance(TimeSpan.FromMilliseconds(1100));
+            Assert.False(readiness.IsCompleted);
+            Assert.False(second.IsDisposed);
+            second.Reply(batch);
+        }
+        await readiness.ConfigureAwait(true);
+        Assert.Equal(ZooKeeperSessionState.Connected, Client.Session.State);
+        Assert.Equal(2, Client.Session.ConnectionGeneration);
+        Assert.All(watches, watch => Assert.Equal(1, watch.Queue.Reader.Count));
+    }
+
     [Theory(Timeout = TestTimeoutMilliseconds)]
     [InlineData(false)]
     [InlineData(true)]
@@ -95,11 +127,11 @@ public sealed class WatchRecoveryTests : IAsyncLifetime
         {
             await _fixture
                 .Time.WaitForTimerAsync(
-                    SessionFixture.Options().ConnectAttemptTimeout,
+                    TimeSpan.FromMilliseconds(NegotiatedMilliseconds * 2 / 3),
                     TestContext.Current.CancellationToken
                 )
                 .ConfigureAwait(true);
-            _fixture.Time.Advance(SessionFixture.Options().ConnectAttemptTimeout);
+            _fixture.Time.Advance(TimeSpan.FromMilliseconds(NegotiatedMilliseconds * 2 / 3));
         }
         else
             second.Drop();

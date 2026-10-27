@@ -249,7 +249,10 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                         _lastZxid,
                         _password
                     )
-                        .RunAsync(attempt.Token)
+                        .RunAsync(
+                            () => deadline.CancelAfter(Timeout.InfiniteTimeSpan),
+                            attempt.Token
+                        )
                         .ConfigureAwait(false);
                     var runtime = new ConnectionRuntime(
                         this,

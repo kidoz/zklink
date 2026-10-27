@@ -32,7 +32,8 @@ public sealed class ZooKeeperClientOptions
     /// <summary>Gets the total deadline for initial connection across all endpoints.</summary>
     public TimeSpan InitialConnectTimeout { get; init; } = TimeSpan.FromSeconds(30);
 
-    /// <summary>Gets the maximum DNS/TCP/TLS/handshake/authentication/restoration time for one endpoint attempt.</summary>
+    /// <summary>Gets the maximum DNS/TCP/TLS/handshake time for one endpoint attempt.</summary>
+    /// <remarks>After an accepted handshake, authentication and watch restoration use negotiated inbound liveness.</remarks>
     public TimeSpan ConnectAttemptTimeout { get; init; } = TimeSpan.FromSeconds(5);
 
     /// <summary>Gets the application request deadline, including admission delay.</summary>
