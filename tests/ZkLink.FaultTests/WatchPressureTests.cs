@@ -229,8 +229,15 @@ public sealed class WatchPressureTests : IAsyncLifetime
             await CountersAsync(capture, token, HandleCount, OverflowCapacity).ConfigureAwait(true);
             Step("shared-state-watch-budget-full");
             Step("full-counts " + Snapshot(capture));
+            // Only the recursive handle matches this sibling. The unread state
+            // entry must participate in the budget for this single entry to overflow.
             await _fixture
-                .Client.SetDataAsync(path, new byte[] { 3 }, ZNodeVersion.Any, token)
+                .Client.CreateAsync(
+                    parent + "/trigger",
+                    null,
+                    LiveZooKeeperFixture.OwnerCreate,
+                    token
+                )
                 .ConfigureAwait(true);
             await WaitAsync(
                     () => owner.Session.State == ZooKeeperSessionState.Faulted,

@@ -50,8 +50,10 @@ events still require rereading application state.
 
 A separate owner uses `MaxBufferedEvents=10`. An unread initial state snapshot
 and nine watch entries fill this shared budget exactly. Ordinary work must still
-succeed at that boundary. One further change requires three more logical
-recipients and must fault the owner with `ZooKeeperEventOverflowException`.
+succeed at that boundary. Creating a sibling then matches only the recursive
+handle and requires one additional entry. That single entry must fault the owner
+with `ZooKeeperEventOverflowException`, proving that the unread state snapshot
+participates in the same limit as watch entries.
 
 The test requires:
 
