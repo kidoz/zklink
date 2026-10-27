@@ -42,7 +42,7 @@ public sealed class PartitionOutageTests : IAsyncLifetime
     [Trait("Acceptance", "T26")]
     [Trait("Acceptance", "T29")]
     [Trait("Acceptance", "T32")]
-    public async Task IncomingSilenceIgnoresOutgoingHeartbeatsAndNeverReplaysUncertainCreate()
+    public async Task OneWayTrafficLossNeverForwardsOrReplaysDiscardedApplicationRequests()
     {
         var clock = Stopwatch.StartNew();
         void Step(string name) =>
@@ -52,6 +52,9 @@ public sealed class PartitionOutageTests : IAsyncLifetime
         var token = TestContext.Current.CancellationToken;
         var fault = new MemberControl();
         bool expectLost = fault.Outage == MemberControl.UntilLost;
+        bool outgoing = fault.Direction == MemberControl.Outgoing;
+        string direction = fault.Direction!;
+        int committedAttempts = outgoing ? 0 : 1;
         using var capture = new TelemetryCapture();
         var proxy = new FaultProxy(fault.Endpoint, holdRestore: !expectLost, token);
         await using var proxyLifetime = proxy.ConfigureAwait(true);
@@ -120,7 +123,17 @@ public sealed class PartitionOutageTests : IAsyncLifetime
         Task<CreateResult>? uncertain = null;
         try
         {
-            proxy.ArmCreateReply();
+            var silence = new Stopwatch();
+            int pingsBefore = proxy.ForwardedPings;
+            if (outgoing)
+            {
+                proxy.BlockOutgoing();
+                Step("outgoing-partition-enabled");
+            }
+            else
+            {
+                proxy.ArmCreateReply();
+            }
             uncertain = owner.CreateAsync(
                 _fixture.Root + "/" + AttemptPrefix,
                 new byte[] { 7 },
@@ -130,17 +143,42 @@ public sealed class PartitionOutageTests : IAsyncLifetime
                 ),
                 token
             );
-            await proxy.ResponseWithheld.WaitAsync(EventGuard, token).ConfigureAwait(true);
-            Assert.Equal(FaultProxy.Success, proxy.WithheldError);
+            if (outgoing)
+            {
+                await proxy.CreateDropped.WaitAsync(EventGuard, token).ConfigureAwait(true);
+                Assert.Equal(1, proxy.DroppedCreates);
+                Assert.Equal(createsBefore, proxy.CreateTransmissions);
+            }
+            else
+            {
+                await proxy.ResponseWithheld.WaitAsync(EventGuard, token).ConfigureAwait(true);
+                Assert.Equal(FaultProxy.Success, proxy.WithheldError);
+            }
             Assert.False(uncertain.IsCompleted);
             Assert.True(proxy.HasOpenConnection);
             Assert.False(proxy.ServerClosed.IsCompleted);
-            await AssertSingleAttemptAsync().ConfigureAwait(true);
-            Step("committed-reply-withheld-open-transport");
-            var silence = Stopwatch.StartNew();
-            int pingsBefore = proxy.ForwardedPings;
-            proxy.BlockIncoming();
-            Step("incoming-partition-enabled");
+            await AssertAttemptCountAsync().ConfigureAwait(true);
+            if (outgoing)
+            {
+                Step("outgoing-create-discarded-open-transport");
+                await control
+                    .SetDataAsync(persistentPath, new byte[] { 2 }, ZNodeVersion.Any, token)
+                    .ConfigureAwait(true);
+                Assert.True(await nextGap.ConfigureAwait(true));
+                Assert.Equal(ZooKeeperWatchEventKind.NodeDataChanged, events.Current.Kind);
+                Assert.False(proxy.IncomingPartitionActive);
+                Assert.Equal(0, proxy.DroppedIncomingFrames);
+                nextGap = events.MoveNextAsync();
+                Step("incoming-watch-event-delivered-during-outgoing-loss");
+                silence.Start();
+            }
+            else
+            {
+                Step("committed-reply-withheld-open-transport");
+                silence.Start();
+                proxy.BlockIncoming();
+                Step("incoming-partition-enabled");
+            }
             await WaitStateAsync(ZooKeeperSessionState.Disconnected).ConfigureAwait(true);
             var readSilence = negotiated * ReadSilenceNumerator / SessionTimerDenominator;
             Assert.InRange(
@@ -148,11 +186,25 @@ public sealed class PartitionOutageTests : IAsyncLifetime
                 readSilence - SchedulingAllowance,
                 readSilence + SchedulingAllowance
             );
-            Assert.True(proxy.ForwardedPings > pingsBefore);
-            Assert.True(proxy.DroppedIncomingFrames > 0);
+            if (outgoing)
+            {
+                Assert.True(proxy.DroppedPings > 0);
+                Assert.Equal(pingsBefore, proxy.ForwardedPings);
+                Assert.Equal(0, proxy.DroppedIncomingFrames);
+            }
+            else
+            {
+                Assert.True(proxy.ForwardedPings > pingsBefore);
+                Assert.True(proxy.DroppedIncomingFrames > 0);
+                Assert.Equal(0, proxy.DroppedOutgoingFrames);
+            }
             Assert.False(proxy.ServerClosed.IsCompleted);
             Assert.Null(proxy.RunFailure);
-            Step("disconnected-from-incoming-silence-with-forwarded-pings");
+            Step(
+                outgoing
+                    ? "disconnected-after-dropped-outgoing-heartbeats"
+                    : "disconnected-from-incoming-silence-with-forwarded-pings"
+            );
             var error = await Assert
                 .ThrowsAsync<ZooKeeperException>(async () =>
                 {
@@ -196,8 +248,8 @@ public sealed class PartitionOutageTests : IAsyncLifetime
                 long terminalGeneration = owner.Session.ConnectionGeneration;
                 int terminalAttempts = proxy.ConnectionAttempts;
                 Step("local-lost-without-server-expiry-claim");
-                proxy.HealIncoming();
-                Step("incoming-partition-healed-after-local-loss");
+                HealTraffic();
+                Step(direction + "-partition-healed-after-local-loss");
                 var observation = Stopwatch.StartNew();
                 do
                 {
@@ -222,8 +274,8 @@ public sealed class PartitionOutageTests : IAsyncLifetime
             }
             else
             {
-                proxy.HealIncoming();
-                Step("incoming-partition-healed-before-local-loss");
+                HealTraffic();
+                Step(direction + "-partition-healed-before-local-loss");
                 await Task.WhenAny(proxy.RestoreHeld, ready)
                     .WaitAsync(EventGuard, token)
                     .ConfigureAwait(true);
@@ -268,12 +320,13 @@ public sealed class PartitionOutageTests : IAsyncLifetime
                 Assert.Null(await control.ExistsAsync(ephemeralPath, token).ConfigureAwait(true));
                 Step("same-session-watches-and-acknowledged-close");
             }
-            await AssertSingleAttemptAsync().ConfigureAwait(true);
-            Assert.Equal(createsBefore + 1, proxy.CreateTransmissions);
+            await AssertAttemptCountAsync().ConfigureAwait(true);
+            Assert.Equal(createsBefore + committedAttempts, proxy.CreateTransmissions);
+            Assert.Equal(outgoing ? 1 : 0, proxy.DroppedCreates);
             capture.Collect();
             capture.AssertRedacted(_fixture.Root);
             TestContext.Current.TestOutputHelper?.WriteLine(
-                $"partition counters forwarded-pings={proxy.ForwardedPings} dropped-incoming={proxy.DroppedIncomingFrames} connection-attempts={proxy.ConnectionAttempts}"
+                $"partition counters direction={direction} forwarded-pings={proxy.ForwardedPings} dropped-pings={proxy.DroppedPings} dropped-incoming={proxy.DroppedIncomingFrames} dropped-outgoing={proxy.DroppedOutgoingFrames} dropped-creates={proxy.DroppedCreates} forwarded-creates={proxy.CreateTransmissions} connection-attempts={proxy.ConnectionAttempts}"
             );
             Step("uncertain-create-never-replayed");
         }
@@ -286,9 +339,9 @@ public sealed class PartitionOutageTests : IAsyncLifetime
         }
         finally
         {
-            proxy.HealIncoming();
+            HealTraffic();
             proxy.ReleaseRestore();
-            Step("incoming-partition-healed-in-finally");
+            Step("partition-healed-in-finally");
             await owner.DisposeAsync().ConfigureAwait(true);
             if (uncertain is not null)
             {
@@ -305,21 +358,31 @@ public sealed class PartitionOutageTests : IAsyncLifetime
                 .ConfigureAwait(true);
             await using var probeLifetime = probe.ConfigureAwait(true);
             Assert.False(proxy.IncomingPartitionActive);
+            Assert.False(proxy.OutgoingPartitionActive);
             await probe.SyncAsync(_fixture.Root, cleanup.Token).ConfigureAwait(true);
             await probe.CloseAsync(cleanup.Token).ConfigureAwait(true);
             Assert.Equal(ZooKeeperCloseStatus.Acknowledged, probe.Session.CloseStatus);
             Step("healed-proxy-authenticated-sync-close");
         }
 
-        async Task AssertSingleAttemptAsync()
+        async Task AssertAttemptCountAsync()
         {
             await control.SyncAsync(_fixture.Root, token).ConfigureAwait(true);
-            Assert.Single(
-                (
-                    await control.GetChildrenAsync(_fixture.Root, token).ConfigureAwait(true)
-                ).Children,
-                static child => child.StartsWith(AttemptPrefix, StringComparison.Ordinal)
+            var children = await control
+                .GetChildrenAsync(_fixture.Root, token)
+                .ConfigureAwait(true);
+            Assert.Equal(
+                committedAttempts,
+                children.Children.Count(static child =>
+                    child.StartsWith(AttemptPrefix, StringComparison.Ordinal)
+                )
             );
+        }
+
+        void HealTraffic()
+        {
+            proxy.HealIncoming();
+            proxy.HealOutgoing();
         }
 
         async Task WaitStateAsync(ZooKeeperSessionState state)

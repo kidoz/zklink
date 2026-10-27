@@ -15,6 +15,8 @@ internal sealed class MemberControl
     internal const string Partition = "partition";
     internal const string Brief = "brief";
     internal const string UntilLost = "lost";
+    internal const string Incoming = "incoming";
+    internal const string Outgoing = "outgoing";
     private static readonly string[] Services = ["zoo1", "zoo2", "zoo3"];
     private static readonly TimeSpan ElectionGuard = TimeSpan.FromSeconds(15);
     private const string StopGraceSeconds = "1";
@@ -28,6 +30,8 @@ internal sealed class MemberControl
     internal string Service { get; } = Required("ZKLINK_FAULT_SERVICE");
     internal string Endpoint { get; } = Required("ZKLINK_FAULT_ENDPOINT");
     internal string? Outage { get; } = Environment.GetEnvironmentVariable("ZKLINK_FAULT_OUTAGE");
+    internal string? Direction { get; } =
+        Environment.GetEnvironmentVariable("ZKLINK_PARTITION_DIRECTION");
     private readonly string[] _targets;
     internal bool RestoreRequired { get; private set; }
 
@@ -45,6 +49,7 @@ internal sealed class MemberControl
             || _targets.Any(target => !Services.Contains(target, StringComparer.Ordinal))
             || _targets.Distinct(StringComparer.Ordinal).Count() != _targets.Length
             || (Role is Quorum or Partition && Outage is not (Brief or UntilLost))
+            || (Role == Partition && Direction is not (Incoming or Outgoing))
             || !Path.IsPathFullyQualified(_root)
             || !File.Exists(Path.Combine(_root, "compose.fault.yaml"))
         )

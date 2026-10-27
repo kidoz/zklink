@@ -6,8 +6,8 @@ using System.Security.Cryptography;
 namespace ZkLink.FaultTests;
 
 // Forwards bounded frames and consumes one selected create reply. Incoming-frame
-// suppression leaves outgoing traffic and TCP intact; restore acknowledgments can
-// be held separately for readiness checks. Discarded frames are never queued.
+// suppression and outgoing-frame suppression act independently across reconnects;
+// restore acknowledgments can be held separately. Discarded frames are never queued.
 internal sealed class FaultProxy : IAsyncDisposable
 {
     internal const int Success = 0;
@@ -30,7 +30,11 @@ internal sealed class FaultProxy : IAsyncDisposable
     private bool _armed;
     private bool _replyDiscarded;
     private int _incomingPartition;
+    private int _outgoingPartition;
     private int _droppedIncomingFrames;
+    private int _droppedOutgoingFrames;
+    private int _droppedPings;
+    private int _droppedCreates;
     private int _forwardedPings;
     private int? _selectedXid;
     private int _creates;
@@ -43,6 +47,7 @@ internal sealed class FaultProxy : IAsyncDisposable
     private readonly TaskCompletionSource _withheld = NewSignal();
     private readonly TaskCompletionSource _restoreHeld = NewSignal();
     private readonly TaskCompletionSource _serverClosed = NewSignal();
+    private readonly TaskCompletionSource _createDropped = NewSignal();
     internal Task ResponseWithheld => _withheld.Task;
     internal Task RestoreHeld => _restoreHeld.Task;
     internal Task ServerClosed => _serverClosed.Task;
@@ -51,7 +56,12 @@ internal sealed class FaultProxy : IAsyncDisposable
     internal int ConnectionAttempts => Volatile.Read(ref _connectionAttempts);
     internal string Endpoint { get; }
     internal bool IncomingPartitionActive => Volatile.Read(ref _incomingPartition) != 0;
+    internal bool OutgoingPartitionActive => Volatile.Read(ref _outgoingPartition) != 0;
     internal int DroppedIncomingFrames => Volatile.Read(ref _droppedIncomingFrames);
+    internal int DroppedOutgoingFrames => Volatile.Read(ref _droppedOutgoingFrames);
+    internal int DroppedPings => Volatile.Read(ref _droppedPings);
+    internal int DroppedCreates => Volatile.Read(ref _droppedCreates);
+    internal Task CreateDropped => _createDropped.Task;
     internal int ForwardedPings => Volatile.Read(ref _forwardedPings);
     internal bool HasOpenConnection
     {
@@ -67,6 +77,10 @@ internal sealed class FaultProxy : IAsyncDisposable
     internal void BlockIncoming() => Volatile.Write(ref _incomingPartition, 1);
 
     internal void HealIncoming() => Volatile.Write(ref _incomingPartition, 0);
+
+    internal void BlockOutgoing() => Volatile.Write(ref _outgoingPartition, 1);
+
+    internal void HealOutgoing() => Volatile.Write(ref _outgoingPartition, 0);
 
     internal FaultProxy(string endpoint, bool holdRestore, CancellationToken token)
     {
@@ -220,21 +234,36 @@ internal sealed class FaultProxy : IAsyncDisposable
                         && BinaryPrimitives.ReadInt32BigEndian(packet) == PingXid
                         && BinaryPrimitives.ReadInt32BigEndian(packet.AsSpan(sizeof(int)))
                             == PingOperation;
+                    bool create =
+                        !incoming
+                        && !handshake
+                        && length >= RequestHeaderBytes
+                        && BinaryPrimitives.ReadInt32BigEndian(packet.AsSpan(sizeof(int)))
+                            is (int)ZooKeeperOperation.Create
+                                or (int)ZooKeeperOperation.CreateWithStat
+                                or (int)ZooKeeperOperation.CreateContainer
+                                or (int)ZooKeeperOperation.CreateTtl;
+                    if (!incoming && OutgoingPartitionActive)
+                    {
+                        Interlocked.Increment(ref _droppedOutgoingFrames);
+                        if (ping)
+                        {
+                            Interlocked.Increment(ref _droppedPings);
+                        }
+                        if (create)
+                        {
+                            Interlocked.Increment(ref _droppedCreates);
+                            _createDropped.TrySetResult();
+                        }
+                        handshake = false;
+                        continue;
+                    }
                     if (!handshake && length >= HeaderBytes)
                     {
                         int xid = BinaryPrimitives.ReadInt32BigEndian(packet);
                         if (!incoming)
                         {
-                            int opcode = BinaryPrimitives.ReadInt32BigEndian(
-                                packet.AsSpan(sizeof(int))
-                            );
-                            if (
-                                opcode
-                                is (int)ZooKeeperOperation.Create
-                                    or (int)ZooKeeperOperation.CreateWithStat
-                                    or (int)ZooKeeperOperation.CreateContainer
-                                    or (int)ZooKeeperOperation.CreateTtl
-                            )
+                            if (create)
                             {
                                 Interlocked.Increment(ref _creates);
                                 lock (_gate)

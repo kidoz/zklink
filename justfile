@@ -86,6 +86,6 @@ zk-leader-faults:
 zk-quorum-faults:
     bash dev/test-zookeeper-quorum-faults.sh
 
-# Block incoming client traffic and verify recovery or local loss on both versions.
+# Discard each direction of client traffic independently and verify recovery or local loss.
 zk-partition-faults:
     bash dev/test-zookeeper-partition-faults.sh

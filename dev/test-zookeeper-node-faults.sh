@@ -59,10 +59,15 @@ outages=(member)
 test_fixture=MemberFault
 if [[ "${role}" == partition ]]; then test_fixture=PartitionFault; fi
 if [[ "${role}" == quorum || "${role}" == partition ]]; then outages=(brief lost); fi
+directions=(none)
+if [[ "${role}" == partition ]]; then directions=(outgoing incoming); fi
+for direction in "${directions[@]}"; do
+export ZKLINK_PARTITION_DIRECTION="${direction}"
 for outage in "${outages[@]}"; do
   for version in 3.8.7 3.9.6; do
     evidence_key="${version}"
     if [[ "${role}" == quorum || "${role}" == partition ]]; then evidence_key="${version}-${outage}"; fi
+    if [[ "${role}" == partition ]]; then evidence_key="${version}-${direction}-${outage}"; fi
     export ZKLINK_FAULT_RUN_ID="$(python3 -c 'import uuid; print(uuid.uuid4().hex)')"
     project="zklink-${role}-fault-${version//./-}-${ZKLINK_FAULT_RUN_ID}"
     target=""
@@ -108,7 +113,9 @@ with socket.socket() as first, socket.socket() as second, socket.socket() as thi
 PORTS
 )
     fi
-    echo "Checking ${role} outage (${outage}) on ZooKeeper ${version}"
+    case_label="${outage}"
+    if [[ "${role}" == partition ]]; then case_label="${direction}/${outage}"; fi
+    echo "Checking ${role} outage (${case_label}) on ZooKeeper ${version}"
     compose config >"${artifacts}/${evidence_key}-compose.yaml"
     compose up -d --wait --wait-timeout "${startup_guard_seconds}" >"${artifacts}/${evidence_key}-startup.log" 2>&1
     leaders=0
@@ -134,6 +141,7 @@ PORTS
     if [[ "${role}" == partition ]]; then selection="observed leader as the client proxy target"; fi
     if [[ "${role}" == quorum ]]; then selection="observed leader and first observed follower"; fi
     printf 'Selection: %s in zoo1/zoo2/zoo3 order\nTarget: %s\n' "${selection}" "${target}" >"${artifacts}/${evidence_key}-selection.txt"
+    if [[ "${role}" == partition ]]; then printf 'Direction: %s\nOutage: %s\n' "${direction}" "${outage}" >>"${artifacts}/${evidence_key}-selection.txt"; fi
     if [[ "${role}" == quorum ]]; then printf 'Second stopped member: %s\nOutage: %s\n' "${second_target}" "${outage}" >>"${artifacts}/${evidence_key}-selection.txt"; fi
     endpoints="$(compose port zoo1 2181),$(compose port zoo2 2181),$(compose port zoo3 2181)"
     ZKLINK_TEST_CONNECTION_STRING="${endpoints}" ZKLINK_TEST_SERVER_VERSION="${version}" \
@@ -153,6 +161,7 @@ PORTS
     compose down --volumes >"${artifacts}/${evidence_key}-cleanup.log" 2>&1
     project=""
     target=""
-    echo "ZooKeeper ${version}: PASS (${role}/${outage} fault, expected session outcome, no replay, restoration, rollback and cleanup)"
+    echo "ZooKeeper ${version}: PASS (${role}/${case_label} fault, expected session outcome, no replay, restoration, rollback and cleanup)"
   done
+done
 done
