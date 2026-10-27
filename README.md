@@ -1,5 +1,6 @@
 # ZkLink
 
+[![Build and verification](https://github.com/kidoz/zklink/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/kidoz/zklink/actions/workflows/build.yml)
 [![Language](https://img.shields.io/badge/language-C%23-512BD4)](https://learn.microsoft.com/dotnet/csharp/)
 [![.NET SDK](https://img.shields.io/badge/.NET%20SDK-10.0.403-512BD4)](https://github.com/kidoz/zklink/blob/main/global.json)
 [![License](https://img.shields.io/badge/license-MIT-green)](https://github.com/kidoz/zklink/blob/main/LICENSE)
