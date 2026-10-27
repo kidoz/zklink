@@ -101,6 +101,15 @@ usable, so connection rejection is distinguishable from server unavailability.
 Depending on TLS alert timing, an mTLS rejection can surface during TLS or during
 the subsequent connection attempt; no ready ZooKeeper client is returned.
 
+`just zk-security-concurrency` separately releases seven rejection attempts
+together after all actors establish valid controls. Three rounds per patch retain
+the original four-second initial connection budget while another authenticated
+client repeatedly makes progress. Timing labels distinguish certificate loading,
+option capture, connection completion and disposal. Earlier intermittent timeouts
+remain unexplained; passing bounded rounds does not establish a root-cause fix or
+qualify sustained failure traffic. CI includes the command; remote results have
+not yet been observed.
+
 The runner removes its generated private stores separately from retained logs.
 macOS uses temporary platform key storage for imported test certificates; every
 handle is disposed. Revocation is disabled only for the private test CA, which

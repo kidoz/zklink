@@ -70,7 +70,10 @@ identity, unknown issuer, expiry, mutual authentication, missing required client
 certificate and plaintext rejection on local macOS arm64. The default local fixtures use plaintext; `just zk-security-matrix` separately
 passed 9 TLS and 13 mTLS cases per pinned patch, including secure operations,
 watch recovery, server/client certificate rejection and X.509 ACL identity
-isolation. These are macOS arm64 client observations; remote CI and other
+isolation. `just zk-security-concurrency` adds three bounded rounds of seven
+synchronized rejection attempts per patch, with repeated valid-control requests.
+The earlier intermittent concurrency timeout has not been reproduced or explained;
+these short runs do not qualify sustained load. These are macOS arm64 client observations; remote CI and other
 client platforms remain unverified. See [Verify secure connections](../how-to/verify-secure-connections.md). SASL and read-only
 mode are outside the planned initial client scope; coordination recipes and
 administration require separate designs.

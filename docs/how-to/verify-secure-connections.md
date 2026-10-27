@@ -19,7 +19,27 @@ its TLS client port before the .NET checks run.
 Security cases share one test collection so certificate rejection and positive
 controls run independently. Negative probes have a one-second connection budget
 with the same rejection assertions and outer timeout guards; sustained concurrent
-TLS failure traffic is outside this check.
+TLS failure traffic is outside this functional check.
+
+Run the separate bounded concurrency check with:
+
+```sh
+just zk-security-concurrency
+```
+
+On each server version, it runs three rounds of seven simultaneous rejection
+attempts: wrong server name, untrusted server root, expired server, plaintext
+endpoint, and missing, untrusted or expired client certificate. Each round waits
+for every actor's valid setup before releasing the rejection attempts together.
+Probes retain a four-second initial connection budget and a two-second attempt
+budget. A separate valid authenticated connection repeatedly sends `Sync` while
+rejections run; every actor also checks its valid connection afterward. Setup
+and execution have sixteen-second guards, with a ninety-second test guard.
+Fixed progress labels and elapsed times identify certificate loading, option
+capture, connection completion and disposal without printing secrets.
+
+These short runs do not establish sustained-load or soak behavior. The earlier
+intermittent concurrent rejection timeouts have not been reproduced or explained.
 
 The checks exercise trusted connections on every node, digest-only ACLs, node
 operations, transactions, one-shot and persistent watch restoration, and

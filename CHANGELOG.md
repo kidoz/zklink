@@ -29,6 +29,8 @@ remain unavailable. See
   and explicit plaintext/expired-certificate negative controls.
 - `just zk-security-matrix`, a dedicated CI job, private fixture cleanup and
   scanning of retained evidence for private material.
+- `just zk-security-concurrency` runs synchronized TLS rejection rounds with
+  valid control requests and safe timing diagnostics on both pinned patches.
 
 - Optional `ZkLink.Analyzers` Roslyn package with six security, watch-ownership
   and async-usage diagnostics, compilation tests and packed-consumer verification.

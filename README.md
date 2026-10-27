@@ -44,6 +44,7 @@ Install [just](https://just.systems/) and .NET SDK **10.0.402**. Docker with Com
 | `just zk-matrix` | Smoke-test both pinned server versions and clean up |
 | `just zk-driver-matrix` | Also connect/authenticate/sync/close using ZkLink on every node |
 | `just zk-security-matrix` | Verify client TLS/mTLS operations, certificate rejection and secure watch recovery on both versions |
+| `just zk-security-concurrency` | Run bounded concurrent TLS rejection rounds with valid controls on both versions |
 | `just zk-ttl-matrix` | Test TTL-enabled and TTL-disabled servers on both versions |
 | `just zk-operations-matrix` | Run live node/ACL/transaction/auxiliary/watch tests on both versions and examples on each node |
 
