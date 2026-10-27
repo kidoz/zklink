@@ -26,6 +26,8 @@ remain unavailable. See
   registration.
 - Protocol writer size calculations can no longer surface checked-integer
   overflow instead of the documented malformed-record failure.
+- Local watch cleanup now checks capacity explicitly before recreating bucket
+  metadata.
 
 ### Changed
 

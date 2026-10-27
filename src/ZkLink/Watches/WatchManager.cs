@@ -349,6 +349,13 @@ internal sealed class WatchManager(
                     // Release may have pruned an empty bucket; retain a bounded cleanup intent.
                     if (!_buckets.ContainsKey(key))
                     {
+                        if (_buckets.Count >= options.Settings.MaxWatches)
+                            throw new ZooKeeperBackpressureException(
+                                new ZooKeeperRequestInfo(
+                                    ZooKeeperOperation.RemoveWatches,
+                                    path: watch.Path
+                                )
+                            );
                         bucket ??= new Bucket();
                         _buckets.Add(key, bucket);
                         if (key.Category == WatchProtocol.PersistentRecursive)
