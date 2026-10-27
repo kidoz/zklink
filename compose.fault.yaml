@@ -1,0 +1,10 @@
+x-fault-labels: &fault-labels
+  org.zklink.fault-run: ${ZKLINK_FAULT_RUN_ID:?The follower fault runner must supply its run ID}
+
+services:
+  zoo1:
+    labels: *fault-labels
+  zoo2:
+    labels: *fault-labels
+  zoo3:
+    labels: *fault-labels

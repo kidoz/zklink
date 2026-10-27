@@ -73,3 +73,7 @@ zk-security-matrix:
 
 zk-security-concurrency:
     bash dev/test-zookeeper-security.sh --concurrent
+
+# Stop one observed follower and verify same-session recovery on both pinned versions.
+zk-follower-faults:
+    bash dev/test-zookeeper-follower-faults.sh
