@@ -9,7 +9,7 @@ This describes the checkout as of **2026-10-27**. No package has been released.
 | Build | .NET 10, C# 14, deterministic builds, locked dependencies, warnings as errors, MIT license | Release package metadata and package qualification |
 | Protocol | Internal codecs for all 27 implemented opcodes, handshake/multi/framing, path/chroot translation and Gradle-managed Java fixtures | Remaining live qualification |
 | Public types | Immutable snapshots, endpoints, create options, ACLs, versions, request failures, watch handles/events and removal results; contract tests | Package consumer qualification |
-| Sessions and operations | Connect/authenticate/sync, snapshots/subscriptions, heartbeat, same-session recovery, cancellation, close, node/ACL methods, typed transactions, auxiliary queries, opt-in TTL creation and watches | Leader/quorum/partition and broader live recovery faults |
+| Sessions and operations | Connect/authenticate/sync, snapshots/subscriptions, heartbeat, same-session recovery, cancellation, close, node/ACL methods, typed transactions, auxiliary queries, opt-in TTL creation and watches | Quorum/partition and broader live recovery faults |
 | Watches | One-shot reads, persistent/recursive subscriptions, buffered events, shared removal, cancellation cleanup, bounded restoration and explicit reconnect gaps | Broader fault and concurrency qualification |
 | Security | TCP/TLS, custom roots/client certificates, live client TLS/mTLS operations, digest replay, certificate rejection and distinct digest/X.509 ACLs | Revocation, rotation, quorum TLS, additional auth schemes and cross-platform qualification |
 | Dependency injection | Optional `AddZkLink` registration with one host-owned singleton and asynchronous startup/shutdown | Installed-package and DI-specific Native AOT qualification |
@@ -25,8 +25,10 @@ best-effort delivery semantics.
 A dedicated [follower recovery check](../how-to/verify-follower-recovery.md) stops
 an observed follower on each pinned version. Scoped evidence covers session and
 ephemeral preservation, watch restoration before readiness, explicit request
-outcomes and no replay, with verified rollback. Leader/quorum failures and
-partitions remain unverified.
+outcomes and no replay, with verified rollback. A separate
+[leader recovery check](../how-to/verify-leader-recovery.md) also verifies replacement
+election and old-leader return as a follower. Quorum failures and partitions
+remain unverified.
 
 ## Frameworks and platforms
 

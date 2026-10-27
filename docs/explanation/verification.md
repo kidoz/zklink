@@ -139,7 +139,12 @@ Forwarding endpoints hold selected replies to make those observations repeatable
 the server stop causes the transport loss. Both pinned versions have scoped local
 evidence, with server restoration and owned-volume cleanup. A deliberate abort
 also exercised rollback. See [Verify follower recovery](../how-to/verify-follower-recovery.md).
-Leader failure, quorum loss, partitions and sustained faults remain separate work.
+`just zk-leader-faults` shares the outage scenario and additionally requires a
+replacement leader among the two survivors, followed by the old leader joining as
+a follower while that replacement stays leader. Election-time connection failures
+reach the driver through proxies that keep accepting later attempts. See
+[Verify leader recovery](../how-to/verify-leader-recovery.md). Quorum loss,
+partitions and sustained faults remain separate work.
 
 ## Release claims need consumer evidence
 

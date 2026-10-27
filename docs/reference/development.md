@@ -35,6 +35,7 @@ notation; omit the brackets when invoking a command.
 | `just zk-status [version]` | Show health and host ports |
 | `just zk-logs [version]` | Print server logs |
 | `just zk-down [version]` | Remove the selected ensemble and its volumes |
+| `just zk-leader-faults` | Verify leader stop, replacement election, session/watch recovery and rollback on both versions; requires Docker, pinned .NET and Python 3 |
 | `just zk-follower-faults` | Verify a real follower outage, same-session/watch recovery and rollback on both versions; requires Docker, pinned .NET and Python 3 |
 | `just zk-security-matrix` | Verify client TLS/mTLS, rejection and secure recovery on both versions; requires Docker, .NET, OpenSSL and Python 3 |
 | `just zk-ttl-matrix` | Verify single/atomic TTL creates with enabled and disabled servers on both versions |
@@ -55,7 +56,7 @@ Definitions are in the [justfile](../../justfile).
 | [ZkLink.Extensions.DependencyInjection.Tests](../../tests/ZkLink.Extensions.DependencyInjection.Tests/ZkLink.Extensions.DependencyInjection.Tests.csproj) | DI registration, real-host startup/shutdown and connection ownership | Pinned .NET SDK |
 | [ZkLink.Protocol.Tests](../../tests/ZkLink.Protocol.Tests/ZkLink.Protocol.Tests.csproj) | Protocol/path fixtures, malformed input, virtual-time sessions/requests and loopback TLS/mTLS | Pinned .NET SDK |
 | [ZkLink.IntegrationTests](../../tests/ZkLink.IntegrationTests/ZkLink.IntegrationTests.csproj) | Live node/ACL/transaction/auxiliary/watch operations, restoration, rollback, reply-loss, chroot and ephemeral lifecycle | Explicit pinned ensemble configuration; use `just zk-operations-matrix` |
-| [ZkLink.FaultTests](../../tests/ZkLink.FaultTests/ZkLink.FaultTests.csproj) | Real follower stop, uncertain request/no replay, watch readiness and verified rollback | Owned labeled fixtures; use `just zk-follower-faults` |
+| [ZkLink.FaultTests](../../tests/ZkLink.FaultTests/ZkLink.FaultTests.csproj) | Real follower/leader stops, replacement election, uncertain request/no replay, watch readiness and verified rollback | Owned labeled fixtures; use `just zk-follower-faults` or `just zk-leader-faults` |
 | [ZkLink.JavaOracle](../../tests/ZkLink.JavaOracle/README.md) | Optional Apache Java fixture generation and decoding of C# bytes | Gradle wrapper, JDK 25, Python 3, pinned .NET SDK, network access |
 
 The public-contract and protocol suites need neither a ZooKeeper installation

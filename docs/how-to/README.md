@@ -6,6 +6,8 @@ Complete a specific task in an existing checkout.
   dependencies, public contracts, and protocol bytes after a change.
 - [Run a local ZooKeeper ensemble](run-local-zookeeper.md) — start a pinned
   three-node fixture, collect logs, and remove its disposable data.
+- [Verify leader recovery](verify-leader-recovery.md) — stop the observed leader,
+  check replacement election and session/watch recovery, and restore it as a follower.
 - [Verify follower recovery](verify-follower-recovery.md) — stop one observed
   follower, check session/watch recovery and request outcomes, and restore it.
 - [Verify secure connections](verify-secure-connections.md) — run isolated TLS

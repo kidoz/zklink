@@ -10,8 +10,9 @@ Use the SDK pinned in `global.json`, Docker with Compose, and Python 3. The
 runner uses the JDK inside each pinned server image for readiness and role checks;
 host Java and Gradle are unnecessary for this check.
 
-The command creates separate disposable three-node ensembles for ZooKeeper
-3.8.7 and 3.9.6. Published ports bind to loopback. Every node must report the
+The follower and [leader checks](verify-leader-recovery.md) share a role-validated
+runner and outage scenario. The command creates separate disposable three-node
+ensembles for ZooKeeper 3.8.7 and 3.9.6. Published ports bind to loopback. Every node must report the
 expected version and pass an authenticated create/read/delete probe. The runner
 uses [`zkServer.sh status`](https://zookeeper.apache.org/doc/r3.9.6/zookeeperTools.html)
 to require one leader and two followers, then selects the first observed follower
@@ -71,11 +72,12 @@ driver telemetry excludes credentials, session passwords, paths and payloads.
 Local checks passed on both versions with a macOS arm64 client. A deliberate
 test abort after stopping the follower additionally verified restoration and
 cleanup; that expected failure is recorded separately from passing checks.
-The [CI workflow](../../.github/workflows/build.yml) defines a separate fault job;
-remote execution remains unobserved.
+The [CI workflow](../../.github/workflows/build.yml) defines separate follower and
+leader fault jobs; remote execution remains unobserved.
 
 This check uses plaintext client connections with the explicit development
-digest override. Leader failure, quorum loss, partitions, forced expiry, observer
-endpoints, secure server outages and sustained load require separate evidence.
+digest override. Leader recovery is checked separately by `just zk-leader-faults`.
+Quorum loss, partitions, forced expiry, observer endpoints, secure server outages
+and sustained load require separate evidence.
 
 [How-to guides](README.md) · [Documentation home](../README.md)

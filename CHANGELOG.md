@@ -45,6 +45,10 @@ remain unavailable. See
 
 ### Added
 
+- `just zk-leader-faults` verifies replacement election, preserved sessions and
+  watches, no uncertain-create replay and old-leader return as a follower on both
+  pinned server versions, using shared follower/leader fault infrastructure.
+
 - Dedicated follower-outage tests, labeled disposable ensembles and
   `just zk-follower-faults` with a separate CI job on both pinned server versions.
 - Verification of retained sessions/ephemerals, watch restoration before readiness,
