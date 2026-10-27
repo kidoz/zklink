@@ -12,6 +12,8 @@ public sealed class MemberOutageTests : IAsyncLifetime
     private static readonly TimeSpan RecoveryAttempt = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan OperationGuard = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan RollbackGuard = TimeSpan.FromSeconds(50);
+    private static readonly TimeSpan ShortSession = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan QuorumReadGuard = TimeSpan.FromSeconds(35);
     private readonly LiveZooKeeperFixture _fixture = new();
 
     public ValueTask InitializeAsync()
@@ -27,7 +29,7 @@ public sealed class MemberOutageTests : IAsyncLifetime
     [Trait("Acceptance", "T14")]
     [Trait("Acceptance", "T26")]
     [Trait("Acceptance", "T34")]
-    public async Task StoppedMemberPreservesSessionRestoresWatchesAndNeverReplaysUncertainCreate()
+    public async Task StoppedMembersPreserveValidSessionsOrReportLossWithoutReplayingUncertainCreate()
     {
         var clock = Stopwatch.StartNew();
         void Step(string name) =>
@@ -36,14 +38,18 @@ public sealed class MemberOutageTests : IAsyncLifetime
             );
         var token = TestContext.Current.CancellationToken;
         var fault = new MemberControl();
+        bool expectLost =
+            fault.Role == MemberControl.Quorum && fault.Outage == MemberControl.UntilLost;
         string[] survivors = _fixture
             .ConnectionString.Split(',')
             .Where(endpoint => endpoint != fault.Endpoint)
             .ToArray();
         Assert.Equal(2, survivors.Length);
+        string[] maintenanceEndpoints =
+            fault.Role == MemberControl.Quorum ? _fixture.ConnectionString.Split(',') : survivors;
         await _fixture
             .Client.UpdateEndpointsAsync(
-                survivors
+                maintenanceEndpoints
                     .Select(static endpoint => new ZooKeeperEndpoint("127.0.0.1", Port(endpoint)))
                     .ToArray(),
                 token
@@ -52,17 +58,32 @@ public sealed class MemberOutageTests : IAsyncLifetime
         using var capture = new TelemetryCapture();
         var source = new FaultProxy(fault.Endpoint, holdRestore: false, token);
         await using var sourceLifetime = source.ConfigureAwait(true);
-        var first = new FaultProxy(survivors[0], holdRestore: true, token);
+        var first = new FaultProxy(survivors[0], holdRestore: !expectLost, token);
         await using var firstLifetime = first.ConfigureAwait(true);
-        var second = new FaultProxy(survivors[1], holdRestore: true, token);
+        var second = new FaultProxy(survivors[1], holdRestore: !expectLost, token);
         await using var secondLifetime = second.ConfigureAwait(true);
         var control = await _fixture
             .ConnectAsync(connectionString: survivors[0])
             .ConfigureAwait(true);
         await using var controlLifetime = control.ConfigureAwait(true);
+        if (fault.Role == MemberControl.Quorum)
+        {
+            await control
+                .UpdateEndpointsAsync(
+                    maintenanceEndpoints
+                        .Select(static endpoint => new ZooKeeperEndpoint(
+                            "127.0.0.1",
+                            Port(endpoint)
+                        ))
+                        .ToArray(),
+                    token
+                )
+                .ConfigureAwait(true);
+        }
         var owner = await _fixture
             .ConnectAsync(
                 connectionString: source.Endpoint,
+                sessionTimeout: expectLost ? ShortSession : null,
                 connectAttemptTimeout: RecoveryAttempt,
                 operationTimeout: OperationGuard
             )
@@ -91,7 +112,13 @@ public sealed class MemberOutageTests : IAsyncLifetime
             .AddWatchAsync(persistentPath, PersistentWatchMode.Persistent, token)
             .ConfigureAwait(true);
         await using var persistentLifetime = persistent.ConfigureAwait(true);
-        var events = new EventProbe<ZooKeeperWatchEvent>(persistent.ReadEventsAsync(token), token);
+        TimeSpan restorationGuard =
+            fault.Role == MemberControl.Quorum && !expectLost ? QuorumReadGuard : EventGuard;
+        var events = new EventProbe<ZooKeeperWatchEvent>(
+            persistent.ReadEventsAsync(token),
+            token,
+            restorationGuard
+        );
         await using var eventsLifetime = events.ConfigureAwait(true);
         var nextGap = events.MoveNextAsync();
         var onceEvents = new EventProbe<ZooKeeperWatchEvent>(
@@ -99,7 +126,8 @@ public sealed class MemberOutageTests : IAsyncLifetime
             token
         );
         await using var onceEventsLifetime = onceEvents.ConfigureAwait(true);
-        var nextOnce = onceEvents.MoveNextAsync();
+        Task<bool>? nextOnce =
+            fault.Role == MemberControl.Quorum && !expectLost ? null : onceEvents.MoveNextAsync();
         var states = owner.SubscribeStateChanges();
         await using var statesLifetime = states.ConfigureAwait(true);
         var stateReader = new EventProbe<ZooKeeperSessionSnapshot>(
@@ -110,6 +138,12 @@ public sealed class MemberOutageTests : IAsyncLifetime
         Assert.True(await stateReader.MoveNextAsync().ConfigureAwait(true));
         long session = owner.Session.SessionId;
         long generation = owner.Session.ConnectionGeneration;
+        Assert.NotNull(owner.Session.NegotiatedTimeout);
+        Step("negotiated-timeout-ms-" + owner.Session.NegotiatedTimeout.Value.TotalMilliseconds);
+        if (expectLost)
+        {
+            Assert.True(owner.Session.NegotiatedTimeout <= EventGuard);
+        }
         int createsBefore = source.CreateTransmissions;
         Step("steady-state");
         await owner
@@ -122,6 +156,7 @@ public sealed class MemberOutageTests : IAsyncLifetime
             )
             .ConfigureAwait(true);
         Task<CreateResult>? uncertain = null;
+        ZooKeeperClient? recoveredControl = null;
         string? replacement = null;
         try
         {
@@ -168,8 +203,71 @@ public sealed class MemberOutageTests : IAsyncLifetime
             await WaitStateAsync(stateReader, ZooKeeperSessionState.Disconnected, token)
                 .ConfigureAwait(true);
             var ready = owner.WaitForConnectionAsync(token);
-            await Task.WhenAny(first.RestoreHeld, second.RestoreHeld)
-                .WaitAsync(EventGuard, token)
+            if (fault.Role == MemberControl.Quorum)
+            {
+                Assert.False(ready.IsCompleted);
+                Assert.False(nextGap.IsCompleted);
+                var unavailable = await Assert
+                    .ThrowsAsync<ZooKeeperException>(() => owner.SyncAsync(_fixture.Root, token))
+                    .ConfigureAwait(true);
+                Assert.Equal(RequestOutcome.NotSent, unavailable.Outcome);
+                Step("quorum-unavailable-admission-closed");
+                if (expectLost)
+                {
+                    var lost = await Assert
+                        .ThrowsAsync<ZooKeeperSessionException>(async () =>
+                        {
+                            _ = await nextGap.ConfigureAwait(true);
+                        })
+                        .ConfigureAwait(true);
+                    Assert.Equal(ZooKeeperSessionState.Lost, lost.State);
+                    Assert.Null(lost.ErrorCode);
+                    var onceLost = await Assert
+                        .ThrowsAsync<ZooKeeperSessionException>(async () =>
+                        {
+                            _ = await nextOnce!.ConfigureAwait(true);
+                        })
+                        .ConfigureAwait(true);
+                    Assert.Equal(ZooKeeperSessionState.Lost, onceLost.State);
+                    await Assert
+                        .ThrowsAsync<ZooKeeperSessionException>(() => ready)
+                        .ConfigureAwait(true);
+                    Assert.Equal(ZooKeeperSessionState.Lost, owner.Session.State);
+                    long terminalGeneration = owner.Session.ConnectionGeneration;
+                    int attemptsAtLoss = first.ConnectionAttempts + second.ConnectionAttempts;
+                    Step("local-lost-without-server-expiry-claim");
+                    await fault.RecoverQuorumAsync(token).ConfigureAwait(true);
+                    Step("quorum-restored-after-local-loss");
+                    await RefreshControlAsync().ConfigureAwait(true);
+                    await VerifyNoReplayAsync().ConfigureAwait(true);
+                    Assert.Equal(ZooKeeperSessionState.Lost, owner.Session.State);
+                    Assert.Equal(session, owner.Session.SessionId);
+                    Assert.Equal(terminalGeneration, owner.Session.ConnectionGeneration);
+                    Assert.Equal(
+                        attemptsAtLoss,
+                        first.ConnectionAttempts + second.ConnectionAttempts
+                    );
+                    await Assert
+                        .ThrowsAsync<ZooKeeperSessionException>(() =>
+                            owner.WaitForConnectionAsync(token)
+                        )
+                        .ConfigureAwait(true);
+                    var terminal = await Assert
+                        .ThrowsAsync<ZooKeeperException>(() =>
+                            owner.SyncAsync(_fixture.Root, token)
+                        )
+                        .ConfigureAwait(true);
+                    Assert.Equal(RequestOutcome.NotSent, terminal.Outcome);
+                    capture.Collect();
+                    capture.AssertRedacted(_fixture.Root);
+                    Step("terminal-client-not-revived-no-create-replay");
+                    return;
+                }
+                await fault.RecoverQuorumAsync(token).ConfigureAwait(true);
+                Step("quorum-restored-before-session-loss");
+            }
+            await Task.WhenAny(first.RestoreHeld, second.RestoreHeld, ready)
+                .WaitAsync(restorationGuard, token)
                 .ConfigureAwait(true);
             Assert.Equal(ZooKeeperSessionState.Restoring, owner.Session.State);
             Assert.False(ready.IsCompleted);
@@ -179,13 +277,10 @@ public sealed class MemberOutageTests : IAsyncLifetime
                 .ConfigureAwait(true);
             Assert.Equal(RequestOutcome.NotSent, denied.Outcome);
             Step("restore-held-admission-closed");
-            await control
-                .WaitForConnectionAsync(token)
-                .WaitAsync(EventGuard, token)
-                .ConfigureAwait(true);
-            await control
-                .SetDataAsync(oncePath, new byte[] { 2 }, ZNodeVersion.Any, token)
-                .ConfigureAwait(true);
+            if (fault.Role != MemberControl.Quorum)
+            {
+                await MutateOneShotAsync().ConfigureAwait(true);
+            }
             first.ReleaseRestore();
             second.ReleaseRestore();
             await ready.WaitAsync(EventGuard, token).ConfigureAwait(true);
@@ -193,7 +288,13 @@ public sealed class MemberOutageTests : IAsyncLifetime
             Assert.True(owner.Session.ConnectionGeneration > generation);
             Assert.True(await nextGap.WaitAsync(EventGuard, token).ConfigureAwait(true));
             Assert.Equal(ZooKeeperWatchEventKind.ReconnectedWithGap, events.Current.Kind);
-            Assert.True(await nextOnce.WaitAsync(EventGuard, token).ConfigureAwait(true));
+            if (fault.Role == MemberControl.Quorum)
+            {
+                await RefreshControlAsync().ConfigureAwait(true);
+                nextOnce = onceEvents.MoveNextAsync();
+                await MutateOneShotAsync().ConfigureAwait(true);
+            }
+            Assert.True(await nextOnce!.WaitAsync(EventGuard, token).ConfigureAwait(true));
             Assert.Equal(ZooKeeperWatchEventKind.NodeDataChanged, onceEvents.Current.Kind);
             Assert.False(await onceEvents.MoveNextAsync().ConfigureAwait(true));
             await control
@@ -214,14 +315,7 @@ public sealed class MemberOutageTests : IAsyncLifetime
             var retained = await control.ExistsAsync(ephemeralPath, token).ConfigureAwait(true);
             Assert.NotNull(retained);
             Assert.Equal(session, retained.GetValueOrDefault().EphemeralOwner);
-            Assert.Single(
-                (
-                    await control.GetChildrenAsync(_fixture.Root, token).ConfigureAwait(true)
-                ).Children,
-                static child => child.StartsWith(AttemptPrefix, StringComparison.Ordinal)
-            );
-            Assert.Equal(createsBefore + 1, source.CreateTransmissions);
-            Assert.Equal(0, first.CreateTransmissions + second.CreateTransmissions);
+            await VerifyNoReplayAsync().ConfigureAwait(true);
             Step("same-session-restored-no-create-replay");
             await owner.CloseAsync(token).ConfigureAwait(true);
             Assert.Equal(ZooKeeperCloseStatus.Acknowledged, owner.Session.CloseStatus);
@@ -274,6 +368,19 @@ public sealed class MemberOutageTests : IAsyncLifetime
                 );
             }
         }
+        catch (Exception failure)
+        {
+            TestContext.Current.TestOutputHelper?.WriteLine(
+                $"failure type={failure.GetType().Name} outcome={(failure as ZooKeeperException)?.Outcome} error={(failure as ZooKeeperException)?.ErrorCode} owner-state={owner.Session.State} control-state={control.Session.State} fixture-state={_fixture.Client.Session.State}"
+            );
+            foreach (var proxy in new[] { first, second })
+            {
+                TestContext.Current.TestOutputHelper?.WriteLine(
+                    $"recovery-proxy attempts={proxy.ConnectionAttempts} handshakes={proxy.HandshakeReplies} negotiated-ms={proxy.LastNegotiatedMilliseconds} restore-held={proxy.RestoreHeld.IsCompleted} failure={proxy.RunFailure}"
+                );
+            }
+            throw;
+        }
         finally
         {
             first.ReleaseRestore();
@@ -291,7 +398,11 @@ public sealed class MemberOutageTests : IAsyncLifetime
                             .ConfigureAwait(true)
                     );
                 }
-                Step(fault.Role + "-restored-as-follower-authenticated-readiness");
+                Step(fault.Role + "-restored-authenticated-readiness");
+                if (fault.Role == MemberControl.Quorum)
+                {
+                    await _fixture.RefreshCleanupClientAsync(rollback.Token).ConfigureAwait(true);
+                }
                 Step("fixture-cleanup-state-" + _fixture.Client.Session.State);
                 await _fixture.Client.WaitForConnectionAsync(rollback.Token).ConfigureAwait(true);
                 Step("fixture-cleanup-ready");
@@ -299,6 +410,10 @@ public sealed class MemberOutageTests : IAsyncLifetime
             finally
             {
                 await owner.DisposeAsync().ConfigureAwait(true);
+                if (recoveredControl is not null)
+                {
+                    await recoveredControl.DisposeAsync().ConfigureAwait(true);
+                }
                 if (uncertain is not null)
                 {
                     try
@@ -309,6 +424,43 @@ public sealed class MemberOutageTests : IAsyncLifetime
                         when (error is ZooKeeperException or OperationCanceledException) { }
                 }
             }
+        }
+
+        async Task RefreshControlAsync()
+        {
+            await fault.RestoreAsync(token).ConfigureAwait(true);
+            await control.DisposeAsync().ConfigureAwait(true);
+            recoveredControl = await _fixture.ConnectAsync().ConfigureAwait(true);
+            control = recoveredControl;
+            Step("all-members-healthy-independent-control-connected");
+        }
+
+        async Task MutateOneShotAsync()
+        {
+            await control
+                .WaitForConnectionAsync(token)
+                .WaitAsync(EventGuard, token)
+                .ConfigureAwait(true);
+            await control
+                .SetDataAsync(oncePath, new byte[] { 2 }, ZNodeVersion.Any, token)
+                .ConfigureAwait(true);
+        }
+
+        async Task VerifyNoReplayAsync()
+        {
+            await control
+                .WaitForConnectionAsync(token)
+                .WaitAsync(EventGuard, token)
+                .ConfigureAwait(true);
+            await control.SyncAsync(_fixture.Root, token).ConfigureAwait(true);
+            Assert.Single(
+                (
+                    await control.GetChildrenAsync(_fixture.Root, token).ConfigureAwait(true)
+                ).Children,
+                static child => child.StartsWith(AttemptPrefix, StringComparison.Ordinal)
+            );
+            Assert.Equal(createsBefore + 1, source.CreateTransmissions);
+            Assert.Equal(0, first.CreateTransmissions + second.CreateTransmissions);
         }
     }
 

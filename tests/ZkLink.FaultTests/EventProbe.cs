@@ -7,12 +7,18 @@ internal sealed class EventProbe<T> : IAsyncDisposable
     private static readonly TimeSpan ReadGuard = TimeSpan.FromSeconds(15);
     private readonly CancellationTokenSource _stop;
     private readonly IAsyncEnumerator<T> _reader;
+    private readonly TimeSpan _readGuard;
     private Task<bool>? _read;
     private Task<bool>? _bounded;
     internal T Current => _reader.Current;
 
-    internal EventProbe(IAsyncEnumerable<T> source, CancellationToken token)
+    internal EventProbe(
+        IAsyncEnumerable<T> source,
+        CancellationToken token,
+        TimeSpan? readGuard = null
+    )
     {
+        _readGuard = readGuard ?? ReadGuard;
         _stop = CancellationTokenSource.CreateLinkedTokenSource(token);
         _reader = source.GetAsyncEnumerator(_stop.Token);
     }
@@ -20,9 +26,11 @@ internal sealed class EventProbe<T> : IAsyncDisposable
     internal Task<bool> MoveNextAsync()
     {
         if (_read is { IsCompleted: false })
+        {
             throw new InvalidOperationException("Only one event read may be outstanding.");
+        }
         _read = _reader.MoveNextAsync().AsTask();
-        return _bounded = _read.WaitAsync(ReadGuard, _stop.Token);
+        return _bounded = _read.WaitAsync(_readGuard, _stop.Token);
     }
 
     public async ValueTask DisposeAsync()
@@ -31,7 +39,9 @@ internal sealed class EventProbe<T> : IAsyncDisposable
         try
         {
             if (_read is not null && _bounded is not null)
+            {
                 await Task.WhenAll(_read, _bounded).ConfigureAwait(false);
+            }
         }
         catch (Exception error)
             when (error

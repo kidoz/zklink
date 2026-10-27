@@ -27,6 +27,12 @@ internal sealed class FaultProxy : IAsyncDisposable
     private bool _armed;
     private int? _selectedXid;
     private int _creates;
+    private int _connectionAttempts;
+    private int _handshakeReplies;
+    private int _lastNegotiatedMilliseconds;
+    internal int HandshakeReplies => Volatile.Read(ref _handshakeReplies);
+    internal int LastNegotiatedMilliseconds => Volatile.Read(ref _lastNegotiatedMilliseconds);
+    internal string? RunFailure => _run.Exception?.GetBaseException().GetType().Name;
     private readonly TaskCompletionSource _withheld = NewSignal();
     private readonly TaskCompletionSource _restoreHeld = NewSignal();
     private readonly TaskCompletionSource _serverClosed = NewSignal();
@@ -35,6 +41,7 @@ internal sealed class FaultProxy : IAsyncDisposable
     internal Task ServerClosed => _serverClosed.Task;
     internal int WithheldError { get; private set; }
     internal int CreateTransmissions => Volatile.Read(ref _creates);
+    internal int ConnectionAttempts => Volatile.Read(ref _connectionAttempts);
     internal string Endpoint { get; }
 
     internal FaultProxy(string endpoint, bool holdRestore, CancellationToken token)
@@ -80,6 +87,7 @@ internal sealed class FaultProxy : IAsyncDisposable
                     .AcceptTcpClientAsync(_stop.Token)
                     .ConfigureAwait(false);
                 using var upstream = new TcpClient();
+                Interlocked.Increment(ref _connectionAttempts);
                 try
                 {
                     await upstream
@@ -167,6 +175,14 @@ internal sealed class FaultProxy : IAsyncDisposable
                 try
                 {
                     await source.ReadExactlyAsync(packet, token).ConfigureAwait(false);
+                    if (incoming && handshake && length >= sizeof(int) + sizeof(int))
+                    {
+                        Volatile.Write(
+                            ref _lastNegotiatedMilliseconds,
+                            BinaryPrimitives.ReadInt32BigEndian(packet.AsSpan(sizeof(int)))
+                        );
+                        Interlocked.Increment(ref _handshakeReplies);
+                    }
                     if (!handshake && length >= HeaderBytes)
                     {
                         int xid = BinaryPrimitives.ReadInt32BigEndian(packet);

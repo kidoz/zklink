@@ -29,9 +29,11 @@ internal sealed class LiveZooKeeperFixture : IAsyncLifetime
             );
         string? version = Environment.GetEnvironmentVariable("ZKLINK_TEST_SERVER_VERSION");
         if (version is not ("3.8.7" or "3.9.6"))
+        {
             throw new InvalidOperationException(
                 "The live runner must verify and supply a pinned server version."
             );
+        }
         CompatibilityProfile =
             version == "3.9.6"
                 ? ZooKeeperCompatibilityProfile.ZooKeeper39
@@ -46,12 +48,16 @@ internal sealed class LiveZooKeeperFixture : IAsyncLifetime
     public async ValueTask DisposeAsync()
     {
         if (_client is null)
+        {
             return;
+        }
         try
         {
             using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(15));
             if (_created)
+            {
                 await DeleteTreeAsync(Root, cleanup.Token).ConfigureAwait(false);
+            }
         }
         finally
         {
@@ -66,7 +72,8 @@ internal sealed class LiveZooKeeperFixture : IAsyncLifetime
         bool enableTtlNodes = false,
         TimeSpan? sessionTimeout = null,
         TimeSpan? connectAttemptTimeout = null,
-        TimeSpan? operationTimeout = null
+        TimeSpan? operationTimeout = null,
+        CancellationToken? cancellationToken = null
     )
     {
         using var credentials = ZooKeeperAuthentication.Digest(_user, _password);
@@ -86,8 +93,16 @@ internal sealed class LiveZooKeeperFixture : IAsyncLifetime
             CloseTimeout = TimeSpan.FromSeconds(2),
         };
         return await ZooKeeperClient
-            .ConnectAsync(options, TestContext.Current.CancellationToken)
+            .ConnectAsync(options, cancellationToken ?? TestContext.Current.CancellationToken)
             .ConfigureAwait(false);
+    }
+
+    // A fault scenario can explicitly replace its independent cleanup session after
+    // the ensemble recovers. This never replaces the client under test.
+    internal async Task RefreshCleanupClientAsync(CancellationToken token)
+    {
+        await Client.DisposeAsync().ConfigureAwait(false);
+        _client = await ConnectAsync(cancellationToken: token).ConfigureAwait(false);
     }
 
     private async Task DeleteTreeAsync(string path, CancellationToken token)
@@ -98,7 +113,9 @@ internal sealed class LiveZooKeeperFixture : IAsyncLifetime
                 .GetChildrenAsync(path, token)
                 .ConfigureAwait(false);
             foreach (string child in children.Children)
+            {
                 await DeleteTreeAsync(path + "/" + child, token).ConfigureAwait(false);
+            }
             await Client.DeleteAsync(path, ZNodeVersion.Any, token).ConfigureAwait(false);
         }
         catch (ZooKeeperException error) when (error.KnownErrorCode == ZooKeeperErrorCode.NoNode)

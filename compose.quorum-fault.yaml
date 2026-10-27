@@ -1,0 +1,30 @@
+# Keep voter identity stable while containers stop and start. Literal peer
+# addresses keep this experiment independent of Docker/Java DNS cache behavior.
+x-quorum-environment: &quorum-environment
+  ZOO_SERVERS: >-
+    server.1=${ZKLINK_FAULT_IP_1:?Quorum runner required}:2888:3888;2181
+    server.2=${ZKLINK_FAULT_IP_2:?Quorum runner required}:2888:3888;2181
+    server.3=${ZKLINK_FAULT_IP_3:?Quorum runner required}:2888:3888;2181
+
+services:
+  zoo1:
+    environment: *quorum-environment
+    networks:
+      default:
+        ipv4_address: ${ZKLINK_FAULT_IP_1:?Quorum runner required}
+  zoo2:
+    environment: *quorum-environment
+    networks:
+      default:
+        ipv4_address: ${ZKLINK_FAULT_IP_2:?Quorum runner required}
+  zoo3:
+    environment: *quorum-environment
+    networks:
+      default:
+        ipv4_address: ${ZKLINK_FAULT_IP_3:?Quorum runner required}
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${ZKLINK_FAULT_SUBNET:?Quorum runner required}

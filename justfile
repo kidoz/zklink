@@ -81,3 +81,7 @@ zk-follower-faults:
 # Stop the observed leader and verify election plus session/watch recovery on both versions.
 zk-leader-faults:
     bash dev/test-zookeeper-leader-faults.sh
+
+# Lose quorum and verify retained sessions or local loss on both pinned versions.
+zk-quorum-faults:
+    bash dev/test-zookeeper-quorum-faults.sh
