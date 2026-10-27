@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-if [[ $# -ne 1 || ( "$1" != follower && "$1" != leader && "$1" != quorum && "$1" != partition && "$1" != peer ) ]]; then
-  echo "Usage: $0 follower|leader|quorum|partition|peer" >&2; exit 2
+if [[ $# -ne 1 || ( "$1" != follower && "$1" != leader && "$1" != quorum && "$1" != partition && "$1" != peer && "$1" != pressure ) ]]; then
+  echo "Usage: $0 follower|leader|quorum|partition|peer|pressure" >&2; exit 2
 fi
 role="$1"
 export ZKLINK_FAULT_ROLE="${role}"
@@ -55,6 +55,15 @@ cleanup() {
         ZKLINK_FAULT_PROJECT="${project}" ZKLINK_FAULT_SERVICE="${target}" \
           python3 dev/zookeeper-peer-network.py verify >>"${artifacts}/${evidence_key}-rollback.log" 2>&1 || cleanup_exit=1
       fi
+      if [[ "${role}" == pressure ]]; then
+        for service in zoo1 zoo2 zoo3; do
+          if compose exec -T "${service}" bash /opt/zklink/zookeeper-healthcheck.sh >>"${artifacts}/${evidence_key}-rollback.log" 2>&1; then
+            printf 'pressure-cleanup-authenticated-ready: %s\n' "${service}" >>"${artifacts}/${evidence_key}-rollback.log"
+          else
+            cleanup_exit=1
+          fi
+        done
+      fi
     fi
     compose logs --no-color >>"${artifacts}/${evidence_key}-server.log" 2>&1 || cleanup_exit=1
     compose down --volumes >>"${artifacts}/${evidence_key}-cleanup.log" 2>&1 || cleanup_exit=1
@@ -67,6 +76,7 @@ trap 'exit 143' TERM
 outages=(member)
 test_fixture=MemberFault
 if [[ "${role}" == partition ]]; then test_fixture=PartitionFault; fi
+if [[ "${role}" == pressure ]]; then test_fixture=WatchPressure; fi
 if [[ "${role}" == quorum || "${role}" == partition ]]; then outages=(brief lost); fi
 peer_roles=(none)
 if [[ "${role}" == peer ]]; then peer_roles=(leader follower); fi
@@ -135,7 +145,11 @@ PORTS
     case_label="${outage}"
     if [[ "${role}" == peer ]]; then case_label="${peer_role}"; fi
     if [[ "${role}" == partition ]]; then case_label="${direction}/${outage}"; fi
-    echo "Checking ${role} outage (${case_label}) on ZooKeeper ${version}"
+    if [[ "${role}" == pressure ]]; then
+      echo "Checking watch pressure on ZooKeeper ${version}"
+    else
+      echo "Checking ${role} outage (${case_label}) on ZooKeeper ${version}"
+    fi
     compose config >"${artifacts}/${evidence_key}-compose.yaml"
     compose up -d --wait --wait-timeout "${startup_guard_seconds}" >"${artifacts}/${evidence_key}-startup.log" 2>&1
     leaders=0
@@ -148,7 +162,7 @@ PORTS
       if grep -Fxq 'Mode: follower' "${artifacts}/${evidence_key}-${service}-role-before.txt"; then
         followers=$((followers + 1))
         if [[ "${role}" == quorum && -z "${second_target}" ]]; then second_target="${service}"; fi
-        if [[ ( "${role}" == follower || ( "${role}" == peer && "${peer_role}" == follower ) ) && -z "${target}" ]]; then target="${service}"; fi
+        if [[ ( "${role}" == follower || "${role}" == pressure || ( "${role}" == peer && "${peer_role}" == follower ) ) && -z "${target}" ]]; then target="${service}"; fi
       elif grep -Fxq 'Mode: leader' "${artifacts}/${evidence_key}-${service}-role-before.txt"; then
         leaders=$((leaders + 1))
         if [[ ( "${role}" == leader || "${role}" == quorum || "${role}" == partition || ( "${role}" == peer && "${peer_role}" == leader ) ) && -z "${target}" ]]; then target="${service}"; fi
@@ -159,6 +173,7 @@ PORTS
     if [[ "${leaders}" -ne 1 || "${followers}" -ne 2 ]]; then echo "No healthy voting ensemble" >&2; exit 1; fi
     selection="first observed ${role}"
     if [[ "${role}" == peer ]]; then selection="observed ${peer_role} for peer isolation"; fi
+    if [[ "${role}" == pressure ]]; then selection="first observed follower as transparent forwarding target"; fi
     if [[ "${role}" == partition ]]; then selection="observed leader as the client proxy target"; fi
     if [[ "${role}" == quorum ]]; then selection="observed leader and first observed follower"; fi
     printf 'Selection: %s in zoo1/zoo2/zoo3 order\nTarget: %s\n' "${selection}" "${target}" >"${artifacts}/${evidence_key}-selection.txt"
@@ -182,7 +197,11 @@ PORTS
     compose down --volumes >"${artifacts}/${evidence_key}-cleanup.log" 2>&1
     project=""
     target=""
-    echo "ZooKeeper ${version}: PASS (${role}/${case_label} fault, expected session outcome, no replay, restoration, rollback and cleanup)"
+    if [[ "${role}" == pressure ]]; then
+      echo "ZooKeeper ${version}: PASS (slow consumers, heartbeat progress, shared event overflow, FIFO, counter and fixture cleanup)"
+    else
+      echo "ZooKeeper ${version}: PASS (${role}/${case_label} fault, expected session outcome, no replay, restoration, rollback and cleanup)"
+    fi
   done
 done
 done

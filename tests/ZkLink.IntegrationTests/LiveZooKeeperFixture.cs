@@ -18,6 +18,10 @@ internal sealed class LiveZooKeeperFixture : IAsyncLifetime
     internal ZooKeeperClient Client => _client!;
     internal string ConnectionString => _connection;
     internal string User => _user;
+
+    internal ZooKeeperAuthentication CreateAuthentication() =>
+        ZooKeeperAuthentication.Digest(_user, _password);
+
     internal ZooKeeperCompatibilityProfile CompatibilityProfile { get; private set; }
 
     public async ValueTask InitializeAsync()
@@ -76,7 +80,7 @@ internal sealed class LiveZooKeeperFixture : IAsyncLifetime
         CancellationToken? cancellationToken = null
     )
     {
-        using var credentials = ZooKeeperAuthentication.Digest(_user, _password);
+        using var credentials = CreateAuthentication();
         var options = new ZooKeeperClientOptions
         {
             ConnectionString = connectionString ?? _connection,

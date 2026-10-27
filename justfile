@@ -93,3 +93,7 @@ zk-partition-faults:
 # Isolate each leader/follower peer interface and verify election and recovery.
 zk-peer-partition-faults:
     bash dev/test-zookeeper-peer-partition-faults.sh
+
+# Verify slow watch consumers, shared event limits and overflow on both versions.
+zk-watch-pressure-faults:
+    bash dev/test-zookeeper-watch-pressure-faults.sh
