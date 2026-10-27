@@ -37,7 +37,35 @@ public sealed class ConnectionLifetimeTests
         await connection.Received(1).CloseAsync(cancellation.Token);
         Assert.Throws<InvalidOperationException>(() => host.Client);
         await host.DisposeAsync();
-        await connection.DidNotReceive().DisposeAsync();
+        await connection.Received(1).DisposeAsync();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Acceptance", "T40")]
+    public async Task FailedOrCancelledStopStillDisposesTheConnection(bool cancelled)
+    {
+        var (host, connection, _) = CreateStartedHost(out var startTask);
+        await startTask.ConfigureAwait(true);
+        using var stop = new CancellationTokenSource();
+        if (cancelled)
+        {
+            await stop.CancelAsync();
+        }
+        Exception error = cancelled
+            ? new OperationCanceledException(stop.Token)
+            : new IOException("close failed");
+        connection.CloseAsync(stop.Token).Returns(Task.FromException(error));
+
+        Assert.Same(
+            error,
+            await Assert.ThrowsAnyAsync<Exception>(() => host.StopAsync(stop.Token))
+        );
+        await connection.Received(1).DisposeAsync();
+        await host.DisposeAsync();
+        await connection.Received(1).DisposeAsync();
+        Assert.Throws<InvalidOperationException>(() => host.Client);
     }
 
     [Fact]

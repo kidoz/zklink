@@ -34,7 +34,14 @@ internal sealed class ZkLinkConnectionHost(
         var connection = Interlocked.Exchange(ref _connection, null);
         if (connection is not null)
         {
-            await connection.CloseAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await connection.CloseAsync(cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                await connection.DisposeAsync().ConfigureAwait(false);
+            }
         }
     }
 

@@ -38,7 +38,7 @@ public static class ZkLinkServiceCollectionExtensions
         services.AddSingleton<IHostedService>(static provider =>
             provider.GetRequiredService<ZkLinkConnectionHost>()
         );
-        services.AddSingleton(static provider =>
+        services.AddTransient(static provider =>
             provider.GetRequiredService<ZkLinkConnectionHost>().Client
         );
         return services;
