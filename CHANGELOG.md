@@ -23,6 +23,16 @@ remain unavailable. See
 
 ### Added
 
+- Disposable client TLS/mTLS ensembles, generated certificates, certificate
+  rejection and secure node/transaction/watch recovery tests on both pinned patches.
+- Distinct digest and X.509 ACL checks, trusted connections on every secure node,
+  and explicit plaintext/expired-certificate negative controls.
+- `just zk-security-matrix`, a dedicated CI job, private fixture cleanup and
+  scanning of retained evidence for private material.
+
+- Optional `ZkLink.Analyzers` Roslyn package with six security, watch-ownership
+  and async-usage diagnostics, compilation tests and packed-consumer verification.
+
 - Optional `ZkLink.Extensions.DependencyInjection` registration with one shared
   host-connected client, asynchronous startup, acknowledged shutdown and lifecycle tests.
 

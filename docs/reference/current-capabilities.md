@@ -1,6 +1,6 @@
 # Current capabilities
 
-This describes the checkout as of **2026-10-26**. No package has been released.
+This describes the checkout as of **2026-10-27**. No package has been released.
 
 ## Code and verification
 
@@ -11,9 +11,10 @@ This describes the checkout as of **2026-10-26**. No package has been released.
 | Public types | Immutable snapshots, endpoints, create options, ACLs, versions, request failures, watch handles/events and removal results; contract tests | Package consumer qualification |
 | Sessions and operations | Connect/authenticate/sync, snapshots/subscriptions, heartbeat, same-session recovery, cancellation, close, node/ACL methods, typed transactions, auxiliary queries, opt-in TTL creation and watches | Broader live recovery under faults |
 | Watches | One-shot reads, persistent/recursive subscriptions, buffered events, shared removal, cancellation cleanup, bounded restoration and explicit reconnect gaps | Broader fault and concurrency qualification |
-| Security | TCP/TLS, optional custom roots/client certificates, digest replay, explicit plaintext override and live ACL tests | Live secure ZooKeeper, additional identity schemes and cross-platform security qualification |
+| Security | TCP/TLS, custom roots/client certificates, live client TLS/mTLS operations, digest replay, certificate rejection and distinct digest/X.509 ACLs | Revocation, rotation, quorum TLS, additional auth schemes and cross-platform qualification |
 | Dependency injection | Optional `AddZkLink` registration with one host-owned singleton and asynchronous startup/shutdown | Installed-package and DI-specific Native AOT qualification |
-| Local servers | Pinned three-node Compose fixtures for 3.8.7 and 3.9.6 | Secure server and broader fault fixtures |
+| Analyzers | Six optional ZKL diagnostics, Roslyn compilation tests and a local packed-package consumer check | Released package and cross-platform qualification |
+| Local servers | Pinned three-node plaintext/TLS/mTLS fixtures for 3.8.7 and 3.9.6, expired-certificate negative control | Broader fault fixtures |
 | Native AOT | Planned requirement | Publish and direct execution evidence for consumers |
 | Performance | Initial small GetData codec allocation check | Session/load benchmarks and runtime performance evidence |
 
@@ -66,7 +67,11 @@ acknowledgments and local loss while reconnect is paused. See the
 
 TLS is required by default. Loopback tests cover trusted/custom roots, wrong
 identity, unknown issuer, expiry, mutual authentication, missing required client
-certificate and plaintext rejection on local macOS arm64. The local fixtures use plaintext. SASL and read-only
+certificate and plaintext rejection on local macOS arm64. The default local fixtures use plaintext; `just zk-security-matrix` separately
+passed 9 TLS and 13 mTLS cases per pinned patch, including secure operations,
+watch recovery, server/client certificate rejection and X.509 ACL identity
+isolation. These are macOS arm64 client observations; remote CI and other
+client platforms remain unverified. See [Verify secure connections](../how-to/verify-secure-connections.md). SASL and read-only
 mode are outside the planned initial client scope; coordination recipes and
 administration require separate designs.
 

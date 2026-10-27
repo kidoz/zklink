@@ -83,6 +83,8 @@ size rejection, late replies and cancellation outcomes.
 
 Run `just zk-operations-matrix` for isolated live servers, retained evidence and
 cleanup. For session ephemerals, descendant counts and identities, see
-[auxiliary operations](auxiliary-operations.md). These are plaintext tests. Live secure ZooKeeper and broader fault qualification remain open.
+[auxiliary operations](auxiliary-operations.md). These operation tests use plaintext. A separate [security matrix](../how-to/verify-secure-connections.md)
+verifies selected node/ACL/transaction operations over client TLS/mTLS on both
+versions. Broader fault qualification remains open.
 
 [Reference](README.md) · [Documentation home](../README.md)

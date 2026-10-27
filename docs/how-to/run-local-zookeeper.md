@@ -23,8 +23,9 @@ every lifecycle command. To use 3.8.7, replace `3.9.6` with `3.8.7` throughout.
 | 3.9.6 | `127.0.0.1:2181`, `127.0.0.1:2182`, `127.0.0.1:2183` |
 | 3.8.7 | `127.0.0.1:22181`, `127.0.0.1:22182`, `127.0.0.1:22183` |
 
-The ports bind to loopback and use plaintext. TLS/mTLS and authentication-required
-fixtures are not provided. Image pins and environment variables are listed in
+The ports bind to loopback and use plaintext. TLS/mTLS fixtures are available separately through
+[Verify secure connections](verify-secure-connections.md); authentication-required
+server fixtures remain open. Image pins and environment variables are listed in
 the [development reference](../reference/development.md#zookeeper-fixture-settings).
 
 ## Preserve logs and remove the fixture
@@ -67,8 +68,8 @@ required prerequisite or check fails.
 To additionally run the managed driver's new-session, digest-authentication,
 sync and acknowledged-close checks on every node, use `just zk-driver-matrix`.
 It requires the pinned .NET SDK and OpenSSL, and retains per-node driver output.
-Use `just zk-operations-matrix` for the separate live node/ACL/transaction/auxiliary/watch suite and examples. Both commands leave live TLS and broader fault recovery
-unqualified.
+Use `just zk-operations-matrix` for the separate live node/ACL/transaction/auxiliary/watch suite and examples. Use `just zk-security-matrix` for dedicated client TLS/mTLS checks. Broader
+fault recovery remains unqualified.
 
 ## Resolve common startup problems
 

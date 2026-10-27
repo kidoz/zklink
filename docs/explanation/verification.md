@@ -53,7 +53,7 @@ consumes/drops a real transaction reply, then allows reconnect so tests can chec
 actual commitment, session identity and exactly one transmitted write. Auxiliary
 cases verify textual-prefix session ephemeral queries, chroot, nested counts,
 READ permissions and authenticated/anonymous identities. Broader live
-recovery and TLS/mTLS ZooKeeper fixtures remain unverified.
+recovery remains unverified beyond the scoped cases below.
 
 One-shot watch tests cover reader ordering, missing-node registration, shared
 removal, cancellation/timeouts, global event overflow, unknown lost-response
@@ -83,6 +83,31 @@ each patch. It checks opt-in, maximum TTL, single/atomic creation, close
 survival, child protection and eventual cleanup, plus disabled-server errors and
 rollback. Bounded cleanup polling establishes eventual removal under the test
 conditions, without promising exact deletion timing.
+
+## Secure server checks keep authentication and authorization distinct
+
+`just zk-security-matrix` uses separate three-node client TLS/mTLS ensembles on
+both pinned versions. Secure authenticated readiness precedes .NET tests.
+The .NET client validates custom trust and host identity, exercises node and
+transaction operations, restores one-shot/persistent watches through an opaque
+TLS tunnel, and closes with acknowledgment. Digest-only ACLs prevent a shared
+client certificate from bypassing digest authorization checks. Different trusted
+client certificates also demonstrate distinct X.509 ACL identities.
+
+Negative controls reject wrong hostnames, unknown roots, expired server
+certificates and TLS-required connections to a plaintext port. mTLS also rejects
+configured missing/untrusted/expired client certificates. A valid control remains
+usable, so connection rejection is distinguishable from server unavailability.
+Depending on TLS alert timing, an mTLS rejection can surface during TLS or during
+the subsequent connection attempt; no ready ZooKeeper client is returned.
+
+The runner removes its generated private stores separately from retained logs.
+macOS uses temporary platform key storage for imported test certificates; every
+handle is disposed. Revocation is disabled only for the private test CA, which
+has no revocation service. These results establish client TLS behavior on the
+observed macOS arm64 platform, without qualifying revocation, rotation, quorum
+TLS, SASL, Native AOT or other client operating systems. See
+[Verify secure connections](../how-to/verify-secure-connections.md).
 
 ## Release claims need consumer evidence
 

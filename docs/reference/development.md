@@ -29,11 +29,13 @@ notation; omit the brackets when invoking a command.
 | `just check` | Check formatting and build; does not run tests |
 | `just test <project>` | Run a selected test project in Release mode |
 | `bash dev/test-jute-oracle.sh` | Compare all implemented protocol/path fixtures using the Gradle wrapper; macOS/Linux, JDK 25, Python 3 |
+| `bash dev/test-analyzers-package.sh` | Pack the local analyzer and verify clean/intentional-diagnostic package consumers |
 | `just zk-check [version]` | Validate Compose configuration |
 | `just zk-up [version]` | Start three nodes and wait up to 90 seconds for readiness |
 | `just zk-status [version]` | Show health and host ports |
 | `just zk-logs [version]` | Print server logs |
 | `just zk-down [version]` | Remove the selected ensemble and its volumes |
+| `just zk-security-matrix` | Verify client TLS/mTLS, rejection and secure recovery on both versions; requires Docker, .NET, OpenSSL and Python 3 |
 | `just zk-ttl-matrix` | Verify single/atomic TTL creates with enabled and disabled servers on both versions |
 | `just zk-operations-matrix` | Run live node/ACL/transaction/auxiliary/watch tests and examples on both versions; requires Docker, .NET, Bash and OpenSSL |
 | `just zk-driver-matrix` | Run the fixture matrix plus managed session/auth/sync/close on each node; requires .NET and OpenSSL |
@@ -47,6 +49,8 @@ Definitions are in the [justfile](../../justfile).
 | Project | Scope | External prerequisites |
 | --- | --- | --- |
 | [ZkLink.Tests](../../tests/ZkLink.Tests/ZkLink.Tests.csproj) | Endpoints, model ownership, create options, failure contracts | Pinned .NET SDK |
+| [ZkLink.Analyzers.Tests](../../tests/ZkLink.Analyzers.Tests/ZkLink.Analyzers.Tests.csproj) | Roslyn source-pattern and diagnostic-ID tests | Pinned .NET SDK |
+| [ZkLink.Analyzers.PackageSmoke](../../tests/ZkLink.Analyzers.PackageSmoke/ZkLink.Analyzers.PackageSmoke.csproj) | Clean/intentional-diagnostic consumers of the packed analyzer | Local package produced by `dev/test-analyzers-package.sh`; not in the solution |
 | [ZkLink.Extensions.DependencyInjection.Tests](../../tests/ZkLink.Extensions.DependencyInjection.Tests/ZkLink.Extensions.DependencyInjection.Tests.csproj) | DI registration, real-host startup/shutdown and connection ownership | Pinned .NET SDK |
 | [ZkLink.Protocol.Tests](../../tests/ZkLink.Protocol.Tests/ZkLink.Protocol.Tests.csproj) | Protocol/path fixtures, malformed input, virtual-time sessions/requests and loopback TLS/mTLS | Pinned .NET SDK |
 | [ZkLink.IntegrationTests](../../tests/ZkLink.IntegrationTests/ZkLink.IntegrationTests.csproj) | Live node/ACL/transaction/auxiliary/watch operations, restoration, rollback, reply-loss, chroot and ephemeral lifecycle | Explicit pinned ensemble configuration; use `just zk-operations-matrix` |
@@ -91,6 +95,7 @@ runs additionally retain SDK details, .NET results and per-node CRUD/transaction
 | --- | --- |
 | `src/ZkLink/` | Core library, XML API documentation, and API baselines |
 | `src/ZkLink.Extensions.DependencyInjection/` | Optional host-owned DI registration and API baselines |
+| `src/ZkLink.Analyzers/` | Optional Roslyn diagnostics, release tracking and analyzer-only package assets |
 | `tests/` | Server-free/live .NET suites and optional Java oracle |
 | `samples/ZkLink.Samples.Basic/` | Connect/auth/sync/close and authenticated CRUD/transactions/auxiliary queries with `--nodes` / `--transactions` / `--auxiliary` / `--watches` |
 | `dev/` | Versioned server settings, health checks, and verification scripts |

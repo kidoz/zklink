@@ -187,7 +187,8 @@ every node. Additional live checks drop a server-applied reset acknowledgment,
 verify admission stays closed, resume the same session with one gap, and exercise
 local loss after a paused reconnect. Controlled peers cover multi-batch failure,
 reset rejection, stale generations and terminal expiry/authentication. Broader
-quorum faults, live secure-server and release/AOT
-qualification remain open.
+quorum faults and release/AOT qualification remain open. The separate
+[security matrix](../how-to/verify-secure-connections.md) checks selected one-shot
+and persistent restoration over end-to-end client TLS/mTLS on both versions.
 
 [Reference](README.md) · [Documentation home](../README.md)

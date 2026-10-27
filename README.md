@@ -6,11 +6,11 @@
 
 ZkLink is a managed .NET client for Apache ZooKeeper: a first-class C# implementation of the ZooKeeper client TCP protocol, targeting .NET 10. Native AOT compatibility is a planned, separately tested requirement, not a current capability.
 
-**Status: under development.** Internal protocol codecs, handshake records, transactions, connection-string/path/chroot handling, immutable result models and request-failure contracts are implemented and tested. A connectable client now provides TCP/TLS, digest authentication, session recovery, state subscriptions, bounded requests, `SyncAsync` and acknowledged close. Node CRUD, stat, children and ACL operations are now available. Typed write transactions, read batches, session ephemeral queries, descendant counts and identity queries are available. TTL creation is available with explicit client opt-in and server enablement; one-shot watched reads and persistent/recursive subscriptions are available, with removal, same-session restoration and explicit persistent reconnect gaps. An optional `AddZkLink` helper provides host-owned dependency injection with server-free lifecycle tests.
+**Status: under development.** Internal protocol codecs, handshake records, transactions, connection-string/path/chroot handling, immutable result models and request-failure contracts are implemented and tested. A connectable client now provides TCP/TLS, digest authentication, session recovery, state subscriptions, bounded requests, `SyncAsync` and acknowledged close. Node CRUD, stat, children and ACL operations are now available. Typed write transactions, read batches, session ephemeral queries, descendant counts and identity queries are available. TTL creation is available with explicit client opt-in and server enablement; one-shot watched reads and persistent/recursive subscriptions are available, with removal, same-session restoration and explicit persistent reconnect gaps. An optional `AddZkLink` helper provides host-owned dependency injection with server-free lifecycle tests. Six optional Roslyn analyzers cover literal credentials, unsafe plaintext digest, watch ownership and asynchronous usage, with compilation and packed-consumer tests.
 
 ## Current repository state
 
-- **Solution:** `ZkLink.slnx` with the core and dependency-injection libraries, four .NET test projects and a runnable connection sample.
+- **Solution:** `ZkLink.slnx` with the core, dependency-injection and analyzer libraries, five .NET test projects and a runnable connection sample.
 - **Target:** `net10.0`, C# 14, nullable reference types, and warnings as errors.
 - **Code:** checked protocol encoding/decoding for node, ACL, transaction and control messages; bounded asynchronous framing; new/resume handshake records; connection-string parsing and namespace translation. Public supporting types include immutable results, create options and failure/removal contracts. One explicit session per client, negotiated-timeout heartbeats, endpoint rotation, same-session reconnect, cancellation outcomes and close cleanup are implemented. Sent application requests are never replayed automatically.
 - **Tests:** xUnit suites cover Apache Java fixtures for all implemented opcodes, transaction success/error shapes, every reply split and truncation, all UTF-16 path code units, chroot boundaries and supporting public contracts. A bounded scripted stream and loopback fake server exercise delayed delivery, partial writes, dropped replies and handshake exchanges. Virtual-time tests exercise session and request lifecycles. Loopback TLS tests check chain/name validation, certificate expiry and mutual authentication. The managed connection sample has passed digest auth, sync and acknowledged close on every node of both pinned versions. Live .NET tests cover CRUD, versions, null/empty and 1,000,000-byte data, create modes, chroot, ACL authorization and acknowledged-close ephemeral deletion on both pinned versions. Live transaction tests verify atomic success/rollback, independent read errors, and committed writes whose replies are dropped, followed by same-session resume without replay. Auxiliary tests verify session-scoped textual ephemeral prefixes, chroot, recursive counts, permissions and server identities. One-shot watch tests cover events, sharing/removal, chroot, re-registration and same-session restoration after a connection cut. Persistent/recursive watch tests cover repeated delivery, profile-specific removal and reconnect gaps. Broader live faults remain unverified.
@@ -33,6 +33,8 @@ Install [just](https://just.systems/) and .NET SDK **10.0.402**. Docker with Com
 | `just test tests/ZkLink.Protocol.Tests` | Run the server-free protocol suite |
 | `just test tests/ZkLink.Tests` | Run the public model and failure-contract suite |
 | `just test tests/ZkLink.Extensions.DependencyInjection.Tests` | Run the server-free DI registration and host-lifetime suite |
+| `just test tests/ZkLink.Analyzers.Tests` | Run the Roslyn diagnostic suite |
+| `bash dev/test-analyzers-package.sh` | Pack and verify the analyzer with a local consumer |
 | `bash dev/test-jute-oracle.sh` | Use the Gradle wrapper to compare Java fixtures and verify C# requests |
 | `just zk-check [version]` | Validate the selected ZooKeeper configuration |
 | `just zk-up [version]` | Start the selected ensemble and wait for readiness |
@@ -41,6 +43,7 @@ Install [just](https://just.systems/) and .NET SDK **10.0.402**. Docker with Com
 | `just zk-down [version]` | Remove the selected ensemble and its data volumes |
 | `just zk-matrix` | Smoke-test both pinned server versions and clean up |
 | `just zk-driver-matrix` | Also connect/authenticate/sync/close using ZkLink on every node |
+| `just zk-security-matrix` | Verify client TLS/mTLS operations, certificate rejection and secure watch recovery on both versions |
 | `just zk-ttl-matrix` | Test TTL-enabled and TTL-disabled servers on both versions |
 | `just zk-operations-matrix` | Run live node/ACL/transaction/auxiliary/watch tests on both versions and examples on each node |
 
@@ -80,7 +83,7 @@ just zk-down
 
 For 3.8.7, use `just zk-up 3.8.7`, `just zk-status 3.8.7`, `just zk-logs 3.8.7`, and `just zk-down 3.8.7`. The direct Compose equivalent uses `--env-file dev/zookeeper-3.8.7.env` on each command. Always select the same version for startup, logs, and cleanup.
 
-Connect to `127.0.0.1:2181,127.0.0.1:2182,127.0.0.1:2183` for 3.9.6 or `127.0.0.1:22181,127.0.0.1:22182,127.0.0.1:22183` for 3.8.7. Each container becomes healthy after an authenticated create/read/delete probe with fresh credentials and a disposable ephemeral node. Both fixtures use plaintext; ZkLink consumers must explicitly disable TLS for them. Live TLS/mTLS and authentication-required server fixtures, additional operation coverage and broader fault recovery qualification remain planned.
+Connect to `127.0.0.1:2181,127.0.0.1:2182,127.0.0.1:2183` for 3.9.6 or `127.0.0.1:22181,127.0.0.1:22182,127.0.0.1:22183` for 3.8.7. Each container becomes healthy after an authenticated create/read/delete probe with fresh credentials and a disposable ephemeral node. Both fixtures use plaintext; ZkLink consumers must explicitly disable TLS for them. Client TLS/mTLS fixtures are available separately through `just zk-security-matrix`. Authentication-required server fixtures, additional operation coverage and broader fault recovery qualification remain planned.
 
 `just zk-matrix` runs both versions sequentially with unique project names and dynamically assigned loopback ports. It checks the exact server version and authenticated readiness on all three nodes, records configuration, server logs, version output, and container status in a printed temporary artifact directory, and removes its containers and volumes on success or failure. It fails if Docker, either image, readiness, version verification, or cleanup fails. The runner uses the checked-in image pins regardless of an inherited `ZOOKEEPER_IMAGE` override.
 
@@ -107,6 +110,11 @@ resets and terminal stream completion. Both live versions verify a dropped
 restore acknowledgment followed by same-session retry, plus local loss during
 paused reconnect. See [Watch repeated changes](docs/tutorials/watch-repeated-changes.md).
 
+Client TLS and mutual TLS verification covers trusted .NET operations on every
+node, digest and X.509 ACL distinctions, transactions, watch restoration and
+certificate rejection. Run `just zk-security-matrix`; see
+[Verify secure connections](docs/how-to/verify-secure-connections.md).
+
 ## Not yet available
 
-A NuGet package, Native AOT validation and runtime performance data are not available. TLS/mTLS has local loopback evidence only; live secure ZooKeeper and cross-platform security qualification remain open.
+A NuGet package, Native AOT validation and runtime performance data are not available. Client TLS/mTLS has scoped live evidence on both pinned versions with a macOS arm64 client. Revocation services, certificate rotation, quorum TLS and cross-platform security qualification remain open.

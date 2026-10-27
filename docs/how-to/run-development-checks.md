@@ -12,6 +12,9 @@ dotnet csharpier check .
 dotnet build ZkLink.slnx -c Release --no-restore
 dotnet test --project tests/ZkLink.Tests -c Release --no-build --no-restore
 dotnet test --project tests/ZkLink.Protocol.Tests -c Release --no-build --no-restore
+dotnet test --project tests/ZkLink.Extensions.DependencyInjection.Tests -c Release --no-build --no-restore
+dotnet test --project tests/ZkLink.Analyzers.Tests -c Release --no-build --no-restore
+bash dev/test-analyzers-package.sh
 ```
 
 Require every command to exit successfully. These commands mirror the
@@ -41,7 +44,14 @@ For protocol, session, scheduler and transport changes:
 just test tests/ZkLink.Protocol.Tests
 ```
 
-Both suites are server-free. Use `--project` with `dotnet test`; this repository
+For DI registration and Roslyn diagnostic changes:
+
+```sh
+just test tests/ZkLink.Extensions.DependencyInjection.Tests
+just test tests/ZkLink.Analyzers.Tests
+```
+
+All four suites are server-free. Use `--project` with `dotnet test`; this repository
 selects Microsoft.Testing.Platform in [global.json](../../global.json).
 
 ## Compare protocol bytes with Apache Java
@@ -67,10 +77,12 @@ for the limits of these checks.
 For real connection/auth/sync/close checks on all nodes of both pinned versions,
 run `just zk-driver-matrix`. For node/ACL/transaction/auxiliary/watch verification and the examples on
 both versions, run `just zk-operations-matrix`. Required live configuration and
-prerequisites fail explicitly when absent. Live TLS/mTLS and broader operation
-fault tests remain open.
+prerequisites fail explicitly when absent. Use `just zk-security-matrix` for dedicated client TLS/mTLS verification;
+broader operation fault tests remain open.
 
 Run `just zk-ttl-matrix` separately for TTL-enabled and TTL-disabled servers on
-both pinned versions. The ordinary operation suite excludes those fixture cases.
+both pinned versions. The ordinary operation suite excludes TTL and security fixture cases.
+The security runner generates temporary certificates and retains only public
+evidence; see [Verify secure connections](verify-secure-connections.md).
 
 [How-to guides](README.md) · [Documentation home](../README.md)

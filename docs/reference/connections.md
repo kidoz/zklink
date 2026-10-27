@@ -57,7 +57,10 @@ optional custom roots. Connect captures independent certificate handles; client
 cleanup does not dispose the application's originals. Revocation and certificate
 stores depend on the platform. Local loopback evidence currently covers macOS
 arm64 with ephemeral roots and revocation disabled for those test certificates;
-live ZooKeeper TLS/mTLS and other platforms remain unqualified.
+the dedicated live matrix additionally verifies client TLS/mTLS, certificate
+rejection, digest/X.509 ACL distinctions and secure reconnect on both pinned
+versions. Other client platforms, revocation services, rotation and quorum TLS
+remain unqualified. See [Verify secure connections](../how-to/verify-secure-connections.md).
 
 `ZooKeeperAuthentication.Digest(user, password)` owns UTF-8 `user:password` bytes,
 rejects colons in the username and limits the encoded credential to 1,000,000
