@@ -116,6 +116,10 @@ jobs:
         env:
           ZKLINK_MATRIX_ARTIFACT_ROOT: ${{ github.workspace }}/artifacts/security-tests
         run: bash dev/test-zookeeper-security.sh
+      - name: Verify bounded concurrent TLS rejections on both pinned versions
+        env:
+          ZKLINK_MATRIX_ARTIFACT_ROOT: ${{ github.workspace }}/artifacts/security-tests
+        run: bash dev/test-zookeeper-security.sh --concurrent
       - name: Retain public security evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

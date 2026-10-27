@@ -3,10 +3,14 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace ZkLink.IntegrationTests;
 
-internal sealed class SecurityFixture : IAsyncLifetime
+internal sealed class SecurityFixture(Action<string>? progress = null) : IAsyncLifetime
 {
     private static readonly TimeSpan ConnectGuard = TimeSpan.FromSeconds(4);
     private static readonly TimeSpan RejectionGuard = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan ConnectAttemptGuard = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan OperationGuard = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan CloseGuard = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan CleanupGuard = TimeSpan.FromSeconds(15);
     private readonly string _user = "zklink-secure-" + Guid.NewGuid().ToString("N");
     private readonly string _password = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
     private X509Certificate2? _root;
@@ -30,6 +34,14 @@ internal sealed class SecurityFixture : IAsyncLifetime
     internal X509Certificate2 UntrustedCertificate => _untrustedCertificate!;
     internal X509Certificate2 UntrustedRoot => _untrustedRoot!;
     internal CreateOptions DigestCreate { get; private set; } = null!;
+
+    private void Report(string step)
+    {
+        if (progress is not null)
+            progress(step);
+        else
+            TestContext.Current.TestOutputHelper?.WriteLine(step);
+    }
 
     private static string Required(string key) =>
         Environment.GetEnvironmentVariable(key)
@@ -65,6 +77,7 @@ internal sealed class SecurityFixture : IAsyncLifetime
         ).Trim();
         try
         {
+            Report("certificates.begin");
             _root = X509CertificateLoader.LoadCertificateFromFile(
                 Path.Combine(directory, "root.pem")
             );
@@ -75,6 +88,7 @@ internal sealed class SecurityFixture : IAsyncLifetime
             _otherCertificate = Load("other-client");
             _expiredCertificate = Load("expired-client");
             _untrustedCertificate = Load("untrusted-client");
+            Report("certificates.end");
             _client = await ConnectAsync().ConfigureAwait(false);
             await Client
                 .CreateAsync(
@@ -121,32 +135,53 @@ internal sealed class SecurityFixture : IAsyncLifetime
             serverName
         );
 
-    internal async Task<ZooKeeperClient> ConnectAsync(
+    internal Task<ZooKeeperClient> ConnectAsync(
         string? endpoint = null,
         bool digest = true,
         ZooKeeperTlsOptions? tls = null,
         bool rejectionProbe = false
+    ) =>
+        ConnectWithCancellationAsync(
+            endpoint,
+            digest,
+            tls,
+            rejectionProbe,
+            TestContext.Current.CancellationToken
+        );
+
+    internal async Task<ZooKeeperClient> ConnectWithCancellationAsync(
+        string? endpoint,
+        bool digest,
+        ZooKeeperTlsOptions? tls,
+        bool rejectionProbe,
+        CancellationToken cancellationToken
     )
     {
         using var authentication = ZooKeeperAuthentication.Digest(_user, _password);
-        return await ZooKeeperClient
-            .ConnectAsync(
-                new ZooKeeperClientOptions
-                {
-                    ConnectionString = endpoint ?? ConnectionString,
-                    Tls = tls ?? Tls(Mutual ? Certificate : null),
-                    Authentication = digest ? [authentication] : [],
-                    CompatibilityProfile = Profile,
-                    InitialConnectTimeout = rejectionProbe ? RejectionGuard : ConnectGuard,
-                    ConnectAttemptTimeout = rejectionProbe
-                        ? RejectionGuard
-                        : TimeSpan.FromSeconds(2),
-                    OperationTimeout = TimeSpan.FromSeconds(5),
-                    CloseTimeout = TimeSpan.FromSeconds(2),
-                },
-                TestContext.Current.CancellationToken
-            )
-            .ConfigureAwait(false);
+        Report("capture.begin");
+        var pending = ZooKeeperClient.ConnectAsync(
+            new ZooKeeperClientOptions
+            {
+                ConnectionString = endpoint ?? ConnectionString,
+                Tls = tls ?? Tls(Mutual ? Certificate : null),
+                Authentication = digest ? [authentication] : [],
+                CompatibilityProfile = Profile,
+                InitialConnectTimeout = rejectionProbe ? RejectionGuard : ConnectGuard,
+                ConnectAttemptTimeout = rejectionProbe ? RejectionGuard : ConnectAttemptGuard,
+                OperationTimeout = OperationGuard,
+                CloseTimeout = CloseGuard,
+            },
+            cancellationToken
+        );
+        Report("capture.end");
+        try
+        {
+            return await pending.ConfigureAwait(false);
+        }
+        finally
+        {
+            Report("connect.end");
+        }
     }
 
     internal void AssertSafe(Exception error) =>
@@ -157,13 +192,14 @@ internal sealed class SecurityFixture : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
+        Report("fixture.dispose.begin");
         try
         {
             if (_client is not null)
             {
                 try
                 {
-                    using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                    using var cleanup = new CancellationTokenSource(CleanupGuard);
                     if (_created)
                         await DeleteTreeAsync(Root, cleanup.Token).ConfigureAwait(false);
                 }
@@ -181,6 +217,7 @@ internal sealed class SecurityFixture : IAsyncLifetime
             _otherCertificate?.Dispose();
             _expiredCertificate?.Dispose();
             _untrustedCertificate?.Dispose();
+            Report("fixture.dispose.end");
         }
     }
 

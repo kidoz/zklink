@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-if [[ $# -ne 0 ]]; then
-  echo "Usage: $0" >&2
-  exit 2
-fi
 versions=(3.8.7 3.9.6)
 modes=(tls mtls)
+concurrent=false
+if [[ $# -gt 0 ]]; then
+  if [[ "$1" != "--concurrent" || $# -gt 2 ]]; then
+    echo "Usage: $0 [--concurrent [3.8.7|3.9.6]]" >&2
+    exit 2
+  fi
+  concurrent=true
+  modes=(mtls)
+  if [[ $# -eq 2 ]]; then
+    if [[ "$2" != 3.8.7 && "$2" != 3.9.6 ]]; then exit 2; fi
+    versions=("$2")
+  fi
+fi
 for command in docker dotnet openssl python3; do command -v "${command}" >/dev/null; done
 docker compose version >/dev/null
 docker info >/dev/null
@@ -107,7 +116,11 @@ for version in "${versions[@]}"; do
     done
     endpoints="$(compose port zoo1 2281),$(compose port zoo2 2281),$(compose port zoo3 2281)"
     test_filter=(--filter-trait "Fixture=Security")
-    if [[ "${mode}" == tls ]]; then test_filter+=(--filter-not-trait "Transport=MutualOnly"); fi
+    if [[ "${concurrent}" == true ]]; then
+      test_filter=(--filter-trait "Fixture=SecurityConcurrency" --output Detailed --show-stdout All --show-live-output on --timeout 2m)
+    elif [[ "${mode}" == tls ]]; then
+      test_filter+=(--filter-not-trait "Transport=MutualOnly")
+    fi
     if ! ZKLINK_TEST_CONNECTION_STRING="${endpoints}" ZKLINK_TEST_SERVER_VERSION="${version}" \
       ZKLINK_TEST_SECURITY_MODE="${mode}" ZKLINK_TEST_CERTIFICATE_DIRECTORY="${private_root}" \
       ZKLINK_TEST_PLAINTEXT_ENDPOINT="$(compose port zoo1 2181)" \
@@ -123,6 +136,10 @@ for version in "${versions[@]}"; do
     compose logs --no-color >"${artifacts}/${fixture_key}-server.log" 2>&1
     compose down --volumes >"${artifacts}/${fixture_key}-cleanup.log" 2>&1
     project=""
-    echo "ZooKeeper ${fixture_key}: PASS (secure readiness, .NET operations/reconnect/rejections, cleanup)"
+    if [[ "${concurrent}" == true ]]; then
+      echo "ZooKeeper ${fixture_key}: PASS (concurrent rejection rounds, valid controls, cleanup)"
+    else
+      echo "ZooKeeper ${fixture_key}: PASS (secure readiness, .NET operations/reconnect/rejections, cleanup)"
+    fi
   done
 done

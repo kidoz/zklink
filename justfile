@@ -70,3 +70,6 @@ zk-ttl-matrix:
 # Verify client TLS, mTLS, certificate rejection and secure recovery on both pinned versions.
 zk-security-matrix:
     bash dev/test-zookeeper-security.sh
+
+zk-security-concurrency:
+    bash dev/test-zookeeper-security.sh --concurrent
