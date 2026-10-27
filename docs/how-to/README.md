@@ -6,6 +6,8 @@ Complete a specific task in an existing checkout.
   dependencies, public contracts, and protocol bytes after a change.
 - [Run a local ZooKeeper ensemble](run-local-zookeeper.md) — start a pinned
   three-node fixture, collect logs, and remove its disposable data.
+- [Verify follower recovery](verify-follower-recovery.md) — stop one observed
+  follower, check session/watch recovery and request outcomes, and restore it.
 - [Verify secure connections](verify-secure-connections.md) — run isolated TLS
   and mTLS fixtures, certificate rejection and secure recovery checks.
 - [Register ZkLink with dependency injection](use-dependency-injection.md) — let

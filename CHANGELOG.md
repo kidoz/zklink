@@ -45,6 +45,11 @@ remain unavailable. See
 
 ### Added
 
+- Dedicated follower-outage tests, labeled disposable ensembles and
+  `just zk-follower-faults` with a separate CI job on both pinned server versions.
+- Verification of retained sessions/ephemerals, watch restoration before readiness,
+  uncertain sequential creates without replay, and bounded rollback after a stop.
+
 - BCL tracing and metrics for connections, operations, recovery, heartbeat and
   watch pressure, with bounded diagnostic delivery and sensitive-data exclusion.
 - Controlled listener tests and live telemetry verification on both pinned

@@ -129,6 +129,18 @@ watch restoration. Secure rejection cases also observe TLS failure activities.
 See [Tracing and metrics](../reference/telemetry.md) for delivery limits and names.
 These checks do not provide benchmark or sustained-load evidence.
 
+## Real follower outages verify endpoint recovery
+
+`just zk-follower-faults` runs separately from ordinary operation and security
+checks. It stops one observed follower while two voting members remain, then
+checks session/ephemeral preservation, authentication and watch restoration,
+explicit gap/readiness ordering and an uncertain sequential create without replay.
+Forwarding endpoints hold selected replies to make those observations repeatable;
+the server stop causes the transport loss. Both pinned versions have scoped local
+evidence, with server restoration and owned-volume cleanup. A deliberate abort
+also exercised rollback. See [Verify follower recovery](../how-to/verify-follower-recovery.md).
+Leader failure, quorum loss, partitions and sustained faults remain separate work.
+
 ## Release claims need consumer evidence
 
 The build workflow defines checks on Linux, Windows, and macOS. A workflow file
