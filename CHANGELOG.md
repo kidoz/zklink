@@ -20,6 +20,8 @@ remain unavailable. See
   failures consistently during reconnect.
 - Restoration completion, readiness and gap publication share the session lock,
   preserving cleanup when disposal races the final acknowledgment.
+- Close now rejects unsent watch maintenance instead of allowing it onto the wire
+  after `closeSession`.
 
 ### Added
 

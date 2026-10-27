@@ -328,6 +328,37 @@ public sealed class RequestLifecycleTests : IDisposable
 
     [Fact(Timeout = 10000)]
     [Trait("Acceptance", "T14")]
+    public async Task CloseRejectsUnsentMaintenanceAndRemainsLastOnTheWire()
+    {
+        var observer = NSubstitute.Substitute.For<IRequestObserver>();
+        var maintenance = _scheduler.Submit(
+            new WatchRequest(
+                ZooKeeperOperation.RemoveWatches,
+                "/a",
+                ZkLink.Watches.WatchProtocol.Any
+            ),
+            new ZooKeeperRequestInfo(ZooKeeperOperation.RemoveWatches, path: "/a"),
+            TestContext.Current.CancellationToken,
+            observer,
+            watchOperation: true,
+            maintenance: true
+        );
+
+        var close = _scheduler.EnqueueClose();
+
+        Assert.Same(close, Take());
+        Assert.Null(_scheduler.Take(1).Request);
+        var error = await Assert
+            .ThrowsAsync<ZooKeeperException>(() => maintenance)
+            .ConfigureAwait(true);
+        Assert.Equal(RequestOutcome.NotSent, error.Outcome);
+        NSubstitute
+            .SubstituteExtensions.Received(observer, 1)
+            .Abandoned(NSubstitute.Arg.Any<PendingRequest>());
+    }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T14")]
     public async Task PingAcknowledgmentsDoNotExtendTheOldestUnansweredRequestBudget()
     {
         var task = Submit(token: TestContext.Current.CancellationToken);

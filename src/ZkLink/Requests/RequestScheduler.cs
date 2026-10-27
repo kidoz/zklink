@@ -463,6 +463,13 @@ internal sealed class RequestScheduler(
             {
                 Finish(pending, new ZooKeeperException(pending.Info, RequestOutcome.NotSent));
             }
+            if (_maintenance is { Sent: false, Completed: false })
+            {
+                Finish(
+                    _maintenance,
+                    new ZooKeeperException(_maintenance.Info, RequestOutcome.NotSent)
+                );
+            }
             foreach (var pending in _sent)
             {
                 if (
