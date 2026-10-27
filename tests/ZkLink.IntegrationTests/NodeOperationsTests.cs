@@ -341,6 +341,8 @@ public sealed class NodeOperationsTests : IAsyncLifetime
             )
             .ConfigureAwait(true);
         Assert.Equal("/child", created.Path);
+        // The unscoped reader may use a different replica from the scoped writer.
+        await Client.SyncAsync(Root, TestContext.Current.CancellationToken).ConfigureAwait(true);
         Assert.NotNull(
             await Client
                 .ExistsAsync(Root + "/child", TestContext.Current.CancellationToken)
@@ -391,6 +393,7 @@ public sealed class NodeOperationsTests : IAsyncLifetime
         await scoped
             .DeleteAsync("/child", ZNodeVersion.Any, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
+        await Client.SyncAsync(Root, TestContext.Current.CancellationToken).ConfigureAwait(true);
         Assert.Null(
             await Client
                 .ExistsAsync(Root + "/child", TestContext.Current.CancellationToken)
