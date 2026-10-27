@@ -6,8 +6,8 @@ Complete a specific task in an existing checkout.
   dependencies, public contracts, and protocol bytes after a change.
 - [Run a local ZooKeeper ensemble](run-local-zookeeper.md) — start a pinned
   three-node fixture, collect logs, and remove its disposable data.
-- [Verify incoming-traffic recovery](verify-partition-recovery.md) — block incoming
-  client traffic while forwarding heartbeats and check recovery or terminal loss.
+- [Verify one-way traffic recovery](verify-partition-recovery.md) — discard incoming
+  or outgoing client traffic and check recovery, terminal loss and no replay.
 - [Verify quorum recovery](verify-quorum-recovery.md) — stop two voters and check
   valid-session recovery or terminal local loss, with verified cleanup.
 - [Verify leader recovery](verify-leader-recovery.md) — stop the observed leader,

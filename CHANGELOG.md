@@ -45,6 +45,10 @@ remain unavailable. See
 
 ### Added
 
+- Outgoing request/heartbeat loss cases extend `just zk-partition-faults` to both
+  directions independently, checking incoming watch delivery, accurate unknown
+  outcomes and no forwarding or replay of discarded writes after healing.
+
 - `just zk-partition-faults` checks one-way incoming traffic loss, forwarded
   heartbeats, session/watch recovery or terminal local loss and healed-proxy
   cleanup on both pinned server versions.

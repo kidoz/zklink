@@ -43,7 +43,7 @@ Install [just](https://just.systems/) and .NET SDK **10.0.403**. Docker with Com
 | `just zk-down [version]` | Remove the selected ensemble and its data volumes |
 | `just zk-matrix` | Smoke-test both pinned server versions and clean up |
 | `just zk-driver-matrix` | Also connect/authenticate/sync/close using ZkLink on every node |
-| `just zk-partition-faults` | Discard incoming client traffic and verify heartbeat deadlines, valid-session recovery or local loss on both versions |
+| `just zk-partition-faults` | Discard each direction of client traffic independently and verify recovery or local loss on both versions |
 | `just zk-quorum-faults` | Stop two voters and verify valid-session recovery or local loss, no replay and cleanup on both versions |
 | `just zk-leader-faults` | Stop the observed leader and verify replacement election, session/watch recovery and rollback on both versions |
 | `just zk-follower-faults` | Stop one observed follower and verify session/watch recovery, request outcomes and rollback on both versions |
@@ -131,8 +131,9 @@ preservation, watch readiness and no replay of an uncertain create.
 a replacement election and the old leader returning as a follower.
 [Quorum-outage checks](docs/how-to/verify-quorum-recovery.md) cover brief recovery
 and terminal local loss after a longer interruption.
-[Incoming-traffic checks](docs/how-to/verify-partition-recovery.md) verify that
-outgoing heartbeats cannot hide incoming silence, with recovery or terminal local loss.
+[One-way traffic checks](docs/how-to/verify-partition-recovery.md) cover both
+directions independently, with accurate request outcomes, no delayed forwarding
+or replay, and recovery or terminal local loss.
 
 ## Not yet available
 

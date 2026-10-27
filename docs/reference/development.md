@@ -35,7 +35,7 @@ notation; omit the brackets when invoking a command.
 | `just zk-status [version]` | Show health and host ports |
 | `just zk-logs [version]` | Print server logs |
 | `just zk-down [version]` | Remove the selected ensemble and its volumes |
-| `just zk-partition-faults` | Verify incoming traffic loss, heartbeat deadlines, recovery or terminal local loss on both versions; requires Docker, pinned .NET and Python 3 |
+| `just zk-partition-faults` | Verify each client traffic-loss direction independently, recovery or terminal local loss on both versions; requires Docker, pinned .NET and Python 3 |
 | `just zk-quorum-faults` | Verify brief quorum recovery and longer-outage local loss on both versions; requires Docker, pinned .NET and Python 3 |
 | `just zk-leader-faults` | Verify leader stop, replacement election, session/watch recovery and rollback on both versions; requires Docker, pinned .NET and Python 3 |
 | `just zk-follower-faults` | Verify a real follower outage, same-session/watch recovery and rollback on both versions; requires Docker, pinned .NET and Python 3 |
@@ -58,7 +58,7 @@ Definitions are in the [justfile](../../justfile).
 | [ZkLink.Extensions.DependencyInjection.Tests](../../tests/ZkLink.Extensions.DependencyInjection.Tests/ZkLink.Extensions.DependencyInjection.Tests.csproj) | DI registration, real-host startup/shutdown and connection ownership | Pinned .NET SDK |
 | [ZkLink.Protocol.Tests](../../tests/ZkLink.Protocol.Tests/ZkLink.Protocol.Tests.csproj) | Protocol/path fixtures, malformed input, virtual-time sessions/requests and loopback TLS/mTLS | Pinned .NET SDK |
 | [ZkLink.IntegrationTests](../../tests/ZkLink.IntegrationTests/ZkLink.IntegrationTests.csproj) | Live node/ACL/transaction/auxiliary/watch operations, restoration, rollback, reply-loss, chroot and ephemeral lifecycle | Explicit pinned ensemble configuration; use `just zk-operations-matrix` |
-| [ZkLink.FaultTests](../../tests/ZkLink.FaultTests/ZkLink.FaultTests.csproj) | Real follower/leader/quorum stops and incoming client traffic loss, session/watch recovery or local loss, no replay and cleanup | Owned labeled fixtures; use `just zk-follower-faults` or `just zk-leader-faults`; quorum cases use `just zk-quorum-faults`; incoming traffic loss uses `just zk-partition-faults` |
+| [ZkLink.FaultTests](../../tests/ZkLink.FaultTests/ZkLink.FaultTests.csproj) | Real follower/leader/quorum stops and one-way client traffic loss, session/watch recovery or local loss, no replay and cleanup | Owned labeled fixtures; use `just zk-follower-faults` or `just zk-leader-faults`; quorum cases use `just zk-quorum-faults`; one-way traffic loss uses `just zk-partition-faults` |
 | [ZkLink.JavaOracle](../../tests/ZkLink.JavaOracle/README.md) | Optional Apache Java fixture generation and decoding of C# bytes | Gradle wrapper, JDK 25, Python 3, pinned .NET SDK, network access |
 
 The public-contract and protocol suites need neither a ZooKeeper installation

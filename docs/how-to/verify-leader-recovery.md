@@ -65,8 +65,8 @@ checks rollback separately from successful recovery.
 
 Local checks cover both pinned versions with a macOS arm64 client.
 [Quorum loss](verify-quorum-recovery.md) and
-[incoming client-traffic loss](verify-partition-recovery.md) have separate commands.
-Remote CI, other partition directions, forced expiry, observer endpoints, secure outages and sustained-load
+[one-way client-traffic loss](verify-partition-recovery.md) have separate commands.
+Remote CI, kernel/IP and inter-server faults, forced expiry, observer endpoints, secure outages and sustained-load
 behavior require separate evidence. The fixture uses plaintext
 with the explicit development digest override. A valid session is preserved in
 this bounded test; it does not promise indefinite preservation during an outage.
