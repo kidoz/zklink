@@ -59,9 +59,9 @@ public sealed class ZooKeeperWatch : IAsyncDisposable
         {
             while (await Queue.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (_owner.TryRead(this, out var value))
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
                     yield return value!;
                 }
             }
