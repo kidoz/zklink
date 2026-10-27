@@ -304,9 +304,19 @@ internal sealed class WatchManager(
             throw new ArgumentOutOfRangeException(nameof(mode));
         lock (_gate)
         {
+            var key = For(watch);
+            if (
+                mode == WatchRemovalMode.ServerConfirmed
+                && _buckets.TryGetValue(key, out var removing)
+                && removing.Removing
+            )
+            {
+                throw new ZooKeeperBackpressureException(
+                    new ZooKeeperRequestInfo(ZooKeeperOperation.RemoveWatches, path: watch.Path)
+                );
+            }
             bool active = watch.Active;
             Suppress(watch);
-            var key = For(watch);
             bool shared = _buckets.TryGetValue(key, out var bucket) && Shared(bucket);
             if (mode == WatchRemovalMode.ServerConfirmed && !shared)
             {
@@ -323,10 +333,6 @@ internal sealed class WatchManager(
                     if (key.Category == WatchProtocol.PersistentRecursive)
                         _recursive.Add(key.Path, bucket);
                 }
-                if (bucket.Removing)
-                    throw new ZooKeeperBackpressureException(
-                        new ZooKeeperRequestInfo(ZooKeeperOperation.RemoveWatches, path: watch.Path)
-                    );
                 bucket.Removing = true;
                 // This ordered request covers older cleanup intents. A newer intent
                 // can set Dirty again while its response is outstanding.
@@ -553,6 +559,10 @@ internal sealed class WatchManager(
                 _cleanup.Remove(key);
                 continue;
             }
+            // Submit may synchronously notify the observer. Clear the older intent
+            // first so a cancellation can install a fresh retry without being erased.
+            bucket.Dirty = false;
+            _cleanup.Remove(key);
             if (
                 !session.TryWatchCleanup(
                     new WatchRequest(
@@ -564,11 +574,13 @@ internal sealed class WatchManager(
                     out var task
                 )
             )
+            {
+                bucket.Dirty = true;
+                _cleanup.Add(key);
                 return;
-            bucket.Dirty = false;
-            _cleanup.Remove(key);
-            bucket.Removing = true;
-            _ = ObserveCleanupAsync(task!);
+            }
+            bucket.Removing = !task!.IsCompleted;
+            _ = ObserveCleanupAsync(task);
             return;
         }
     }
@@ -580,6 +592,7 @@ internal sealed class WatchManager(
             await task.ConfigureAwait(false);
         }
         catch (ZooKeeperException) { }
+        catch (OperationCanceledException) { }
     }
 
     internal IReadOnlyList<RestoreRequest> Restoration(long zxid)
