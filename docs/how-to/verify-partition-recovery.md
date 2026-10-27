@@ -105,8 +105,9 @@ managed diagnostic output.
 Local checks cover both directions and outcomes on both pinned versions with a macOS arm64
 client. CI selects partition cases independently from server-outage cases;
 remote execution remains unobserved. The fixture uses plaintext with the explicit
-development digest override. Kernel/IP faults, inter-server
-partitions, secure connections under this fault and sustained load require
-separate evidence.
+development digest override.
+[Follower peer isolation](verify-peer-partition-recovery.md) has its own check.
+Broader network faults, secure connections under this fault and sustained load
+require separate evidence.
 
 [How-to guides](README.md) · [Documentation home](../README.md)

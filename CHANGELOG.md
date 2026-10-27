@@ -45,6 +45,10 @@ remain unavailable. See
 
 ### Added
 
+- `just zk-peer-partition-faults` isolates an observed follower's peer interface
+  on both pinned versions, preserving process/client identities and verifying
+  majority progress, minority write failure, same-session/watch recovery,
+  no replay and replica consistency after healing, with a separate CI selection.
 - Outgoing request/heartbeat loss cases extend `just zk-partition-faults` to both
   directions independently, checking incoming watch delivery, accurate unknown
   outcomes and no forwarding or replay of discarded writes after healing.

@@ -90,9 +90,10 @@ from managed test output. CI includes a separate quorum job; remote execution
 requires its own observed evidence.
 
 The fixture uses plaintext with the development digest override.
-[One-way client-traffic loss](verify-partition-recovery.md) has a separate check.
-Kernel/IP and inter-server faults, changing peer addresses, simultaneous multi-member startup, observer
-endpoints, secure outages and sustained faults remain separate checks. See the
+[One-way client-traffic loss](verify-partition-recovery.md) and
+[follower peer isolation](verify-peer-partition-recovery.md) have separate checks.
+Other network faults, changing peer addresses, simultaneous multi-member
+startup, observer endpoints, secure outages and sustained faults remain separate checks. See the
 [Apache quorum description](https://zookeeper.apache.org/doc/r3.9.6/zookeeperInternals.html#sc_quorums)
 and [session documentation](https://zookeeper.apache.org/doc/r3.9.6/zookeeperProgrammers.html#ch_zkSessions).
 

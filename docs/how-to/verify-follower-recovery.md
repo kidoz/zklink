@@ -78,8 +78,9 @@ leader fault jobs; remote execution remains unobserved.
 This check uses plaintext client connections with the explicit development
 digest override. Leader recovery is checked separately by `just zk-leader-faults`.
 [Quorum loss](verify-quorum-recovery.md) also has a separate command.
-[One-way client-traffic loss](verify-partition-recovery.md) has its own check;
-kernel/IP and inter-server faults, forced expiry, observer endpoints, secure server outages and sustained load
-require separate evidence.
+[One-way client-traffic loss](verify-partition-recovery.md) and
+[follower peer isolation](verify-peer-partition-recovery.md) have separate checks.
+Broader network faults, forced expiry, observer endpoints, secure server outages
+and sustained load require separate evidence.
 
 [How-to guides](README.md) · [Documentation home](../README.md)

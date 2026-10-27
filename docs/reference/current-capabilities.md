@@ -34,8 +34,12 @@ in local `Lost`, without automatic replacement or uncertain-create replay.
 [One-way client-traffic checks](../how-to/verify-partition-recovery.md) cover both
 directions independently, with valid-session recovery or terminal local loss.
 Outgoing cases verify incoming watch delivery and server absence of discarded
-writes without delayed forwarding or replay. Kernel/IP and inter-server partitions
-and broader fault qualification remain unverified.
+writes without delayed forwarding or replay.
+[Peer partition checks](../how-to/verify-peer-partition-recovery.md) detach only an
+observed follower's peer interface on both patches, preserving its process and
+client network. They verify majority writes, minority write failure, retained
+session/watch recovery, no replay and replica consistency after healing.
+Leader/majority isolation and broader network fault qualification remain unverified.
 
 ## Frameworks and platforms
 
