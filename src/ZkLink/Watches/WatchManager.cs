@@ -10,7 +10,7 @@ internal sealed class WatchManager(
     object gate,
     ClientOptionsSnapshot options,
     EventBudget budget,
-    SessionManager session
+    IWatchSession session
 )
 {
     private readonly record struct Key(string Path, int Category);

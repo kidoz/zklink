@@ -1,3 +1,4 @@
+using ZkLink.Diagnostics;
 using ZkLink.Protocol;
 using ZkLink.Requests;
 using ZkLink.Watches;
@@ -149,4 +150,21 @@ internal sealed partial class SessionManager
         Scheduler.Detach();
         _watches.Detached();
     }
+
+    TelemetryState IWatchSession.Telemetry => Telemetry;
+    ZooKeeperSessionSnapshot IWatchSession.Session => Session;
+
+    void IWatchSession.WakeWriter() => WakeWriter();
+
+    Task<WireReply> IWatchSession.SubmitWatchRemoval(
+        WatchRequest request,
+        IRequestObserver observer,
+        CancellationToken token
+    ) => SubmitWatchRemoval(request, observer, token);
+
+    bool IWatchSession.TryWatchCleanup(
+        WatchRequest request,
+        IRequestObserver observer,
+        out Task<WireReply>? task
+    ) => TryWatchCleanup(request, observer, out task);
 }

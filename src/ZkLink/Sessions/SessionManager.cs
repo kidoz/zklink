@@ -9,7 +9,7 @@ using ZkLink.Watches;
 
 namespace ZkLink.Sessions;
 
-internal sealed partial class SessionManager : IAsyncDisposable
+internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
 {
     internal TelemetryState Telemetry { get; } = new();
     private readonly object _gate = new();

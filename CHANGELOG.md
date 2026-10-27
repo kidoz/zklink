@@ -38,6 +38,8 @@ remain unavailable. See
   watch, and shared event-budget bookkeeping.
 - Extracted per-attempt handshake, authentication, and watch-restoration
   sequencing from the session orchestrator without changing session ownership.
+- Narrowed the watch manager's session dependency to an explicit internal
+  handoff with direct substitute-based coverage.
 
 ### Added
 
