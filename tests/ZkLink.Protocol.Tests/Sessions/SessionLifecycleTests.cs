@@ -204,6 +204,43 @@ public sealed class SessionLifecycleTests : IAsyncLifetime
     }
 
     [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T10")]
+    [Trait("Acceptance", "T31")]
+    public async Task TerminalSessionFailureCompletesStateStreamAfterBufferedSnapshots()
+    {
+        var peer = Peer();
+        var client = await SessionTestSupport
+            .Bounded(
+                _fixture.ConnectAsync(
+                    peer,
+                    cancellationToken: TestContext.Current.CancellationToken
+                )
+            )
+            .ConfigureAwait(true);
+        await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
+        var subscription = client.SubscribeStateChanges();
+        var reader = subscription
+            .ReadStatesAsync(TestContext.Current.CancellationToken)
+            .GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        await using var lifetime = reader.ConfigureAwait(true);
+        Assert.True(await reader.MoveNextAsync().ConfigureAwait(true));
+        Assert.Equal(ZooKeeperSessionState.Connected, reader.Current.State);
+        var bytes = new byte[64];
+        var writer = new JuteWriter(bytes, ProtocolFixtures.Limits);
+        writer.WriteReplyHeader(new ReplyHeader(-1, -1, 0));
+        writer.WriteInt32(-1);
+        writer.WriteInt32(-112);
+        writer.WriteString(null);
+        peer.Inject(bytes[..writer.WrittenCount]);
+        Assert.True(await reader.MoveNextAsync().ConfigureAwait(true));
+        Assert.Equal(ZooKeeperSessionState.Expired, reader.Current.State);
+        var error = await Assert
+            .ThrowsAsync<ZooKeeperSessionException>(() => reader.MoveNextAsync().AsTask())
+            .ConfigureAwait(true);
+        Assert.Equal(ZooKeeperSessionState.Expired, error.State);
+    }
+
+    [Fact(Timeout = 10000)]
     [Trait("Acceptance", "T14")]
     public async Task UnacknowledgedCloseTimesOutAfterCleanupAndPreservesItsFirstResult()
     {

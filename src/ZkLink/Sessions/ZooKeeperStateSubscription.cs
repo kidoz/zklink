@@ -24,7 +24,7 @@ public sealed class ZooKeeperStateSubscription : IAsyncDisposable
 
     internal Channel<ZooKeeperSessionSnapshot> Queue { get; }
 
-    /// <summary>Reads the initial snapshot and transitions; cancellation/disposal ends this subscription only.</summary>
+    /// <summary>Reads the initial snapshot and transitions. Buffered snapshots precede any terminal session failure; cancellation/disposal ends this subscription only.</summary>
     public async IAsyncEnumerable<ZooKeeperSessionSnapshot> ReadStatesAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default
     )

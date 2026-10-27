@@ -40,6 +40,8 @@ remain unavailable. See
   sequencing from the session orchestrator without changing session ownership.
 - Narrowed the watch manager's session dependency to an explicit internal
   handoff with direct substitute-based coverage.
+- Clarified and directly tested terminal state-stream completion after buffered
+  snapshots, matching existing watch-stream behavior.
 
 ### Added
 

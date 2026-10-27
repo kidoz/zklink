@@ -124,8 +124,10 @@ Restoration failures follow the same session lifecycle. Retryable reset errors
 and attempt timeouts keep admission closed while retrying the existing session.
 After an established client receives confirmed expiry or authentication failure,
 readiness waits and watch streams fail with `ZooKeeperSessionException` and the
-terminal state. Initial connection failures retain `ZooKeeperConnectionException`.
-A failed restoration attempt emits no persistent reconnect-gap event.
+terminal state. State and watch enumerators deliver already-buffered items before
+raising that failure; acknowledged close completes them normally. Initial connection
+failures retain `ZooKeeperConnectionException`. A failed restoration attempt emits
+no persistent reconnect-gap event.
 
 ## Closing
 

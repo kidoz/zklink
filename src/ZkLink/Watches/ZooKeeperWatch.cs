@@ -48,7 +48,7 @@ public sealed class ZooKeeperWatch : IAsyncDisposable
     /// <summary>Gets the logical registration mode.</summary>
     public ZooKeeperWatchMode Mode { get; }
 
-    /// <summary>Reads ordered invalidations; one-shot streams end after one event. Ending enumeration removes the handle locally.</summary>
+    /// <summary>Reads ordered invalidations; one-shot streams end after one event. Buffered events precede any terminal session failure. Ending enumeration removes the handle locally.</summary>
     public async IAsyncEnumerable<ZooKeeperWatchEvent> ReadEventsAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default
     )
