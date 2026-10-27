@@ -169,35 +169,36 @@ internal sealed class ConnectionRuntime(
 
     private async Task<RuntimeFailure> WriteAsync(CancellationToken cancellationToken)
     {
+        Func<PendingRequest?, Task> write = pending =>
+            transport.Writer.WriteAsync(
+                pending is null ? PingPacket : pending.Packet!,
+                cancellationToken
+            );
         try
         {
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 owner.PrepareWatchCleanup(Generation);
-                (var pending, var ping) = scheduler.Take(Generation);
-                if (pending is null && !ping)
+                (var pending, var writing) = scheduler.WriteNext(
+                    Generation,
+                    write,
+                    cancellationToken
+                );
+                if (writing is null)
                 {
                     await work.WaitAsync(cancellationToken).ConfigureAwait(false);
                     continue;
                 }
-                if (ping)
+                try
                 {
-                    await transport
-                        .Writer.WriteAsync(PingPacket, cancellationToken)
-                        .ConfigureAwait(false);
+                    await writing.ConfigureAwait(false);
                 }
-                else
+                finally
                 {
-                    try
+                    if (pending is not null)
                     {
-                        await transport
-                            .Writer.WriteAsync(pending!.Packet!, cancellationToken)
-                            .ConfigureAwait(false);
-                    }
-                    finally
-                    {
-                        scheduler.WriteFinished(pending!);
+                        scheduler.WriteFinished(pending);
                     }
                 }
                 Interlocked.Exchange(ref _lastWrite, time.GetTimestamp());

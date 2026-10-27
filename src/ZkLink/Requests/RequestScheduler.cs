@@ -551,6 +551,44 @@ internal sealed class RequestScheduler(
         }
     }
 
+    // Dequeue and initiate the transport write under one gate. Cancellation cannot
+    // observe Sent while the writer is still waiting to hand the frame off.
+    internal (PendingRequest? Request, Task? Write) WriteNext(
+        long value,
+        Func<PendingRequest?, Task> write,
+        CancellationToken cancellationToken
+    )
+    {
+        lock (gate)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var (pending, ping) = Take(value);
+            return pending is null && !ping ? (null, null) : (pending, write(pending));
+        }
+    }
+
+    internal (ZooKeeperRequestInfo Info, RequestOutcome Outcome) FreezeClose(
+        PendingRequest? pending
+    )
+    {
+        lock (gate)
+        {
+            if (pending is null)
+            {
+                return (
+                    new ZooKeeperRequestInfo(ZooKeeperOperation.CloseSession),
+                    RequestOutcome.NotSent
+                );
+            }
+            var result = (pending.Info, pending.Outcome);
+            if (!pending.Sent && !pending.Completed)
+            {
+                Finish(pending, new ZooKeeperCloseException(result.Info, result.Outcome));
+            }
+            return result;
+        }
+    }
+
     internal void WriteFinished(PendingRequest pending)
     {
         lock (gate)
@@ -630,6 +668,7 @@ internal sealed class RequestScheduler(
                         or -110
                         or -111
                         or -112
+                        or -113
                         or -114
                         or -115
                         or -119

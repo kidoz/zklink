@@ -705,9 +705,10 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            var frozen = Scheduler.FreezeClose(pending);
             failure = new ZooKeeperOperationCanceledException(
-                pending?.Info ?? new ZooKeeperRequestInfo(ZooKeeperOperation.CloseSession),
-                pending?.Outcome ?? RequestOutcome.NotSent,
+                frozen.Info,
+                frozen.Outcome,
                 cancellationToken
             );
         }
@@ -715,16 +716,12 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
         {
             if (!_serverExpired)
             {
-                failure = error is ZooKeeperException requestFailure
-                    ? new ZooKeeperCloseException(
-                        requestFailure.Request,
-                        requestFailure.Outcome,
-                        requestFailure.ErrorCode
-                    )
-                    : new ZooKeeperCloseException(
-                        pending?.Info ?? new ZooKeeperRequestInfo(ZooKeeperOperation.CloseSession),
-                        pending?.Outcome ?? RequestOutcome.NotSent
-                    );
+                var frozen = Scheduler.FreezeClose(pending);
+                failure = new ZooKeeperCloseException(
+                    frozen.Info,
+                    frozen.Outcome,
+                    error is ZooKeeperException requestFailure ? requestFailure.ErrorCode : null
+                );
             }
         }
         finally

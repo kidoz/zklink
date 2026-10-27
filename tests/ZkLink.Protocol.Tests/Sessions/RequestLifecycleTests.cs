@@ -292,9 +292,13 @@ public sealed class RequestLifecycleTests : IDisposable
     [Theory(Timeout = 10000)]
     [InlineData(-102, RequestOutcome.Rejected)]
     [InlineData(-103, RequestOutcome.Rejected)]
+    [InlineData(-113, RequestOutcome.Rejected)]
     [InlineData(-127, RequestOutcome.Rejected)]
     [InlineData(-999, RequestOutcome.Unknown)]
     [InlineData(-4, RequestOutcome.Unknown)]
+    [InlineData(-7, RequestOutcome.Unknown)]
+    [InlineData(-12, RequestOutcome.Unknown)]
+    [InlineData(-122, RequestOutcome.Unknown)]
     [InlineData(-118, RequestOutcome.Unknown)]
     public async Task RejectionsAreDistinguishedFromUnknownErrors(int code, RequestOutcome outcome)
     {
@@ -304,6 +308,105 @@ public sealed class RequestLifecycleTests : IDisposable
         var error = await Assert.ThrowsAsync<ZooKeeperException>(() => task).ConfigureAwait(true);
         Assert.Equal(code, error.ErrorCode);
         Assert.Equal(outcome, error.Outcome);
+    }
+
+    [Theory(Timeout = 10000)]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Acceptance", "T14")]
+    public async Task FrozenCloseCannotBeWrittenIfItWasNotHandedOff(bool handoff)
+    {
+        var close = _scheduler.EnqueueClose();
+        var writes = 0;
+        if (handoff)
+        {
+            var (request, write) = _scheduler.WriteNext(
+                1,
+                pending =>
+                {
+                    Assert.Same(close, pending);
+                    writes++;
+                    return Task.CompletedTask;
+                },
+                TestContext.Current.CancellationToken
+            );
+            Assert.Same(close, request);
+            await write!.ConfigureAwait(true);
+            _scheduler.WriteFinished(close);
+        }
+
+        var frozen = _scheduler.FreezeClose(close);
+        Assert.Equal(handoff ? RequestOutcome.Unknown : RequestOutcome.NotSent, frozen.Outcome);
+        Assert.Equal(handoff, frozen.Info.RequestId.HasValue);
+        var next = _scheduler.WriteNext(
+            1,
+            _ =>
+            {
+                writes++;
+                return Task.CompletedTask;
+            },
+            TestContext.Current.CancellationToken
+        );
+        Assert.Null(next.Write);
+        Assert.Equal(handoff ? 1 : 0, writes);
+        if (handoff)
+        {
+            Reply(close);
+            await close.Task.ConfigureAwait(true);
+        }
+        else
+        {
+            var error = await Assert.ThrowsAsync<ZooKeeperCloseException>(() => close.Task);
+            Assert.Equal(RequestOutcome.NotSent, error.Outcome);
+        }
+    }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T11")]
+    public async Task CancelledWriterDoesNotDequeueOrAssignAnXid()
+    {
+        var task = Submit(token: TestContext.Current.CancellationToken);
+        using var stop = new CancellationTokenSource();
+        await stop.CancelAsync();
+        Assert.Throws<OperationCanceledException>(() =>
+            _scheduler.WriteNext(
+                1,
+                _ => throw new InvalidOperationException("Unexpected transport handoff"),
+                stop.Token
+            )
+        );
+        _time.Advance(TimeSpan.FromMilliseconds(100));
+        var error = await Assert.ThrowsAsync<ZooKeeperTimeoutException>(() => task);
+        Assert.Equal(RequestOutcome.NotSent, error.Outcome);
+        Assert.Null(error.Request.RequestId);
+        Assert.Equal(0, _scheduler.PendingCount);
+        Assert.Equal(0, _scheduler.OwnedBytes);
+    }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T12")]
+    public async Task CancellationDuringTransportHandoffRetainsTheXidAndTombstone()
+    {
+        using var stop = new CancellationTokenSource();
+        var task = Submit(token: stop.Token);
+        var (pending, writing) = _scheduler.WriteNext(
+            1,
+            request =>
+            {
+                Assert.NotNull(request);
+                return stop.CancelAsync();
+            },
+            TestContext.Current.CancellationToken
+        );
+        await writing!.ConfigureAwait(true);
+        var error = await Assert.ThrowsAsync<ZooKeeperOperationCanceledException>(() => task);
+        Assert.Equal(RequestOutcome.Unknown, error.Outcome);
+        Assert.Equal(pending!.Info.RequestId, error.Request.RequestId);
+        Assert.NotNull(error.Request.RequestId);
+        Assert.Equal(1, _scheduler.PendingCount);
+        _scheduler.WriteFinished(pending);
+        Reply(pending);
+        Assert.Equal(0, _scheduler.OwnedBytes);
     }
 
     [Fact(Timeout = 10000)]
