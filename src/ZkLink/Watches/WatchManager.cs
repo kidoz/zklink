@@ -91,6 +91,7 @@ internal sealed class WatchManager(
 
     private void ValidateCompatible(Key key, ZooKeeperRequestInfo info)
     {
+        SessionGate.RequireHeld(_gate);
         if (options.Settings.CompatibilityProfile == ZooKeeperCompatibilityProfile.ZooKeeper39)
             return;
         foreach (
@@ -156,6 +157,7 @@ internal sealed class WatchManager(
 
     private void Replied(ZooKeeperWatch watch, PendingRequest pending, WireReply reply)
     {
+        SessionGate.RequireHeld(_gate);
         watch.Pending = false;
         bool installed =
             reply.Header.Error == WatchProtocol.Success
@@ -181,6 +183,7 @@ internal sealed class WatchManager(
 
     private void SetActive(ZooKeeperWatch watch, bool active)
     {
+        SessionGate.RequireHeld(_gate);
         if (watch.Active == active)
             return;
         watch.Active = active;
@@ -189,6 +192,7 @@ internal sealed class WatchManager(
 
     private void Suppress(ZooKeeperWatch watch)
     {
+        SessionGate.RequireHeld(_gate);
         watch.Suppressed = true;
         SetActive(watch, false);
         while (watch.Queue.Reader.TryRead(out _))
@@ -198,6 +202,7 @@ internal sealed class WatchManager(
 
     private void Cleanup(Key key, bool restored = false)
     {
+        SessionGate.RequireHeld(_gate);
         if (_buckets.TryGetValue(key, out var bucket) && !Shared(bucket))
         {
             if (
@@ -217,6 +222,7 @@ internal sealed class WatchManager(
 
     private void Release(ZooKeeperWatch watch)
     {
+        SessionGate.RequireHeld(_gate);
         if (!_handles.Remove(watch))
             return;
         var key = For(watch);
@@ -234,6 +240,7 @@ internal sealed class WatchManager(
 
     private void Prune(Key key, Bucket bucket)
     {
+        SessionGate.RequireHeld(_gate);
         if (bucket.Handles.Count == 0 && !bucket.Dirty && !bucket.Removing && !bucket.Restoring)
         {
             _buckets.Remove(key);
@@ -244,6 +251,7 @@ internal sealed class WatchManager(
 
     private void RetryCleanup(Key key)
     {
+        SessionGate.RequireHeld(_gate);
         if (_buckets.TryGetValue(key, out var bucket))
         {
             bucket.Removing = false;
@@ -262,6 +270,7 @@ internal sealed class WatchManager(
 
     private void RejectCleanup(Key key)
     {
+        SessionGate.RequireHeld(_gate);
         if (_buckets.TryGetValue(key, out var bucket))
         {
             bucket.Removing = false;
@@ -402,6 +411,7 @@ internal sealed class WatchManager(
 
     internal bool Dispatch(WireNotification notification)
     {
+        SessionGate.RequireHeld(_gate);
         if (notification.Type == WatchProtocol.SessionEvent)
             return true;
         string path = options.Paths.ToClient(notification.Path!);
@@ -491,6 +501,7 @@ internal sealed class WatchManager(
         long? zxid
     )
     {
+        SessionGate.RequireHeld(_gate);
         if (
             !watch.Queue.Writer.TryWrite(
                 new ZooKeeperWatchEvent(
@@ -508,6 +519,7 @@ internal sealed class WatchManager(
     // Called after all reset acknowledgments, under the session gate before scheduler attachment.
     internal bool Reconnected()
     {
+        SessionGate.RequireHeld(_gate);
         var targets = _handles
             .Where(static watch => watch.Persistent && watch.Active && !watch.Suppressed)
             .ToArray();
@@ -521,6 +533,7 @@ internal sealed class WatchManager(
     // Called by the sole writer under the session gate before taking ordinary work.
     internal void PrepareCleanup()
     {
+        SessionGate.RequireHeld(_gate);
         foreach (var key in _cleanup.ToArray())
         {
             var bucket = _buckets[key];
@@ -667,6 +680,7 @@ internal sealed class WatchManager(
 
     internal void Detached()
     {
+        SessionGate.RequireHeld(_gate);
         _cleanup.Clear();
         foreach (var pair in _buckets.ToArray())
         {
@@ -679,6 +693,7 @@ internal sealed class WatchManager(
 
     internal void Finish(Exception? error)
     {
+        SessionGate.RequireHeld(_gate);
         _finished = true;
         foreach (var watch in _handles)
         {
@@ -744,6 +759,7 @@ internal sealed class WatchManager(
 
         private void Done()
         {
+            SessionGate.RequireHeld(manager._gate);
             if (manager._buckets.TryGetValue(key, out var bucket))
             {
                 bucket.Removing = false;

@@ -56,7 +56,7 @@ internal sealed partial class SessionManager : IAsyncDisposable
         this._connector = connector;
         this._random = random;
         _endpoints = new EndpointProvider(_options.Endpoints, _random);
-        var events = new EventBudget(_options.Settings.MaxBufferedEvents, Telemetry);
+        var events = new EventBudget(_gate, _options.Settings.MaxBufferedEvents, Telemetry);
         _watches = new WatchManager(_gate, _options, events, this);
         _states = new StateHub(_gate, events, BuildSnapshot(ZooKeeperSessionState.Connecting));
         Scheduler = new RequestScheduler(_gate, _options, _time, _work, Telemetry);

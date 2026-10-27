@@ -30,6 +30,8 @@ remain unavailable. See
 - Updated the pinned .NET SDK to 10.0.403, retaining exact-version selection.
 - Removed telemetry gauge observation from scheduler paths that cannot change
   request, byte, or tombstone pressure.
+- Added debug-only assertions for caller-held session-gate contracts in request,
+  watch, and shared event-budget bookkeeping.
 
 ### Added
 

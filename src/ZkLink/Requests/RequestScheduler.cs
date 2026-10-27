@@ -730,6 +730,7 @@ internal sealed class RequestScheduler(
 
     private void Finish(PendingRequest pending, Exception error)
     {
+        SessionGate.RequireHeld(gate);
         pending.Observer?.Abandoned(pending);
         pending.Observer = null;
         RemoveQueued(pending);
@@ -742,6 +743,7 @@ internal sealed class RequestScheduler(
 
     private void RemoveQueued(PendingRequest pending)
     {
+        SessionGate.RequireHeld(gate);
         if (!pending.Sent && ReferenceEquals(_maintenance, pending))
             _maintenance = null;
         if (pending.Node is { List: not null })
@@ -753,6 +755,7 @@ internal sealed class RequestScheduler(
 
     private void Release(PendingRequest pending)
     {
+        SessionGate.RequireHeld(gate);
         if (!pending.Completed || pending.Preparing || pending.Writing || pending.Released)
         {
             return;
@@ -767,21 +770,27 @@ internal sealed class RequestScheduler(
         _bytes -= pending.ReservedBytes;
     }
 
+    private void ObservePressure()
+    {
+        SessionGate.RequireHeld(gate);
+        _telemetry?.Requests(
+            _queued.Count
+                + _sent.Count
+                + (_maintenance is { Sent: false } ? 1 : 0)
+                + (_close is { Sent: false, Completed: false } ? 1 : 0),
+            _bytes,
+            _tombstones
+        );
+    }
+
     private readonly struct PressureObservation(RequestScheduler owner) : IDisposable
     {
-        public void Dispose() =>
-            owner._telemetry?.Requests(
-                owner._queued.Count
-                    + owner._sent.Count
-                    + (owner._maintenance is { Sent: false } ? 1 : 0)
-                    + (owner._close is { Sent: false, Completed: false } ? 1 : 0),
-                owner._bytes,
-                owner._tombstones
-            );
+        public void Dispose() => owner.ObservePressure();
     }
 
     private int AllocateXid()
     {
+        SessionGate.RequireHeld(gate);
         for (var attempt = 0; attempt <= _sent.Count; attempt++)
         {
             var value = _nextXid;
