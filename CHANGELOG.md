@@ -45,6 +45,10 @@ remain unavailable. See
 
 ### Added
 
+- `just zk-quorum-faults` checks brief recovery and terminal local loss after
+  stopping two voters, with no uncertain-create replay and verified cleanup on
+  both pinned server versions.
+
 - `just zk-leader-faults` verifies replacement election, preserved sessions and
   watches, no uncertain-create replay and old-leader return as a follower on both
   pinned server versions, using shared follower/leader fault infrastructure.

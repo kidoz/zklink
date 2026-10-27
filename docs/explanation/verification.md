@@ -143,8 +143,13 @@ also exercised rollback. See [Verify follower recovery](../how-to/verify-followe
 replacement leader among the two survivors, followed by the old leader joining as
 a follower while that replacement stays leader. Election-time connection failures
 reach the driver through proxies that keep accepting later attempts. See
-[Verify leader recovery](../how-to/verify-leader-recovery.md). Quorum loss,
-partitions and sustained faults remain separate work.
+[Verify leader recovery](../how-to/verify-leader-recovery.md).
+`just zk-quorum-faults` stops two voters and checks brief valid-session recovery
+and longer-outage local `Lost` on both versions. The tested client is never
+replaced and uncertain creates are never replayed. Independent control sessions
+observe results after all members recover; local loss does not establish
+server-confirmed expiry. See [Verify quorum recovery](../how-to/verify-quorum-recovery.md).
+Partitions and sustained faults remain separate work.
 
 ## Release claims need consumer evidence
 

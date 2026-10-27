@@ -43,6 +43,7 @@ Install [just](https://just.systems/) and .NET SDK **10.0.403**. Docker with Com
 | `just zk-down [version]` | Remove the selected ensemble and its data volumes |
 | `just zk-matrix` | Smoke-test both pinned server versions and clean up |
 | `just zk-driver-matrix` | Also connect/authenticate/sync/close using ZkLink on every node |
+| `just zk-quorum-faults` | Stop two voters and verify valid-session recovery or local loss, no replay and cleanup on both versions |
 | `just zk-leader-faults` | Stop the observed leader and verify replacement election, session/watch recovery and rollback on both versions |
 | `just zk-follower-faults` | Stop one observed follower and verify session/watch recovery, request outcomes and rollback on both versions |
 | `just zk-security-matrix` | Verify client TLS/mTLS operations, certificate rejection and secure watch recovery on both versions |
@@ -127,6 +128,8 @@ after an actual server stop on both pinned versions, including session/ephemeral
 preservation, watch readiness and no replay of an uncertain create.
 [Leader-outage checks](docs/how-to/verify-leader-recovery.md) additionally verify
 a replacement election and the old leader returning as a follower.
+[Quorum-outage checks](docs/how-to/verify-quorum-recovery.md) cover brief recovery
+and terminal local loss after a longer interruption.
 
 ## Not yet available
 

@@ -63,9 +63,10 @@ logs. The test records the replacement's service name without printing session
 credentials, paths or payloads. A deliberate abort after replacement election
 checks rollback separately from successful recovery.
 
-Local checks cover both pinned versions with a macOS arm64 client. Remote CI,
-quorum loss, partitions, forced expiry, observer endpoints, secure outages and
-sustained-load behavior require separate evidence. The fixture uses plaintext
+Local checks cover both pinned versions with a macOS arm64 client.
+[Quorum loss](verify-quorum-recovery.md) has a separate command. Remote CI,
+partitions, forced expiry, observer endpoints, secure outages and sustained-load
+behavior require separate evidence. The fixture uses plaintext
 with the explicit development digest override. A valid session is preserved in
 this bounded test; it does not promise indefinite preservation during an outage.
 
