@@ -38,7 +38,7 @@ public sealed class MemberOutageTests : IAsyncLifetime
     [Trait("Acceptance", "T14")]
     [Trait("Acceptance", "T26")]
     [Trait("Acceptance", "T34")]
-    public async Task StoppedMembersPreserveValidSessionsOrReportLossWithoutReplayingUncertainCreate()
+    public async Task MemberFaultsPreserveValidSessionsOrReportLossWithoutReplayingUncertainCreate()
     {
         var clock = Stopwatch.StartNew();
         void Step(string name) =>
@@ -226,6 +226,14 @@ public sealed class MemberOutageTests : IAsyncLifetime
             {
                 await fault.PartitionPeerAsync(token).ConfigureAwait(true);
                 Step("peer-interface-isolated");
+                if (fault.PeerTargetRole == MemberControl.Leader)
+                {
+                    replacement = await fault
+                        .WaitForReplacementLeaderAsync(token)
+                        .ConfigureAwait(true);
+                    Step("peer-replacement-leader-" + replacement);
+                    await control.WaitForConnectionAsync(token).ConfigureAwait(true);
+                }
                 await control
                     .CreateAsync(
                         majorityPath,

@@ -34,6 +34,8 @@ internal sealed class MemberControl
     internal string? Outage { get; } = Environment.GetEnvironmentVariable("ZKLINK_FAULT_OUTAGE");
     internal string? Direction { get; } =
         Environment.GetEnvironmentVariable("ZKLINK_PARTITION_DIRECTION");
+    internal string? PeerTargetRole { get; } =
+        Environment.GetEnvironmentVariable("ZKLINK_PEER_TARGET_ROLE");
     private readonly string[] _targets;
     internal bool RestoreRequired { get; private set; }
 
@@ -58,7 +60,8 @@ internal sealed class MemberControl
             || (
                 Role == Peer
                 && (
-                    peerState is null
+                    PeerTargetRole is not (Leader or Follower)
+                    || peerState is null
                     || !Path.IsPathFullyQualified(peerState)
                     || Path.GetFileName(Path.GetDirectoryName(peerState))
                         ?.StartsWith("zklink-peer-faults.", StringComparison.Ordinal) != true
@@ -249,10 +252,10 @@ internal sealed class MemberControl
             throw new InvalidOperationException("The owned peer-partition runner is required.");
         }
         await VerifyOwnershipAsync(Service, token).ConfigureAwait(false);
-        if (await ReadRoleAsync(Service, token).ConfigureAwait(false) != Follower)
+        if (await ReadRoleAsync(Service, token).ConfigureAwait(false) != PeerTargetRole)
         {
             throw new InvalidOperationException(
-                "Only an attached observed follower may be isolated."
+                "The selected peer no longer has its expected role."
             );
         }
         RestoreRequired = true;
@@ -362,11 +365,15 @@ internal sealed class MemberControl
 
     internal async Task<string> WaitForReplacementLeaderAsync(CancellationToken token)
     {
-        if (Role != Leader)
+        if (Role != Leader && !(Role == Peer && PeerTargetRole == Leader))
         {
             throw new InvalidOperationException(
                 "Replacement election applies only to a leader outage."
             );
+        }
+        if (Role == Peer && RestoreRequired)
+        {
+            await RunPeerAsync("election", token).ConfigureAwait(false);
         }
         string[] survivors = Services.Where(service => service != Service).ToArray();
         using var guard = CancellationTokenSource.CreateLinkedTokenSource(token);

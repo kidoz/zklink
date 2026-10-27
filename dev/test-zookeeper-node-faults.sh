@@ -51,6 +51,10 @@ cleanup() {
       fi
       compose start >>"${artifacts}/${evidence_key}-rollback.log" 2>&1 || cleanup_exit=1
       compose up -d --wait --wait-timeout "${rollback_guard_seconds}" >>"${artifacts}/${evidence_key}-rollback.log" 2>&1 || cleanup_exit=1
+      if [[ "${role}" == peer && -f "${ZKLINK_PEER_STATE_FILE}" ]]; then
+        ZKLINK_FAULT_PROJECT="${project}" ZKLINK_FAULT_SERVICE="${target}" \
+          python3 dev/zookeeper-peer-network.py verify >>"${artifacts}/${evidence_key}-rollback.log" 2>&1 || cleanup_exit=1
+      fi
     fi
     compose logs --no-color >>"${artifacts}/${evidence_key}-server.log" 2>&1 || cleanup_exit=1
     compose down --volumes >>"${artifacts}/${evidence_key}-cleanup.log" 2>&1 || cleanup_exit=1
@@ -64,14 +68,19 @@ outages=(member)
 test_fixture=MemberFault
 if [[ "${role}" == partition ]]; then test_fixture=PartitionFault; fi
 if [[ "${role}" == quorum || "${role}" == partition ]]; then outages=(brief lost); fi
+peer_roles=(none)
+if [[ "${role}" == peer ]]; then peer_roles=(leader follower); fi
 directions=(none)
 if [[ "${role}" == partition ]]; then directions=(outgoing incoming); fi
+for peer_role in "${peer_roles[@]}"; do
+export ZKLINK_PEER_TARGET_ROLE="${peer_role}"
 for direction in "${directions[@]}"; do
 export ZKLINK_PARTITION_DIRECTION="${direction}"
 for outage in "${outages[@]}"; do
   for version in 3.8.7 3.9.6; do
     evidence_key="${version}"
     if [[ "${role}" == quorum || "${role}" == partition ]]; then evidence_key="${version}-${outage}"; fi
+    if [[ "${role}" == peer ]]; then evidence_key="${version}-${peer_role}"; fi
     if [[ "${role}" == partition ]]; then evidence_key="${version}-${direction}-${outage}"; fi
     export ZKLINK_FAULT_RUN_ID="$(python3 -c 'import uuid; print(uuid.uuid4().hex)')"
     project="zklink-${role}-fault-${version//./-}-${ZKLINK_FAULT_RUN_ID}"
@@ -124,6 +133,7 @@ PORTS
 )
     fi
     case_label="${outage}"
+    if [[ "${role}" == peer ]]; then case_label="${peer_role}"; fi
     if [[ "${role}" == partition ]]; then case_label="${direction}/${outage}"; fi
     echo "Checking ${role} outage (${case_label}) on ZooKeeper ${version}"
     compose config >"${artifacts}/${evidence_key}-compose.yaml"
@@ -138,17 +148,17 @@ PORTS
       if grep -Fxq 'Mode: follower' "${artifacts}/${evidence_key}-${service}-role-before.txt"; then
         followers=$((followers + 1))
         if [[ "${role}" == quorum && -z "${second_target}" ]]; then second_target="${service}"; fi
-        if [[ ( "${role}" == follower || "${role}" == peer ) && -z "${target}" ]]; then target="${service}"; fi
+        if [[ ( "${role}" == follower || ( "${role}" == peer && "${peer_role}" == follower ) ) && -z "${target}" ]]; then target="${service}"; fi
       elif grep -Fxq 'Mode: leader' "${artifacts}/${evidence_key}-${service}-role-before.txt"; then
         leaders=$((leaders + 1))
-        if [[ ( "${role}" == leader || "${role}" == quorum || "${role}" == partition ) && -z "${target}" ]]; then target="${service}"; fi
+        if [[ ( "${role}" == leader || "${role}" == quorum || "${role}" == partition || ( "${role}" == peer && "${peer_role}" == leader ) ) && -z "${target}" ]]; then target="${service}"; fi
       else
         echo "Unrecognized initial role; aborting ${version}" >&2; exit 1
       fi
     done
     if [[ "${leaders}" -ne 1 || "${followers}" -ne 2 ]]; then echo "No healthy voting ensemble" >&2; exit 1; fi
     selection="first observed ${role}"
-    if [[ "${role}" == peer ]]; then selection="first observed follower for peer isolation"; fi
+    if [[ "${role}" == peer ]]; then selection="observed ${peer_role} for peer isolation"; fi
     if [[ "${role}" == partition ]]; then selection="observed leader as the client proxy target"; fi
     if [[ "${role}" == quorum ]]; then selection="observed leader and first observed follower"; fi
     printf 'Selection: %s in zoo1/zoo2/zoo3 order\nTarget: %s\n' "${selection}" "${target}" >"${artifacts}/${evidence_key}-selection.txt"
@@ -174,5 +184,6 @@ PORTS
     target=""
     echo "ZooKeeper ${version}: PASS (${role}/${case_label} fault, expected session outcome, no replay, restoration, rollback and cleanup)"
   done
+done
 done
 done

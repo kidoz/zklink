@@ -75,7 +75,7 @@ jobs:
           if-no-files-found: error
 
   member-faults:
-    name: Connected ${{ matrix.role }} outage and recovery
+    name: Connected ${{ matrix.role }} fault and recovery
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -91,7 +91,7 @@ jobs:
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           global-json-file: global.json
-      - name: Verify member outages on both pinned versions
+      - name: Verify member and network faults on both pinned versions
         env:
           ZKLINK_MATRIX_ARTIFACT_ROOT: ${{ github.workspace }}/artifacts/${{ matrix.role }}-faults
         run: bash dev/test-zookeeper-node-faults.sh "${{ matrix.role }}"

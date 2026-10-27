@@ -90,6 +90,6 @@ zk-quorum-faults:
 zk-partition-faults:
     bash dev/test-zookeeper-partition-faults.sh
 
-# Isolate an attached follower from its voting peers and verify majority recovery.
+# Isolate each leader/follower peer interface and verify election and recovery.
 zk-peer-partition-faults:
     bash dev/test-zookeeper-peer-partition-faults.sh
