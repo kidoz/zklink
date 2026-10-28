@@ -51,7 +51,8 @@ Results include framing and copying costs; they do not establish socket, TLS,
 scheduler, session or live ZooKeeper operation performance. Server and network
 settings are recorded as absent. [Live get/set concurrency measurements](run-live-benchmarks.md) have a separate
 runner, as do [shared watch fan-out measurements](run-watch-benchmarks.md).
-Large watch restoration benchmarks remain separate work.
+[Distinct-path watch recovery](run-watch-recovery-benchmarks.md) also has a
+separate runner; controlled-runner performance qualification remains open.
 
 ## Read the results
 

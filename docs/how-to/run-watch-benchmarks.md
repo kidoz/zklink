@@ -111,7 +111,7 @@ plus fresh authenticated all-node readiness and fixture removal in every case.
 
 CI runs all six cases with one-second intervals, checking correctness and cleanup
 without timing thresholds. The [request benchmarks](run-live-benchmarks.md) remain
-separately runnable. Recovery with 10,000 watches and broader performance
-qualification remain separate work.
+separately runnable. [Recovery with 10,000 distinct watched paths](run-watch-recovery-benchmarks.md)
+has a separate command. Broader performance qualification remains open.
 
 [How-to guides](README.md) · [Documentation home](../README.md)

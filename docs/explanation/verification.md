@@ -212,8 +212,16 @@ mutation-to-consumer delivery for 1/32/256 persistent handles. Serialized mutati
 per-consumer counts, protected progress reads and queue-counter boundaries establish
 the measured scope. Complete latency histograms and process resources are retained;
 stream termination, independent namespace cleanup and failed-process fixture
-cleanup are checked. This is a bounded delivery workload, with large watch recovery
-and broader performance qualification still open.
+cleanup are checked. This is a bounded delivery workload; distinct-path recovery is measured separately
+and broader performance qualification remains open.
+
+The [distinct-path recovery benchmark](../how-to/run-watch-recovery-benchmarks.md)
+registers 10,000 persistent watches, verifies native bounded multi-frame restoration
+through an owned inspecting proxy, and checks session/ephemeral preservation,
+readiness gating, every reconnect gap and subsequent invalidation/protected read.
+Timings separate intentional gates from active recovery observations. The smaller
+CI workload checks the same invariants at 100 paths; full local measurements and
+process resources are retained separately from broader release qualification.
 
 ## Release claims need consumer evidence
 

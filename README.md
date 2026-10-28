@@ -45,6 +45,7 @@ Install [just](https://just.systems/) and .NET SDK **10.0.403**. Docker with Com
 | `just zk-matrix` | Smoke-test both pinned server versions and clean up |
 | `just zk-driver-matrix` | Also connect/authenticate/sync/close using ZkLink on every node |
 | `just bench [args…]` | Run protocol/framing benchmarks with retained raw results |
+| `just bench-recovery [watches]` | Measure controlled recovery of 10,000 distinct persistent-watch paths (100 for smoke) |
 | `just bench-watches [seconds]` | Measure exact shared persistent-watch fan-out to 1/32/256 consumers on both versions |
 | `just bench-live [seconds]` | Measure live get/set requests at 1/32/256 concurrency on both server versions |
 | `just bench-allocations [output]` | Check measured allocation budgets without timing thresholds |
@@ -159,4 +160,4 @@ choices; release-duration qualification requires separate executed evidence.
 
 ## Not yet available
 
-A NuGet package and Native AOT validation are not available. Initial [protocol/framing benchmarks](docs/how-to/run-benchmarks.md) and allocation gates are available; [live get/set measurements](docs/how-to/run-live-benchmarks.md) cover bounded concurrency on both server versions. [Shared persistent-watch fan-out measurements](docs/how-to/run-watch-benchmarks.md) cover bounded delivery to 1/32/256 consumers. Large watch recovery and controlled-runner qualification remain open. Client TLS/mTLS has scoped live evidence on both pinned versions with a macOS arm64 client. Revocation services, certificate rotation, quorum TLS and cross-platform security qualification remain open.
+A NuGet package and Native AOT validation are not available. Initial [protocol/framing benchmarks](docs/how-to/run-benchmarks.md) and allocation gates are available; [live get/set measurements](docs/how-to/run-live-benchmarks.md) cover bounded concurrency on both server versions. [Shared persistent-watch fan-out measurements](docs/how-to/run-watch-benchmarks.md) cover bounded delivery to 1/32/256 consumers. [Distinct-path watch recovery](docs/how-to/run-watch-recovery-benchmarks.md) has scoped 10,000-path measurements on both versions. Controlled-runner and broader release qualification remain open. Client TLS/mTLS has scoped live evidence on both pinned versions with a macOS arm64 client. Revocation services, certificate rotation, quorum TLS and cross-platform security qualification remain open.

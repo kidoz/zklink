@@ -36,6 +36,7 @@ notation; omit the brackets when invoking a command.
 | `just zk-logs [version]` | Print server logs |
 | `just zk-down [version]` | Remove the selected ensemble and its volumes |
 | `just bench [args…]` | Run server-free protocol/framing benchmarks and retain raw results; requires pinned .NET SDK |
+| `just bench-recovery [watches]` | Measure distinct-path persistent-watch recovery; accepts 10000 (default) or 100; requires pinned .NET, Docker/Compose and Python 3 |
 | `just bench-watches [seconds]` | Measure live shared persistent-watch fan-out on both versions; requires pinned .NET, Docker/Compose and Python 3 |
 | `just bench-live [seconds]` | Measure live get/set concurrency on both versions; requires pinned .NET, Docker/Compose and Python 3 |
 | `just bench-allocations [output]` | Check measured allocation budgets; requires pinned .NET SDK |

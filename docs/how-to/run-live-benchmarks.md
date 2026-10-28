@@ -124,7 +124,7 @@ separate process-group interruption check verified descendant termination.
 
 The [protocol/framing suite](run-benchmarks.md) remains independently runnable.
 [Shared watch fan-out](run-watch-benchmarks.md) has a separate measurement command.
-Large watch restoration, TLS performance and broader release qualification remain
-separate work.
+[Distinct-path watch restoration](run-watch-recovery-benchmarks.md) has a dedicated
+runner. TLS performance and broader release qualification remain separate work.
 
 [How-to guides](README.md) · [Documentation home](../README.md)

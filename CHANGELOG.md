@@ -45,6 +45,11 @@ remain unavailable. See
 
 ### Added
 
+- `just bench-recovery [watches]` measures controlled same-session recovery of
+  10,000 distinct persistent-watch paths on both pinned versions, with native
+  restore-frame/path counts, held-ack readiness checks, complete gap delivery,
+  all-path post-recovery validation, resource reports and a smaller CI selection.
+
 - `just bench-watches [seconds]` measures persistent-watch fan-out to 1, 32 and
   256 logical consumers on both pinned versions, with exact delivery/progress
   checks, bounded queues, latency/resource reports, shared live-fixture tooling
