@@ -65,7 +65,8 @@ supports configurable durations; a passing short run does not establish the
 
 The current target framework is `net10.0`; the pinned SDK is `10.0.403`. The core
 has no third-party runtime dependencies. Public API declarations are checked
-against shipped/unshipped baseline files; the shipped baseline is empty.
+against shipped/unshipped baseline files; the core's shipped baseline records
+the initial 0.1.0 API.
 
 The [build workflow](../../.github/workflows/build.yml) defines Linux, Windows,
 and macOS checks. Local macOS arm64 execution is recorded in the repository;
