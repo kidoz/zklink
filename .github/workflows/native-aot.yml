@@ -1,0 +1,108 @@
+name: Native AOT verification
+
+on:
+  push:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  TESTINGPLATFORM_TELEMETRY_OPTOUT: '1'
+  PYTHONDONTWRITEBYTECODE: '1'
+
+jobs:
+  publish:
+    name: Native publish and executable identity (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            rid: linux-x64
+          - os: ubuntu-24.04-arm
+            rid: linux-arm64
+          - os: windows-2025
+            rid: win-x64
+          - os: macos-15
+            rid: osx-arm64
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install pinned SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      - name: Set up Python
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: '3.12'
+      - name: Install Linux native prerequisites
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+      - name: Publish both consumers and directly verify native identity
+        run: python dev/prepare-aot.py ${{ matrix.rid }}
+      - name: Retain native artifacts and analysis evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-publish-${{ matrix.rid }}
+          path: |
+            artifacts/aot/run.*/feed
+            artifacts/aot/run.*/*-publish
+            artifacts/aot/run.*/*.txt
+            artifacts/aot/run.*/*.json
+            artifacts/aot/run.*/ZkLink.Aot*/obj/packages.lock.json
+            artifacts/aot/run.*/ZkLink.Aot*/obj/project.assets.json
+          if-no-files-found: error
+
+  live:
+    name: Native TLS and session operations (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            rid: linux-x64
+          - os: ubuntu-24.04-arm
+            rid: linux-arm64
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install pinned SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      - name: Set up Python
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: '3.12'
+      - name: Install native prerequisites
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+      - name: Publish and run native consumers against both server versions
+        run: bash dev/test-native-aot.sh
+      - name: Retain native live evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-live-${{ matrix.rid }}
+          path: |
+            artifacts/aot/run.*/feed
+            artifacts/aot/run.*/*-publish
+            artifacts/aot/run.*/*.txt
+            artifacts/aot/run.*/*.json
+            artifacts/aot/run.*/*.log
+            artifacts/aot/run.*/*-compose.yaml
+            artifacts/aot/run.*/ZkLink.Aot*/obj/packages.lock.json
+            artifacts/aot/run.*/ZkLink.Aot*/obj/project.assets.json
+          if-no-files-found: error

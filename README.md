@@ -9,6 +9,16 @@ ZkLink is a managed .NET client for Apache ZooKeeper: a first-class C# implement
 
 **Status: under development.** Internal protocol codecs, handshake records, transactions, connection-string/path/chroot handling, immutable result models and request-failure contracts are implemented and tested. A connectable client now provides TCP/TLS, digest authentication, session recovery, state subscriptions, bounded requests, `SyncAsync` and acknowledged close. Node CRUD, stat, children and ACL operations are now available. Typed write transactions, read batches, session ephemeral queries, descendant counts and identity queries are available. TTL creation is available with explicit client opt-in and server enablement; one-shot watched reads and persistent/recursive subscriptions are available, with removal, same-session restoration and explicit persistent reconnect gaps. An optional `AddZkLink` helper provides host-owned dependency injection with server-free lifecycle tests. Six optional Roslyn analyzers cover literal credentials, unsafe plaintext digest, watch ownership and asynchronous usage, with compilation and packed-consumer tests.
 
+## Install the core package
+
+```sh
+dotnet add package ZkLink --version 0.1.0
+```
+
+The initial release targets .NET 10. APIs may change before 1.0. Optional DI and
+analyzer packages remain available from source. See the [release guide](docs/how-to/release-nuget.md)
+for verification and publishing details.
+
 ## Current repository state
 
 - **Solution:** `ZkLink.slnx` with the core, dependency-injection and analyzer libraries, five .NET test projects and a runnable connection sample.
@@ -16,9 +26,9 @@ ZkLink is a managed .NET client for Apache ZooKeeper: a first-class C# implement
 - **Code:** checked protocol encoding/decoding for node, ACL, transaction and control messages; bounded asynchronous framing; new/resume handshake records; connection-string parsing and namespace translation. Public supporting types include immutable results, create options and failure/removal contracts. One explicit session per client, negotiated-timeout heartbeats, endpoint rotation, same-session reconnect, cancellation outcomes and close cleanup are implemented. Sent application requests are never replayed automatically.
 - **Tests:** xUnit suites cover Apache Java fixtures for all implemented opcodes, transaction success/error shapes, every reply split and truncation, all UTF-16 path code units, chroot boundaries and supporting public contracts. A bounded scripted stream and loopback fake server exercise delayed delivery, partial writes, dropped replies and handshake exchanges. Virtual-time tests exercise session and request lifecycles. Loopback TLS tests check chain/name validation, certificate expiry and mutual authentication. The managed connection sample has passed digest auth, sync and acknowledged close on every node of both pinned versions. Live .NET tests cover CRUD, versions, null/empty and 1,000,000-byte data, create modes, chroot, ACL authorization and acknowledged-close ephemeral deletion on both pinned versions. Live transaction tests verify atomic success/rollback, independent read errors, and committed writes whose replies are dropped, followed by same-session resume without replay. Auxiliary tests verify session-scoped textual ephemeral prefixes, chroot, recursive counts, permissions and server identities. One-shot watch tests cover events, sharing/removal, chroot, re-registration and same-session restoration after a connection cut. Persistent/recursive watch tests cover repeated delivery, profile-specific removal and reconnect gaps. Broader live faults remain unverified.
 - **Build:** SDK 10.0.403 is pinned, with central dependency versions and lock files; core has no third-party runtime dependencies. Public API changes are checked against nullable baselines. The [build workflow](.github/workflows/build.yml) defines Linux/Windows/macOS checks and separate Gradle-based Apache Java verification. Only local macOS arm64 execution has been verified; remote runs and Native AOT remain unverified.
-- **Distribution:** no package has been released. The project is [MIT-licensed](LICENSE); remaining release packaging and qualification remain open. See the [dependency inventory](THIRD-PARTY-NOTICES.md).
+- **Distribution:** local core candidates include package metadata, documentation, notices and source/symbol information, with an installed-package consumer check on both server versions. The initial core package is version 0.1.0; broader production and Native AOT qualification remain open. The project is [MIT-licensed](LICENSE); see the [dependency inventory](THIRD-PARTY-NOTICES.md).
 
-The library lives in `src/`; `tests/` contains public-contract tests, protocol tests and an optional Java oracle. The [basic sample](samples/ZkLink.Samples.Basic) can connect, exercise CRUD with `--nodes`, run transactions with `--transactions`, and query ephemerals/counts/identities with `--auxiliary`, and exercise one-shot, persistent and recursive watches with `--watches`; benchmarks are not yet available.
+The library lives in `src/`; `tests/` contains public-contract tests, protocol tests and an optional Java oracle. The [basic sample](samples/ZkLink.Samples.Basic) can connect, exercise CRUD with `--nodes`, run transactions with `--transactions`, query ephemerals/counts/identities with `--auxiliary`, and exercise one-shot, persistent and recursive watches with `--watches`.
 
 ## Development commands
 
@@ -36,6 +46,9 @@ Install [just](https://just.systems/) and .NET SDK **10.0.403**. Docker with Com
 | `just test tests/ZkLink.Extensions.DependencyInjection.Tests` | Run the server-free DI registration and host-lifetime suite |
 | `just test tests/ZkLink.Analyzers.Tests` | Run the Roslyn diagnostic suite |
 | `bash dev/test-analyzers-package.sh` | Pack and verify the analyzer with a local consumer |
+| `just package-check` | Inspect the core package and symbols, then run installed-package examples on both server versions |
+| `just aot-publish` | Publish rooted analysis and packed Native AOT consumers on the current target host |
+| `just aot-check` | Directly run native consumers against both server versions over TLS/mTLS |
 | `bash dev/test-jute-oracle.sh` | Use the Gradle wrapper to compare Java fixtures and verify C# requests |
 | `just zk-check [version]` | Validate the selected ZooKeeper configuration |
 | `just zk-up [version]` | Start the selected ensemble and wait for readiness |
@@ -160,4 +173,4 @@ choices; release-duration qualification requires separate executed evidence.
 
 ## Not yet available
 
-A NuGet package and Native AOT validation are not available. Initial [protocol/framing benchmarks](docs/how-to/run-benchmarks.md) and allocation gates are available; [live get/set measurements](docs/how-to/run-live-benchmarks.md) cover bounded concurrency on both server versions. [Shared persistent-watch fan-out measurements](docs/how-to/run-watch-benchmarks.md) cover bounded delivery to 1/32/256 consumers. [Distinct-path watch recovery](docs/how-to/run-watch-recovery-benchmarks.md) has scoped 10,000-path measurements on both versions. Controlled-runner and broader release qualification remain open. Client TLS/mTLS has scoped live evidence on both pinned versions with a macOS arm64 client. Revocation services, certificate rotation, quorum TLS and cross-platform security qualification remain open.
+Native AOT support is not yet advertised. Initial [protocol/framing benchmarks](docs/how-to/run-benchmarks.md) and allocation gates are available; [live get/set measurements](docs/how-to/run-live-benchmarks.md) cover bounded concurrency on both server versions. [Shared persistent-watch fan-out measurements](docs/how-to/run-watch-benchmarks.md) cover bounded delivery to 1/32/256 consumers. [Distinct-path watch recovery](docs/how-to/run-watch-recovery-benchmarks.md) has scoped 10,000-path measurements on both versions. Controlled-runner and broader release qualification remain open. Client TLS/mTLS has scoped live evidence on both pinned versions with a macOS arm64 client. Revocation services, certificate rotation, quorum TLS and cross-platform security qualification remain open.

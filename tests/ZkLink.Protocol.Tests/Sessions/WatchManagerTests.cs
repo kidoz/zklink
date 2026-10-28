@@ -180,6 +180,104 @@ public sealed class WatchManagerTests
         outstanding.SetResult(fixture.Reply);
     }
 
+    [Theory(Timeout = 10000)]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    [Trait("Acceptance", "T29")]
+    public async Task AbandonedCleanupRetriesOnlyWhileConnected(bool inline, bool disconnected)
+    {
+        TestContext.Current.CancellationToken.ThrowIfCancellationRequested();
+        using var fixture = new RemovalFixture();
+        var attempts = 0;
+        IRequestObserver? observer = null;
+        var outstanding = new TaskCompletionSource<WireReply>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        fixture
+            .Session.TryWatchCleanup(
+                Arg.Any<WatchRequest>(),
+                Arg.Any<IRequestObserver>(),
+                out Arg.Any<Task<WireReply>?>()
+            )
+            .Returns(call =>
+            {
+                attempts++;
+                observer = call.Arg<IRequestObserver>();
+                if (inline && attempts == 1)
+                {
+                    observer.Abandoned(fixture.Pending);
+                    call[2] = Task.FromException<WireReply>(new InvalidDataException());
+                }
+                else
+                {
+                    call[2] = outstanding.Task;
+                }
+                return true;
+            });
+        await fixture.Register().DisposeAsync();
+        lock (fixture.Gate)
+        {
+            if (disconnected)
+            {
+                fixture.Session.Session.Returns(
+                    new ZooKeeperSessionSnapshot(
+                        ZooKeeperSessionState.Disconnected,
+                        1,
+                        TimeSpan.FromSeconds(10),
+                        TimeSpan.FromSeconds(10),
+                        1,
+                        0,
+                        ZooKeeperCloseStatus.None,
+                        null
+                    )
+                );
+            }
+            fixture.Manager.PrepareCleanup();
+            Assert.Equal(1, attempts);
+            if (!inline)
+            {
+                observer!.Abandoned(fixture.Pending);
+                outstanding.SetException(new InvalidDataException());
+                outstanding = new TaskCompletionSource<WireReply>(
+                    TaskCreationOptions.RunContinuationsAsynchronously
+                );
+            }
+            fixture.Manager.PrepareCleanup();
+            Assert.Equal(disconnected ? 1 : 2, attempts);
+            fixture.Manager.PrepareCleanup();
+            Assert.Equal(disconnected ? 1 : 2, attempts);
+            if (!disconnected)
+            {
+                observer!.Replied(fixture.Pending, fixture.Reply);
+                outstanding.SetResult(fixture.Reply);
+            }
+        }
+    }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T29")]
+    public async Task CancelingEnumerationDisposesTheRegistrationAndSchedulesCleanup()
+    {
+        using var fixture = new RemovalFixture();
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken
+        );
+        var watch = fixture.Register();
+        await using var events = watch
+            .ReadEventsAsync(stop.Token)
+            .GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        var reading = events.MoveNextAsync().AsTask();
+        await stop.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reading);
+        Assert.True(watch.Suppressed);
+        Assert.False(watch.Active);
+        Assert.Equal(0, fixture.Manager.Count);
+        fixture.Session.Received().WakeWriter();
+    }
+
     private sealed class RemovalFixture : IDisposable
     {
         internal object Gate { get; } = new();

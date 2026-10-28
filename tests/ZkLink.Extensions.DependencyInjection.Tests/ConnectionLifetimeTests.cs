@@ -90,13 +90,12 @@ public sealed class ConnectionLifetimeTests
 
     [Fact]
     [Trait("Acceptance", "T40")]
-    public async Task SecondStartDisposesAdditionalConnectionAndKeepsOriginal()
+    public async Task SecondStartFailsWithoutConnectingAgainAndKeepsOriginal()
     {
         var options = CreateOptions();
-        var first = Substitute.For<IZkLinkConnection>();
-        var second = Substitute.For<IZkLinkConnection>();
+        var connection = Substitute.For<IZkLinkConnection>();
         var factory = Substitute.For<IZkLinkConnectionFactory>();
-        factory.ConnectAsync(options, Arg.Any<CancellationToken>()).Returns(first, second);
+        factory.ConnectAsync(options, Arg.Any<CancellationToken>()).Returns(connection);
         var host = new ZkLinkConnectionHost(options, factory);
         await host.StartAsync(TestContext.Current.CancellationToken);
 
@@ -105,10 +104,41 @@ public sealed class ConnectionLifetimeTests
         );
 
         Assert.Contains("already started", error.Message, StringComparison.Ordinal);
-        await second.Received(1).DisposeAsync();
-        Assert.Same(first.Client, host.Client);
+        await factory.Received(1).ConnectAsync(options, Arg.Any<CancellationToken>());
+        Assert.Same(connection.Client, host.Client);
         await host.DisposeAsync();
-        await first.Received(1).DisposeAsync();
+        await connection.Received(1).DisposeAsync();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Acceptance", "T40")]
+    public async Task ShutdownDuringStartupWaitsAndReleasesConnection(bool dispose)
+    {
+        var options = CreateOptions();
+        var connection = Substitute.For<IZkLinkConnection>();
+        var factory = Substitute.For<IZkLinkConnectionFactory>();
+        var pendingConnection = new TaskCompletionSource<IZkLinkConnection>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        factory.ConnectAsync(options, Arg.Any<CancellationToken>()).Returns(pendingConnection.Task);
+        var host = new ZkLinkConnectionHost(options, factory);
+        var start = host.StartAsync(TestContext.Current.CancellationToken);
+
+        var shutdown = dispose
+            ? host.DisposeAsync().AsTask()
+            : host.StopAsync(TestContext.Current.CancellationToken);
+        Assert.False(shutdown.IsCompleted);
+
+        pendingConnection.SetResult(connection);
+        await start.ConfigureAwait(true);
+        await shutdown.ConfigureAwait(true);
+
+        await connection.Received(1).DisposeAsync();
+        Assert.Throws<InvalidOperationException>(() => host.Client);
+        await host.DisposeAsync();
+        await connection.Received(1).DisposeAsync();
     }
 
     [Fact]

@@ -33,6 +33,14 @@ Complete a specific task in an existing checkout.
 - [Register ZkLink with dependency injection](use-dependency-injection.md) — let
   a Microsoft host connect, share and close one ZooKeeper client.
 
+- [Verify a local core package](verify-core-package.md) — inspect package and symbol
+  contents, then compile and run installed-package examples on both server versions.
+- [Verify Native AOT consumers](verify-native-aot.md) — publish rooted analysis and
+  packed consumers, then directly exercise native TLS/session/watch behavior.
+
+- [Release the core NuGet package](release-nuget.md) — validate a versioned
+  package and publish through GitHub Actions with NuGet trusted publishing.
+
 For a first walkthrough, use the [build tutorial](../tutorials/build-and-test.md).
 
 [Documentation home](../README.md)

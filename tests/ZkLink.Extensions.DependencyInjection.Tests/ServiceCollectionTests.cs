@@ -96,6 +96,13 @@ public sealed class ServiceCollectionTests
             await lifetime.StartAsync(stop.Token);
             var client = provider.GetRequiredService<ZooKeeperClient>();
             Assert.Same(client, provider.GetRequiredService<ZooKeeperClient>());
+            await using (var scope = provider.CreateAsyncScope())
+            {
+                Assert.Same(client, scope.ServiceProvider.GetRequiredService<ZooKeeperClient>());
+            }
+
+            Assert.NotEqual(ZooKeeperSessionState.Closed, client.Session.State);
+            Assert.Same(client, provider.GetRequiredService<ZooKeeperClient>());
             await lifetime.StopAsync(stop.Token);
             Assert.Equal(ZooKeeperCloseStatus.Acknowledged, client.Session.CloseStatus);
             Assert.Throws<InvalidOperationException>(() =>

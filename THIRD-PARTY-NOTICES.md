@@ -23,6 +23,8 @@ The resolved dependency graphs and integrity hashes are in the project `packages
 | System.Reflection.TypeExtensions | 4.7.0 | Transitive benchmark tooling | MIT |
 | CSharpier | 1.3.0 | Local formatting tool | MIT |
 | Microsoft.CodeAnalysis.PublicApiAnalyzers | 5.6.0 | Build analyzer only; private assets | MIT |
+| Microsoft.NET.ILLink.Tasks | 10.0.14 | SDK-selected trim/AOT build analysis; private assets | MIT |
+| Microsoft.DotNet.ILCompiler, runtime-specific compiler and Microsoft.NETCore.App.Runtime.NativeAOT packs | 10.0.14 | Native test consumers and their SDK-selected compiler/runtime only | MIT; upstream third-party notices retained with native artifacts |
 | Microsoft.CodeAnalysis.Analyzers, Microsoft.CodeAnalysis.CSharp | 5.9.0 | ZkLink analyzer build/tests; private assets | MIT |
 | Microsoft.CodeAnalysis.Common | 5.9.0 | Transitive analyzer build/tests | MIT |
 | NETStandard.Library | 2.0.3 | Analyzer target build only | MIT |

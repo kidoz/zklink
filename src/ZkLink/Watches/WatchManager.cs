@@ -585,14 +585,18 @@ internal sealed class WatchManager(
         }
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "Best-effort cleanup failures are observed here; request observers retain retry intent under the session gate."
+    )]
     private static async Task ObserveCleanupAsync(Task<WireReply> task)
     {
         try
         {
             await task.ConfigureAwait(false);
         }
-        catch (ZooKeeperException) { }
-        catch (OperationCanceledException) { }
+        catch (Exception) { }
     }
 
     internal IReadOnlyList<RestoreRequest> Restoration(long zxid)
@@ -762,7 +766,8 @@ internal sealed class WatchManager(
         public void Abandoned(PendingRequest pending)
         {
             _observed = true;
-            Done();
+            // RetryCleanup drops connection-bound intent once the session disconnects.
+            manager.RetryCleanup(key);
         }
 
         internal void UnobservedFailure()

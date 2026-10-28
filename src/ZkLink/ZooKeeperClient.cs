@@ -11,12 +11,17 @@ public sealed partial class ZooKeeperClient : IAsyncDisposable
 {
     private readonly SessionManager _session;
     private readonly bool _enableTtlNodes;
+    private readonly bool _ownsSession;
 
-    private ZooKeeperClient(SessionManager session, bool enableTtlNodes)
+    private ZooKeeperClient(SessionManager session, bool enableTtlNodes, bool ownsSession = true)
     {
         _session = session;
         _enableTtlNodes = enableTtlNodes;
+        _ownsSession = ownsSession;
     }
+
+    internal ZooKeeperClient CreateNonOwningView() =>
+        new(_session, _enableTtlNodes, ownsSession: false);
 
     /// <summary>Snapshots options before returning its Task, then connects/authenticates within the initial deadline.</summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -130,8 +135,9 @@ public sealed partial class ZooKeeperClient : IAsyncDisposable
     public Task CloseAsync(CancellationToken cancellationToken = default) =>
         _session.CloseAsync(cancellationToken);
 
-    /// <summary>Always releases local resources, without requiring server acknowledgment.</summary>
-    public ValueTask DisposeAsync() => _session.DisposeAsync();
+    /// <summary>Releases owned local resources, without requiring server acknowledgment.</summary>
+    public ValueTask DisposeAsync() =>
+        _ownsSession ? _session.DisposeAsync() : ValueTask.CompletedTask;
 
     internal SessionManager Manager => _session;
 }

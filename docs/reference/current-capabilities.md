@@ -1,14 +1,15 @@
 # Current capabilities
 
-This describes the checkout as of **2026-10-28**. No package has been released.
+This describes the checkout as of **2026-10-28**. The initial core package version is **0.1.0**.
 
 ## Code and verification
 
 | Area | Available now | Remaining scope |
 | --- | --- | --- |
-| Build | .NET 10, C# 14, deterministic builds, locked dependencies, warnings as errors, MIT license | Release package metadata and package qualification |
+| Build | .NET 10, C# 14, deterministic builds, locked dependencies, warnings as errors, MIT license | Observed cross-platform and release qualification |
+| Core packaging | Version 0.1.0 release workflow, metadata/documentation/notices, portable symbols, Source Link and embedded-source checks; installed-package examples on both server versions | Released-version compatibility validation, secure/native and cross-platform consumer qualification |
 | Protocol | Internal codecs for all 27 implemented opcodes, handshake/multi/framing, path/chroot translation and Gradle-managed Java fixtures | Remaining live qualification |
-| Public types | Immutable snapshots, endpoints, create options, ACLs, versions, request failures, watch handles/events and removal results; contract tests | Package consumer qualification |
+| Public types | Immutable snapshots, endpoints, create options, ACLs, versions, request failures, watch handles/events and removal results; contract tests and local core package consumer | Compatibility validation against future released versions |
 | Sessions and operations | Connect/authenticate/sync, snapshots/subscriptions, heartbeat, same-session recovery, cancellation, close, node/ACL methods, typed transactions, auxiliary queries, opt-in TTL creation and watches | Broader live recovery, asymmetric peer faults and observer qualification |
 | Watches | One-shot reads, persistent/recursive subscriptions, buffered events, shared removal, cancellation cleanup, bounded restoration and explicit reconnect gaps | Broader fault and concurrency qualification |
 | Security | TCP/TLS, custom roots/client certificates, live client TLS/mTLS operations, digest replay, certificate rejection and distinct digest/X.509 ACLs | Revocation, rotation, quorum TLS, additional auth schemes and cross-platform qualification |
@@ -16,11 +17,15 @@ This describes the checkout as of **2026-10-28**. No package has been released.
 | Analyzers | Six optional ZKL diagnostics, Roslyn compilation tests and a local packed-package consumer check | Released package and cross-platform qualification |
 | Local servers | Pinned three-node plaintext/TLS/mTLS fixtures for 3.8.7 and 3.9.6, expired-certificate negative control | Broader fault fixtures |
 | Observability | BCL traces and metrics, bounded asynchronous diagnostic delivery, finite tags, listener isolation and redaction checks | Exporter integration, sustained-load and cross-platform qualification |
-| Native AOT | Planned requirement | Publish and direct execution evidence for consumers |
+| Native AOT | Rooted analysis and unrooted packed consumers, native identity checks and secure live harness | Four-RID live qualification and release compatibility metadata |
 | Performance | Protocol/framing benchmarks and allocation gates; live get/set concurrency, shared persistent-watch fan-out and 10,000-path recovery measurements with latency/resource observations | Repeated controlled-runner measurements, TLS performance and broader qualification |
 
 See [Tracing and metrics](telemetry.md) for instrument names, timing, privacy and
 best-effort delivery semantics.
+
+See [Verify a local core package](../how-to/verify-core-package.md) for archive,
+source/symbol and installed-consumer checks. These use local plaintext fixtures;
+the release workflow verifies the exact package before publishing. Native AOT support remains separately qualified.
 
 A dedicated [follower recovery check](../how-to/verify-follower-recovery.md) stops
 an observed follower on each pinned version. Scoped evidence covers session and

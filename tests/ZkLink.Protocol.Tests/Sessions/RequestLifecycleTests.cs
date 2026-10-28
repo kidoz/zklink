@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Runtime.CompilerServices;
 using ZkLink.Configuration;
 using ZkLink.Protocol;
 using ZkLink.Requests;
@@ -213,6 +214,29 @@ public sealed class RequestLifecycleTests : IDisposable
         Reply(pending);
         await task.ConfigureAwait(true);
     }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T14")]
+    public async Task XidAllocationFailureLeavesTheRequestOwnedUntilDetach()
+    {
+        var task = Submit(token: TestContext.Current.CancellationToken);
+        // Simulate the corrupt xid set that triggers the allocator's invariant guard.
+        AllocatedXids(_scheduler).Add(1);
+
+        Assert.Throws<InvalidOperationException>(() => _scheduler.Take(1));
+        Assert.Equal(1, _scheduler.PendingCount);
+        Assert.False(task.IsCompleted);
+        _scheduler.Detach();
+
+        var error = await Assert.ThrowsAsync<ZooKeeperException>(() => task);
+        Assert.Equal(RequestOutcome.NotSent, error.Outcome);
+        Assert.Null(error.Request.RequestId);
+        Assert.Equal(0, _scheduler.PendingCount);
+        Assert.Equal(0, _scheduler.OwnedBytes);
+    }
+
+    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_xids")]
+    private static extern ref HashSet<int> AllocatedXids(RequestScheduler scheduler);
 
     [Fact(Timeout = 10000)]
     [Trait("Acceptance", "T14")]

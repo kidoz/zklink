@@ -32,6 +32,10 @@ baseline only for an intended API change, preserving nullable annotations.
 
 ## Run one suite while iterating
 
+Run `just package-check` separately to inspect the core package, debugging symbols
+and installed-package examples on both pinned server versions. This requires
+Docker, Python 3 and OpenSSL; see [Verify a local core package](verify-core-package.md).
+
 For model, endpoint, and exception changes:
 
 ```sh

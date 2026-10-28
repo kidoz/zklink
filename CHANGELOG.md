@@ -5,15 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-ZkLink is in initial development. No version has been released, so the entries
-below describe work in progress rather than supported behavior. A NuGet package, Native AOT validation and runtime performance data
-remain unavailable. See
+ZkLink is in initial development. The first core release is **0.1.0**; APIs may
+change before 1.0. Release verification covers the documented scenarios and does
+not establish broader security, Native AOT or production qualification. See
 [README.md](README.md) for the current status and verified scope.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-28
+
 ### Fixed
 
+- Requests remain owned by the scheduler when xid allocation fails, so teardown
+  completes their tasks and releases their byte reservations.
+- Automatic watch cleanup retains retry intent after a local preparation failure
+  on a live connection and observes every background task exception.
+- Watch documentation consistently states that canceling event enumeration
+  disposes the registration locally and schedules best-effort server cleanup.
 - Watch restoration now retries timeout/session-moved responses within the owned
   session budget and treats expiry/authentication responses as terminal failures.
 - Established-session readiness waits and watch streams report terminal session
@@ -44,6 +52,19 @@ remain unavailable. See
   snapshots, matching existing watch-stream behavior.
 
 ### Added
+
+- A core NuGet release workflow with tag/version/changelog validation, reusable
+  build/live/native verification gates, installed-consumer checks of the exact
+  release package, provenance attestations and NuGet trusted publishing.
+
+- Native AOT analysis and packed-package smoke consumers, host-specific publish
+  commands, executable identity checks and isolated TLS/mTLS live runners.
+  Separate CI jobs define four-RID publication and Linux live execution.
+
+- `just package-check` builds and inspects a local core candidate and portable
+  symbols, checks embedded sources and dependencies, then compiles and runs
+  installed-package examples on every node of both pinned server versions.
+  A separate CI job retains the candidate and verification evidence.
 
 - `just bench-recovery [watches]` measures controlled same-session recovery of
   10,000 distinct persistent-watch paths on both pinned versions, with native

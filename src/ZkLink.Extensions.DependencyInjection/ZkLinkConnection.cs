@@ -7,12 +7,20 @@ internal interface IZkLinkConnection : IAsyncDisposable
     Task CloseAsync(CancellationToken cancellationToken);
 }
 
-internal sealed class ZkLinkConnection(ZooKeeperClient client) : IZkLinkConnection
+internal sealed class ZkLinkConnection : IZkLinkConnection
 {
-    public ZooKeeperClient Client { get; } = client;
+    private readonly ZooKeeperClient _ownedClient;
+
+    public ZkLinkConnection(ZooKeeperClient client)
+    {
+        _ownedClient = client;
+        Client = client.CreateNonOwningView();
+    }
+
+    public ZooKeeperClient Client { get; }
 
     public Task CloseAsync(CancellationToken cancellationToken) =>
-        Client.CloseAsync(cancellationToken);
+        _ownedClient.CloseAsync(cancellationToken);
 
-    public ValueTask DisposeAsync() => Client.DisposeAsync();
+    public ValueTask DisposeAsync() => _ownedClient.DisposeAsync();
 }

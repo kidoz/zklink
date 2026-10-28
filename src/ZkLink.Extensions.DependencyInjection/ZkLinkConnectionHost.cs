@@ -7,11 +7,18 @@ internal sealed class ZkLinkConnectionHost(
     IZkLinkConnectionFactory connectionFactory
 ) : IHostedService, IAsyncDisposable
 {
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Reliability",
+        "CA2213",
+        Justification = "SemaphoreSlim needs disposal only after AvailableWaitHandle is used; retaining it keeps concurrent and repeated disposal safe."
+    )]
+    private readonly SemaphoreSlim _lifetimeGate = new(1, 1);
     private IZkLinkConnection? _connection;
+    private LifetimeState _state;
 
     public ZooKeeperClient Client =>
         (
-            _connection
+            Volatile.Read(ref _connection)
             ?? throw new InvalidOperationException(
                 "The ZkLink client is available only after host startup and before host shutdown."
             )
@@ -19,38 +26,86 @@ internal sealed class ZkLinkConnectionHost(
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        var connection = await connectionFactory
-            .ConnectAsync(options, cancellationToken)
-            .ConfigureAwait(false);
-        if (Interlocked.CompareExchange(ref _connection, connection, null) is not null)
+        await _lifetimeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            await connection.DisposeAsync().ConfigureAwait(false);
-            throw new InvalidOperationException("The ZkLink host lifetime has already started.");
+            if (_state != LifetimeState.Created)
+            {
+                throw new InvalidOperationException(
+                    "The ZkLink host lifetime has already started."
+                );
+            }
+
+            var connection = await connectionFactory
+                .ConnectAsync(options, cancellationToken)
+                .ConfigureAwait(false);
+            Volatile.Write(ref _connection, connection);
+            _state = LifetimeState.Started;
+        }
+        finally
+        {
+            _lifetimeGate.Release();
         }
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        var connection = Interlocked.Exchange(ref _connection, null);
-        if (connection is not null)
+        await _lifetimeGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+        try
         {
-            try
+            if (_state is LifetimeState.Stopped or LifetimeState.Disposed)
             {
-                await connection.CloseAsync(cancellationToken).ConfigureAwait(false);
+                return;
             }
-            finally
+
+            var connection = Interlocked.Exchange(ref _connection, null);
+            _state = LifetimeState.Stopped;
+            if (connection is not null)
             {
-                await connection.DisposeAsync().ConfigureAwait(false);
+                try
+                {
+                    await connection.CloseAsync(cancellationToken).ConfigureAwait(false);
+                }
+                finally
+                {
+                    await connection.DisposeAsync().ConfigureAwait(false);
+                }
             }
+        }
+        finally
+        {
+            _lifetimeGate.Release();
         }
     }
 
     public async ValueTask DisposeAsync()
     {
-        var connection = Interlocked.Exchange(ref _connection, null);
-        if (connection is not null)
+        await _lifetimeGate.WaitAsync().ConfigureAwait(false);
+        try
         {
-            await connection.DisposeAsync().ConfigureAwait(false);
+            if (_state == LifetimeState.Disposed)
+            {
+                return;
+            }
+
+            var connection = Interlocked.Exchange(ref _connection, null);
+            _state = LifetimeState.Disposed;
+            if (connection is not null)
+            {
+                await connection.DisposeAsync().ConfigureAwait(false);
+            }
         }
+        finally
+        {
+            _lifetimeGate.Release();
+        }
+    }
+
+    private enum LifetimeState
+    {
+        Created,
+        Started,
+        Stopped,
+        Disposed,
     }
 }

@@ -3,6 +3,7 @@ name: Build and verification
 on:
   push:
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read
@@ -52,6 +53,37 @@ jobs:
       - name: Verify analyzer package consumer
         if: runner.os == 'Linux'
         run: bash dev/test-analyzers-package.sh
+
+  core-package:
+    name: Core package and installed consumer
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install pinned SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      - name: Validate local package and examples on both server versions
+        run: bash dev/test-core-package.sh
+      - name: Retain candidate and verification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: core-package
+          path: |
+            artifacts/packages/run.*/feed
+            artifacts/packages/run.*/*.txt
+            artifacts/packages/run.*/*.json
+            artifacts/packages/run.*/*.log
+            artifacts/packages/run.*/*-compose.yaml
+            artifacts/packages/run.*/rejections
+            artifacts/packages/run.*/consumer/obj/packages.lock.json
+            artifacts/packages/run.*/consumer/obj/project.assets.json
+          if-no-files-found: error
 
   allocations:
     name: Protocol and framing allocation budgets

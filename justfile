@@ -20,6 +20,18 @@ build configuration="Release":
 test project:
     dotnet test --project "$1" --configuration Release
 
+# Pack and inspect the core, then run installed-package examples on both versions.
+package-check:
+    bash dev/test-core-package.sh
+
+# Publish native analysis and packed consumers on the current target host.
+aot-publish:
+    python3 dev/prepare-aot.py
+
+# Publish and directly exercise native consumers on both secure server versions.
+aot-check:
+    bash dev/test-native-aot.sh
+
 # Run protocol/framing benchmarks and retain raw results (Short job by default).
 bench *args:
     bash dev/run-benchmarks.sh "$@"

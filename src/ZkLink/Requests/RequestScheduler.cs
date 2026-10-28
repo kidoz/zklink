@@ -533,9 +533,8 @@ internal sealed class RequestScheduler(
                     return (null, false);
                 }
                 pending = head.Value;
-                RemoveQueued(pending);
-                _inFlight++;
             }
+            // Keep ownership in the queued/control slot if allocation fails.
             var xid = AllocateXid();
             pending.Info = new ZooKeeperRequestInfo(
                 pending.Info.Operation,
@@ -543,6 +542,11 @@ internal sealed class RequestScheduler(
                 _endpoint,
                 pending.Info.Path
             );
+            if (!pending.Control)
+            {
+                RemoveQueued(pending);
+                _inFlight++;
+            }
             pending.Sent = true;
             pending.Writing = true;
             _sent.Enqueue(pending);
