@@ -1,0 +1,1447 @@
+{
+  "ObservedOn": "2026-10-28",
+  "Revision": "8e9ecab25f91643a316635cecc71fcc16192b109",
+  "WorkingTree": "Live benchmark implementation pending; source hashes recorded below.",
+  "Scope": "Closed-loop plaintext digest, observed leader, one measured session per case; local Docker evidence, timings informational.",
+  "InputSHA256": {
+    "benchmarks/ZkLink.Benchmarks/Program.cs": "d96f06861cf62cec235bdfbf2bdabddc319f3282bd5739266c2e9b7d5848daf2",
+    "benchmarks/ZkLink.Benchmarks/LatencyHistogram.cs": "6a53f5ebde0e28f8f1291ae2975998334972b5f2c830cb1c5758913ea8b2843b",
+    "benchmarks/ZkLink.Benchmarks/LiveBenchmark.cs": "ca0c6683f46e4f84e6f430ccd3a1048eaf6677d1552da85afea953849b593591",
+    "benchmarks/ZkLink.Benchmarks/LiveInterval.cs": "528d56c91544fd90e93ddb726aea9ce776159f7f3aea551203609718069b1795",
+    "benchmarks/ZkLink.Benchmarks/LiveSettings.cs": "47e80ef2a3bcea026f4b34cd5fab43a2e3724a82d53f6247a34441bb9d29257c",
+    "dev/run-live-benchmarks.sh": "b71ccd89b0c9ef2462a802d227e9cfa919d36498113aaa949f5419f18de0189e",
+    "dev/run-live-benchmark-process.py": "69a13d20276ba32cb29a3bc1b84085945baeebd4598aef63cc7f8e22c3ebc7a8",
+    "compose.benchmark.yaml": "f97c4485ad24d6ab415e2d4c05b64f6ba97f9cb0835b70fafc03564b55f3c67c",
+    "HEAD": "8e9ecab25f91643a316635cecc71fcc16192b109"
+  },
+  "DockerHost": "16 8318709760 7.0.14-linuxkit Docker Desktop aarch64",
+  "Targets": {
+    "3.8.7": "Target: observed leader zoo3\nEndpoint: 127.0.0.1:55008",
+    "3.9.6": "Target: observed leader zoo3\nEndpoint: 127.0.0.1:55010"
+  },
+  "Cases": [
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.8.7",
+      "Endpoint": "127.0.0.1:55008",
+      "Operation": "get",
+      "PayloadBytes": 32,
+      "Concurrency": 1,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 15496,
+        "Completed": 15496,
+        "WorkersWithCompletions": 1,
+        "PeakOutstandingCalls": 1,
+        "ElapsedSecondsIncludingDrain": 5.000352917,
+        "OperationsPerSecond": 3098.9812633658953,
+        "ProcessAllocatedBytes": 77265768,
+        "ProcessAllocatedBytesPerOperation": 4986.175012906557,
+        "Collections": [
+          10,
+          0,
+          0
+        ],
+        "SampledPeakWorkingSetBytes": 77660160,
+        "SampledPeakManagedHeapBytes": 8469616,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 322.5917225735673,
+        "MaxLatencyMicroseconds": 3645,
+        "P50": {
+          "LowerMicroseconds": 312,
+          "UpperMicroseconds": 319
+        },
+        "P95": {
+          "LowerMicroseconds": 392,
+          "UpperMicroseconds": 399
+        },
+        "P99": {
+          "LowerMicroseconds": 512,
+          "UpperMicroseconds": 527
+        }
+      },
+      "HistogramCount": 15496,
+      "RawReportSHA256": "a04f119aef4265719e92a7ba0e08dae792709942bc4f30cc0910d750d6beed6a",
+      "RawHistogramSHA256": "d5ac4039e1dba87b042f08dc39c4134a2ce462621dc56470faf17d8d5423ef4a"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.8.7",
+      "Endpoint": "127.0.0.1:55008",
+      "Operation": "get",
+      "PayloadBytes": 32,
+      "Concurrency": 256,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 74556,
+        "Completed": 74556,
+        "WorkersWithCompletions": 256,
+        "PeakOutstandingCalls": 256,
+        "ElapsedSecondsIncludingDrain": 5.012506584,
+        "OperationsPerSecond": 14873.995425359426,
+        "ProcessAllocatedBytes": 306863432,
+        "ProcessAllocatedBytesPerOperation": 4115.878426954236,
+        "Collections": [
+          37,
+          0,
+          0
+        ],
+        "SampledPeakWorkingSetBytes": 81821696,
+        "SampledPeakManagedHeapBytes": 14860112,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 17188.359569732816,
+        "MaxLatencyMicroseconds": 41183.375,
+        "P50": {
+          "LowerMicroseconds": 16384,
+          "UpperMicroseconds": 16895
+        },
+        "P95": {
+          "LowerMicroseconds": 19968,
+          "UpperMicroseconds": 20479
+        },
+        "P99": {
+          "LowerMicroseconds": 24064,
+          "UpperMicroseconds": 24575
+        }
+      },
+      "HistogramCount": 74556,
+      "RawReportSHA256": "47870557dfb610b02ff1c8da39f2db17dbbcfa2eb564b2cd405715dd7107fafd",
+      "RawHistogramSHA256": "94e669b8f1c71480698967238ce28605a5dac5752fd5da06999c4548e8f1e95e"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.8.7",
+      "Endpoint": "127.0.0.1:55008",
+      "Operation": "get",
+      "PayloadBytes": 32,
+      "Concurrency": 32,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 73015,
+        "Completed": 73015,
+        "WorkersWithCompletions": 32,
+        "PeakOutstandingCalls": 32,
+        "ElapsedSecondsIncludingDrain": 5.001981416,
+        "OperationsPerSecond": 14597.21536878257,
+        "ProcessAllocatedBytes": 304584720,
+        "ProcessAllocatedBytesPerOperation": 4171.53625967267,
+        "Collections": [
+          37,
+          0,
+          0
+        ],
+        "SampledPeakWorkingSetBytes": 78921728,
+        "SampledPeakManagedHeapBytes": 10107952,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 2191.4983841402454,
+        "MaxLatencyMicroseconds": 7341.125,
+        "P50": {
+          "LowerMicroseconds": 2112,
+          "UpperMicroseconds": 2175
+        },
+        "P95": {
+          "LowerMicroseconds": 2816,
+          "UpperMicroseconds": 2879
+        },
+        "P99": {
+          "LowerMicroseconds": 3712,
+          "UpperMicroseconds": 3775
+        }
+      },
+      "HistogramCount": 73015,
+      "RawReportSHA256": "0a16d4a096cf3fc99ed5e067c214daf240d14da750280631871892e98ee2c2d3",
+      "RawHistogramSHA256": "4f37980d3697297f8ca7bc63354cf9eef9cdebd2154cb6531ea5f6a705ad2699"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.8.7",
+      "Endpoint": "127.0.0.1:55008",
+      "Operation": "get",
+      "PayloadBytes": 65536,
+      "Concurrency": 1,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 8623,
+        "Completed": 8623,
+        "WorkersWithCompletions": 1,
+        "PeakOutstandingCalls": 1,
+        "ElapsedSecondsIncludingDrain": 5.000840834,
+        "OperationsPerSecond": 1724.3100283003328,
+        "ProcessAllocatedBytes": 1739221160,
+        "ProcessAllocatedBytesPerOperation": 201695.6001391627,
+        "Collections": [
+          212,
+          0,
+          0
+        ],
+        "SampledPeakWorkingSetBytes": 78987264,
+        "SampledPeakManagedHeapBytes": 10598072,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 575.5566923344544,
+        "MaxLatencyMicroseconds": 25998.667,
+        "P50": {
+          "LowerMicroseconds": 472,
+          "UpperMicroseconds": 479
+        },
+        "P95": {
+          "LowerMicroseconds": 1088,
+          "UpperMicroseconds": 1119
+        },
+        "P99": {
+          "LowerMicroseconds": 2240,
+          "UpperMicroseconds": 2303
+        }
+      },
+      "HistogramCount": 8623,
+      "RawReportSHA256": "51bdd5127bcdf66a0718b5b11e92999c2c3e0720dce274a3ff89e551594e4107",
+      "RawHistogramSHA256": "2d61de6c7e204fb0826dfd5a547166265d7c76605787f83723b9676f3ca598e9"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.8.7",
+      "Endpoint": "127.0.0.1:55008",
+      "Operation": "get",
+      "PayloadBytes": 65536,
+      "Concurrency": 256,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 22542,
+        "Completed": 22542,
+        "WorkersWithCompletions": 256,
+        "PeakOutstandingCalls": 256,
+        "ElapsedSecondsIncludingDrain": 5.047121166,
+        "OperationsPerSecond": 4466.308467459527,
+        "ProcessAllocatedBytes": 4546055256,
+        "ProcessAllocatedBytesPerOperation": 201670.44876231035,
+        "Collections": [
+          639,
+          338,
+          97
+        ],
+        "SampledPeakWorkingSetBytes": 133529600,
+        "SampledPeakManagedHeapBytes": 94959496,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 51,
+        "MeanLatencyMicroseconds": 57039.950192529504,
+        "MaxLatencyMicroseconds": 89712.375,
+        "P50": {
+          "LowerMicroseconds": 55296,
+          "UpperMicroseconds": 56319
+        },
+        "P95": {
+          "LowerMicroseconds": 73728,
+          "UpperMicroseconds": 75775
+        },
+        "P99": {
+          "LowerMicroseconds": 81920,
+          "UpperMicroseconds": 83967
+        }
+      },
+      "HistogramCount": 22542,
+      "RawReportSHA256": "19a97823c71640dd8cf48be74dc3b7993a3e6cd95327f0221a18d1eaae868bf7",
+      "RawHistogramSHA256": "560ea3eda733761641adcd93fc24458afb3382b917cb93ffd311a17284cdcd36"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.8.7",
+      "Endpoint": "127.0.0.1:55008",
+      "Operation": "get",
+      "PayloadBytes": 65536,
+      "Concurrency": 32,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 20491,
+        "Completed": 20491,
+        "WorkersWithCompletions": 32,
+        "PeakOutstandingCalls": 32,
+        "ElapsedSecondsIncludingDrain": 5.006266542,
+        "OperationsPerSecond": 4093.0701208357677,
+        "ProcessAllocatedBytes": 4131484688,
+        "ProcessAllocatedBytesPerOperation": 201624.3564491728,
+        "Collections": [
+          509,
+          173,
+          1
+        ],
+        "SampledPeakWorkingSetBytes": 87195648,
+        "SampledPeakManagedHeapBytes": 21476288,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 7809.969919037626,
+        "MaxLatencyMicroseconds": 21911.667,
+        "P50": {
+          "LowerMicroseconds": 7680,
+          "UpperMicroseconds": 7807
+        },
+        "P95": {
+          "LowerMicroseconds": 11264,
+          "UpperMicroseconds": 11519
+        },
+        "P99": {
+          "LowerMicroseconds": 14336,
+          "UpperMicroseconds": 14591
+        }
+      },
+      "HistogramCount": 20491,
+      "RawReportSHA256": "5f465811db173b25a3291e6993144082515d7ac0b269bbf6246ebf5a84bde070",
+      "RawHistogramSHA256": "0381e3a9cd5f6c8d3130155023d29ba5f18bf7be31eeee998b81eaf327f56800"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.8.7",
+      "Endpoint": "127.0.0.1:55008",
+      "Operation": "set",
+      "PayloadBytes": 32,
+      "Concurrency": 1,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 1228,
+        "Completed": 1228,
+        "WorkersWithCompletions": 1,
+        "PeakOutstandingCalls": 1,
+        "ElapsedSecondsIncludingDrain": 5.003040833,
+        "OperationsPerSecond": 245.45072506706842,
+        "ProcessAllocatedBytes": 6301864,
+        "ProcessAllocatedBytesPerOperation": 5131.811074918567,
+        "Collections": [
+          0,
+          0,
+          0
+        ],
+        "SampledPeakWorkingSetBytes": 76611584,
+        "SampledPeakManagedHeapBytes": 7769672,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 4073.30524267101,
+        "MaxLatencyMicroseconds": 127254.083,
+        "P50": {
+          "LowerMicroseconds": 4096,
+          "UpperMicroseconds": 4223
+        },
+        "P95": {
+          "LowerMicroseconds": 8192,
+          "UpperMicroseconds": 8447
+        },
+        "P99": {
+          "LowerMicroseconds": 14080,
+          "UpperMicroseconds": 14335
+        }
+      },
+      "HistogramCount": 1228,
+      "RawReportSHA256": "4a8ecc461256c77eb54ae0bd92101e1f87ee7b104b78494db180a792ecdfcce4",
+      "RawHistogramSHA256": "4166fdc90bdbe1e60c200fe4e0d1e3efa53688a692ec6254d47a570b5e807f8e"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.8.7",
+      "Endpoint": "127.0.0.1:55008",
+      "Operation": "set",
+      "PayloadBytes": 32,
+      "Concurrency": 256,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 50395,
+        "Completed": 50395,
+        "WorkersWithCompletions": 256,
+        "PeakOutstandingCalls": 256,
+        "ElapsedSecondsIncludingDrain": 5.014959083,
+        "OperationsPerSecond": 10048.935428173661,
+        "ProcessAllocatedBytes": 142118184,
+        "ProcessAllocatedBytesPerOperation": 2820.0850084333765,
+        "Collections": [
+          17,
+          0,
+          0
+        ],
+        "SampledPeakWorkingSetBytes": 83296256,
+        "SampledPeakManagedHeapBytes": 16330520,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 25450.334410536758,
+        "MaxLatencyMicroseconds": 83156.417,
+        "P50": {
+          "LowerMicroseconds": 21504,
+          "UpperMicroseconds": 22015
+        },
+        "P95": {
+          "LowerMicroseconds": 49152,
+          "UpperMicroseconds": 50175
+        },
+        "P99": {
+          "LowerMicroseconds": 65536,
+          "UpperMicroseconds": 67583
+        }
+      },
+      "HistogramCount": 50395,
+      "RawReportSHA256": "ef2bb947502cc5283fa7e845f2aa9d0dad4460d13fff8488676f06b8f7fb840d",
+      "RawHistogramSHA256": "4b421b0bbb76ea5cacfa1d93386c101f981c747e952503ae665a10d090024d44"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.8.7",
+      "Endpoint": "127.0.0.1:55008",
+      "Operation": "set",
+      "PayloadBytes": 32,
+      "Concurrency": 32,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 10607,
+        "Completed": 10607,
+        "WorkersWithCompletions": 32,
+        "PeakOutstandingCalls": 32,
+        "ElapsedSecondsIncludingDrain": 5.027601375,
+        "OperationsPerSecond": 2109.753580055857,
+        "ProcessAllocatedBytes": 31335824,
+        "ProcessAllocatedBytesPerOperation": 2954.2588856415573,
+        "Collections": [
+          4,
+          1,
+          0
+        ],
+        "SampledPeakWorkingSetBytes": 78544896,
+        "SampledPeakManagedHeapBytes": 9160880,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 15164.105337795794,
+        "MaxLatencyMicroseconds": 73327.333,
+        "P50": {
+          "LowerMicroseconds": 12288,
+          "UpperMicroseconds": 12543
+        },
+        "P95": {
+          "LowerMicroseconds": 34816,
+          "UpperMicroseconds": 35839
+        },
+        "P99": {
+          "LowerMicroseconds": 53248,
+          "UpperMicroseconds": 54271
+        }
+      },
+      "HistogramCount": 10607,
+      "RawReportSHA256": "ac38bb7e2fc9216cf38dfc312792b24602a38ad1fe7f666b7ce03eff56167866",
+      "RawHistogramSHA256": "0ca477eaabb6764c1e647f8e0a5de45fa8a547a29429d97630e2c7e1c785e1b9"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.8.7",
+      "Endpoint": "127.0.0.1:55008",
+      "Operation": "set",
+      "PayloadBytes": 65536,
+      "Concurrency": 1,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 202,
+        "Completed": 202,
+        "WorkersWithCompletions": 1,
+        "PeakOutstandingCalls": 1,
+        "ElapsedSecondsIncludingDrain": 5.000635958,
+        "OperationsPerSecond": 40.39486211285608,
+        "ProcessAllocatedBytes": 14499048,
+        "ProcessAllocatedBytesPerOperation": 71777.46534653465,
+        "Collections": [
+          2,
+          1,
+          0
+        ],
+        "SampledPeakWorkingSetBytes": 78135296,
+        "SampledPeakManagedHeapBytes": 8967944,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 24752.064113861386,
+        "MaxLatencyMicroseconds": 89024.291,
+        "P50": {
+          "LowerMicroseconds": 22016,
+          "UpperMicroseconds": 22527
+        },
+        "P95": {
+          "LowerMicroseconds": 50176,
+          "UpperMicroseconds": 51199
+        },
+        "P99": {
+          "LowerMicroseconds": 75776,
+          "UpperMicroseconds": 77823
+        }
+      },
+      "HistogramCount": 202,
+      "RawReportSHA256": "b5f96862003989cd33715a9d81a6889e6064144496851901cdd119312563703e",
+      "RawHistogramSHA256": "f4a038389f5cbcf0451fd41c3da66e4b694f50484452e912cba7b71cbf84cafc"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.8.7",
+      "Endpoint": "127.0.0.1:55008",
+      "Operation": "set",
+      "PayloadBytes": 65536,
+      "Concurrency": 256,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 5049,
+        "Completed": 5049,
+        "WorkersWithCompletions": 256,
+        "PeakOutstandingCalls": 256,
+        "ElapsedSecondsIncludingDrain": 5.028261459,
+        "OperationsPerSecond": 1004.1243959108133,
+        "ProcessAllocatedBytes": 345905216,
+        "ProcessAllocatedBytesPerOperation": 68509.6486432957,
+        "Collections": [
+          55,
+          33,
+          11
+        ],
+        "SampledPeakWorkingSetBytes": 140197888,
+        "SampledPeakManagedHeapBytes": 89670760,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 253843.65117647062,
+        "MaxLatencyMicroseconds": 380088.709,
+        "P50": {
+          "LowerMicroseconds": 262144,
+          "UpperMicroseconds": 270335
+        },
+        "P95": {
+          "LowerMicroseconds": 352256,
+          "UpperMicroseconds": 360447
+        },
+        "P99": {
+          "LowerMicroseconds": 368640,
+          "UpperMicroseconds": 376831
+        }
+      },
+      "HistogramCount": 5049,
+      "RawReportSHA256": "6a8fddbafc6f788fc49095397f8737074c31db56df48fadc263b1f5fd13c9ef8",
+      "RawHistogramSHA256": "6991a946f8a6d3b5d30843b09a7f3b3a90b7a5b131bb53f373fd35458bb03bd4"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.8.7",
+      "Endpoint": "127.0.0.1:55008",
+      "Operation": "set",
+      "PayloadBytes": 65536,
+      "Concurrency": 32,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 3282,
+        "Completed": 3282,
+        "WorkersWithCompletions": 32,
+        "PeakOutstandingCalls": 32,
+        "ElapsedSecondsIncludingDrain": 5.040234875,
+        "OperationsPerSecond": 651.1601307072024,
+        "ProcessAllocatedBytes": 224845032,
+        "ProcessAllocatedBytesPerOperation": 68508.5411334552,
+        "Collections": [
+          29,
+          15,
+          1
+        ],
+        "SampledPeakWorkingSetBytes": 82034688,
+        "SampledPeakManagedHeapBytes": 19032944,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 49021.035814747105,
+        "MaxLatencyMicroseconds": 629378.916,
+        "P50": {
+          "LowerMicroseconds": 36864,
+          "UpperMicroseconds": 37887
+        },
+        "P95": {
+          "LowerMicroseconds": 90112,
+          "UpperMicroseconds": 92159
+        },
+        "P99": {
+          "LowerMicroseconds": 155648,
+          "UpperMicroseconds": 159743
+        }
+      },
+      "HistogramCount": 3282,
+      "RawReportSHA256": "589215ed85b30bf759b559784b72d97ad86b125a118aa752726087421914a1fe",
+      "RawHistogramSHA256": "f4f2ee9e864c256e1a497b2b17ddacc332f5f5b584b2b44d6e08998e87e899f3"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.9.6",
+      "Endpoint": "127.0.0.1:55010",
+      "Operation": "get",
+      "PayloadBytes": 32,
+      "Concurrency": 1,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 17707,
+        "Completed": 17707,
+        "WorkersWithCompletions": 1,
+        "PeakOutstandingCalls": 1,
+        "ElapsedSecondsIncludingDrain": 5.000095417,
+        "OperationsPerSecond": 3541.332419336909,
+        "ProcessAllocatedBytes": 88357928,
+        "ProcessAllocatedBytesPerOperation": 4989.999887050319,
+        "Collections": [
+          10,
+          0,
+          0
+        ],
+        "SampledPeakWorkingSetBytes": 77643776,
+        "SampledPeakManagedHeapBytes": 8571496,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 282.28905223922743,
+        "MaxLatencyMicroseconds": 3553.666,
+        "P50": {
+          "LowerMicroseconds": 264,
+          "UpperMicroseconds": 271
+        },
+        "P95": {
+          "LowerMicroseconds": 368,
+          "UpperMicroseconds": 375
+        },
+        "P99": {
+          "LowerMicroseconds": 496,
+          "UpperMicroseconds": 503
+        }
+      },
+      "HistogramCount": 17707,
+      "RawReportSHA256": "f363019ada869118fb6d2288cc4c63e3eda797f42a262b72ef368fa20e8f18ad",
+      "RawHistogramSHA256": "8266279970acd904d560a5849777abc39cb4de8bd36e3ec9ca2bd40354ee8fae"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.9.6",
+      "Endpoint": "127.0.0.1:55010",
+      "Operation": "get",
+      "PayloadBytes": 32,
+      "Concurrency": 256,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 74163,
+        "Completed": 74163,
+        "WorkersWithCompletions": 256,
+        "PeakOutstandingCalls": 256,
+        "ElapsedSecondsIncludingDrain": 5.0128115,
+        "OperationsPerSecond": 14794.691561811173,
+        "ProcessAllocatedBytes": 310028832,
+        "ProcessAllocatedBytesPerOperation": 4180.370696978278,
+        "Collections": [
+          37,
+          0,
+          0
+        ],
+        "SampledPeakWorkingSetBytes": 81707008,
+        "SampledPeakManagedHeapBytes": 14698424,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 17279.882369618274,
+        "MaxLatencyMicroseconds": 28510.625,
+        "P50": {
+          "LowerMicroseconds": 16384,
+          "UpperMicroseconds": 16895
+        },
+        "P95": {
+          "LowerMicroseconds": 20992,
+          "UpperMicroseconds": 21503
+        },
+        "P99": {
+          "LowerMicroseconds": 24064,
+          "UpperMicroseconds": 24575
+        }
+      },
+      "HistogramCount": 74163,
+      "RawReportSHA256": "795960ceec8154009cd4b7a2159ad39238a2f2a08e2fa67bc253b07b115ce9c8",
+      "RawHistogramSHA256": "b10ea6c363db031c705f0152f47463f57499ca78d58eeb8570da35c08f40eebd"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.9.6",
+      "Endpoint": "127.0.0.1:55010",
+      "Operation": "get",
+      "PayloadBytes": 32,
+      "Concurrency": 32,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 65197,
+        "Completed": 65197,
+        "WorkersWithCompletions": 32,
+        "PeakOutstandingCalls": 32,
+        "ElapsedSecondsIncludingDrain": 5.003654584,
+        "OperationsPerSecond": 13029.876244550936,
+        "ProcessAllocatedBytes": 267175928,
+        "ProcessAllocatedBytesPerOperation": 4097.978864058162,
+        "Collections": [
+          32,
+          0,
+          0
+        ],
+        "SampledPeakWorkingSetBytes": 79101952,
+        "SampledPeakManagedHeapBytes": 9697496,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 2455.276261806525,
+        "MaxLatencyMicroseconds": 42852.292,
+        "P50": {
+          "LowerMicroseconds": 2176,
+          "UpperMicroseconds": 2239
+        },
+        "P95": {
+          "LowerMicroseconds": 3136,
+          "UpperMicroseconds": 3199
+        },
+        "P99": {
+          "LowerMicroseconds": 8064,
+          "UpperMicroseconds": 8191
+        }
+      },
+      "HistogramCount": 65197,
+      "RawReportSHA256": "e9c48c97b03fc293f8be35db68fadbc1837fd228b10c00f4204f5ba9a598383c",
+      "RawHistogramSHA256": "cfbfbe823cdeaa5334ca80b4a34f752930f09228a9280ab1629c73050020adfa"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.9.6",
+      "Endpoint": "127.0.0.1:55010",
+      "Operation": "get",
+      "PayloadBytes": 65536,
+      "Concurrency": 1,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 10430,
+        "Completed": 10430,
+        "WorkersWithCompletions": 1,
+        "PeakOutstandingCalls": 1,
+        "ElapsedSecondsIncludingDrain": 5.000152541,
+        "OperationsPerSecond": 2085.936361836286,
+        "ProcessAllocatedBytes": 2103695736,
+        "ProcessAllocatedBytesPerOperation": 201696.61898370087,
+        "Collections": [
+          256,
+          0,
+          0
+        ],
+        "SampledPeakWorkingSetBytes": 78905344,
+        "SampledPeakManagedHeapBytes": 10472896,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 476.1531611697028,
+        "MaxLatencyMicroseconds": 9407.167,
+        "P50": {
+          "LowerMicroseconds": 384,
+          "UpperMicroseconds": 391
+        },
+        "P95": {
+          "LowerMicroseconds": 928,
+          "UpperMicroseconds": 943
+        },
+        "P99": {
+          "LowerMicroseconds": 1760,
+          "UpperMicroseconds": 1791
+        }
+      },
+      "HistogramCount": 10430,
+      "RawReportSHA256": "ed7e58273430bcbb60a34cb5e36d5ffdfae3b24070640128097f8f100baf0d64",
+      "RawHistogramSHA256": "5e9af490e5cb90f3477f2d079289bc089ed7427cca7620f8a8ae7676b3c94e0e"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.9.6",
+      "Endpoint": "127.0.0.1:55010",
+      "Operation": "get",
+      "PayloadBytes": 65536,
+      "Concurrency": 256,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 22871,
+        "Completed": 22871,
+        "WorkersWithCompletions": 256,
+        "PeakOutstandingCalls": 256,
+        "ElapsedSecondsIncludingDrain": 5.0430585,
+        "OperationsPerSecond": 4535.1446944349345,
+        "ProcessAllocatedBytes": 4612613360,
+        "ProcessAllocatedBytesPerOperation": 201679.56626295307,
+        "Collections": [
+          649,
+          345,
+          99
+        ],
+        "SampledPeakWorkingSetBytes": 135593984,
+        "SampledPeakManagedHeapBytes": 83016080,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 51,
+        "MeanLatencyMicroseconds": 56195.431373005114,
+        "MaxLatencyMicroseconds": 93416.792,
+        "P50": {
+          "LowerMicroseconds": 53248,
+          "UpperMicroseconds": 54271
+        },
+        "P95": {
+          "LowerMicroseconds": 75776,
+          "UpperMicroseconds": 77823
+        },
+        "P99": {
+          "LowerMicroseconds": 86016,
+          "UpperMicroseconds": 88063
+        }
+      },
+      "HistogramCount": 22871,
+      "RawReportSHA256": "6bb1963ecb40d5f39d25811732f01cb6ac57d9044bcf8cb7921a93501d9ca591",
+      "RawHistogramSHA256": "5da462096a485b7e3dd8fbdaa82eabdac4c975815a78bfbee01502af2d74c08e"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.9.6",
+      "Endpoint": "127.0.0.1:55010",
+      "Operation": "get",
+      "PayloadBytes": 65536,
+      "Concurrency": 32,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 23619,
+        "Completed": 23619,
+        "WorkersWithCompletions": 32,
+        "PeakOutstandingCalls": 32,
+        "ElapsedSecondsIncludingDrain": 5.0045955,
+        "OperationsPerSecond": 4719.46234216132,
+        "ProcessAllocatedBytes": 4763590792,
+        "ProcessAllocatedBytesPerOperation": 201684.69418688345,
+        "Collections": [
+          587,
+          198,
+          0
+        ],
+        "SampledPeakWorkingSetBytes": 87588864,
+        "SampledPeakManagedHeapBytes": 20979256,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 6773.351367797112,
+        "MaxLatencyMicroseconds": 17881.708,
+        "P50": {
+          "LowerMicroseconds": 6528,
+          "UpperMicroseconds": 6655
+        },
+        "P95": {
+          "LowerMicroseconds": 8448,
+          "UpperMicroseconds": 8703
+        },
+        "P99": {
+          "LowerMicroseconds": 9984,
+          "UpperMicroseconds": 10239
+        }
+      },
+      "HistogramCount": 23619,
+      "RawReportSHA256": "ad143bf357ab5cec4a4dd094940b2b64730c1c00632452523fc97a9de1353be5",
+      "RawHistogramSHA256": "baa57d5b29bf1d425e45c827535a4b2103b8c24fb2181db3462c3a0e672d2587"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.9.6",
+      "Endpoint": "127.0.0.1:55010",
+      "Operation": "set",
+      "PayloadBytes": 32,
+      "Concurrency": 1,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 867,
+        "Completed": 867,
+        "WorkersWithCompletions": 1,
+        "PeakOutstandingCalls": 1,
+        "ElapsedSecondsIncludingDrain": 5.00495375,
+        "OperationsPerSecond": 173.2283739884709,
+        "ProcessAllocatedBytes": 4497448,
+        "ProcessAllocatedBytesPerOperation": 5187.3679354094575,
+        "Collections": [
+          0,
+          0,
+          0
+        ],
+        "SampledPeakWorkingSetBytes": 74432512,
+        "SampledPeakManagedHeapBytes": 5684256,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 5771.539272202998,
+        "MaxLatencyMicroseconds": 68675.875,
+        "P50": {
+          "LowerMicroseconds": 5376,
+          "UpperMicroseconds": 5503
+        },
+        "P95": {
+          "LowerMicroseconds": 17920,
+          "UpperMicroseconds": 18431
+        },
+        "P99": {
+          "LowerMicroseconds": 32768,
+          "UpperMicroseconds": 33791
+        }
+      },
+      "HistogramCount": 867,
+      "RawReportSHA256": "d7383174e893cd82f450955f4646f1801dbac66b906eff5645affe9215e1dd86",
+      "RawHistogramSHA256": "6c9db8ba32213d03493a43f3cd4d5b1539b80f4e437e1272a24bcd4d6554781e"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.9.6",
+      "Endpoint": "127.0.0.1:55010",
+      "Operation": "set",
+      "PayloadBytes": 32,
+      "Concurrency": 256,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 63890,
+        "Completed": 63890,
+        "WorkersWithCompletions": 256,
+        "PeakOutstandingCalls": 256,
+        "ElapsedSecondsIncludingDrain": 5.010099166,
+        "OperationsPerSecond": 12752.24259702807,
+        "ProcessAllocatedBytes": 179922456,
+        "ProcessAllocatedBytesPerOperation": 2816.1285960244168,
+        "Collections": [
+          22,
+          0,
+          0
+        ],
+        "SampledPeakWorkingSetBytes": 82673664,
+        "SampledPeakManagedHeapBytes": 15754984,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 20054.00052748474,
+        "MaxLatencyMicroseconds": 77560.667,
+        "P50": {
+          "LowerMicroseconds": 17920,
+          "UpperMicroseconds": 18431
+        },
+        "P95": {
+          "LowerMicroseconds": 34816,
+          "UpperMicroseconds": 35839
+        },
+        "P99": {
+          "LowerMicroseconds": 44032,
+          "UpperMicroseconds": 45055
+        }
+      },
+      "HistogramCount": 63890,
+      "RawReportSHA256": "9d11ab190a0ec0b10452bc07a387e5c26da9471a4f98782ce410cc64e824e949",
+      "RawHistogramSHA256": "45d6693f3d3bea0fcc586b107f596e050776ee081947348baecc66de9b23b847"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.9.6",
+      "Endpoint": "127.0.0.1:55010",
+      "Operation": "set",
+      "PayloadBytes": 32,
+      "Concurrency": 32,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 6951,
+        "Completed": 6951,
+        "WorkersWithCompletions": 32,
+        "PeakOutstandingCalls": 32,
+        "ElapsedSecondsIncludingDrain": 5.001064709,
+        "OperationsPerSecond": 1389.9040313337405,
+        "ProcessAllocatedBytes": 19963384,
+        "ProcessAllocatedBytesPerOperation": 2872.0161127895267,
+        "Collections": [
+          2,
+          1,
+          0
+        ],
+        "SampledPeakWorkingSetBytes": 78331904,
+        "SampledPeakManagedHeapBytes": 9041408,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 49,
+        "MeanLatencyMicroseconds": 23021.176009782765,
+        "MaxLatencyMicroseconds": 754458.583,
+        "P50": {
+          "LowerMicroseconds": 12800,
+          "UpperMicroseconds": 13055
+        },
+        "P95": {
+          "LowerMicroseconds": 41984,
+          "UpperMicroseconds": 43007
+        },
+        "P99": {
+          "LowerMicroseconds": 417792,
+          "UpperMicroseconds": 425983
+        }
+      },
+      "HistogramCount": 6951,
+      "RawReportSHA256": "e74fce0f1d79919424c57077fea586abe7ff63521f52a18ed45d923f34fb7f20",
+      "RawHistogramSHA256": "576b121b8fa3b0671f01fac7592155b6606169d7635f4f5444b17896925968c2"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.9.6",
+      "Endpoint": "127.0.0.1:55010",
+      "Operation": "set",
+      "PayloadBytes": 65536,
+      "Concurrency": 1,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 572,
+        "Completed": 572,
+        "WorkersWithCompletions": 1,
+        "PeakOutstandingCalls": 1,
+        "ElapsedSecondsIncludingDrain": 5.00041525,
+        "OperationsPerSecond": 114.39049986898588,
+        "ProcessAllocatedBytes": 40579608,
+        "ProcessAllocatedBytesPerOperation": 70943.37062937063,
+        "Collections": [
+          5,
+          1,
+          0
+        ],
+        "SampledPeakWorkingSetBytes": 78135296,
+        "SampledPeakManagedHeapBytes": 9505512,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 8740.173704545456,
+        "MaxLatencyMicroseconds": 49456,
+        "P50": {
+          "LowerMicroseconds": 7168,
+          "UpperMicroseconds": 7295
+        },
+        "P95": {
+          "LowerMicroseconds": 19456,
+          "UpperMicroseconds": 19967
+        },
+        "P99": {
+          "LowerMicroseconds": 32256,
+          "UpperMicroseconds": 32767
+        }
+      },
+      "HistogramCount": 572,
+      "RawReportSHA256": "59bfb56d8f79471ad99b53e435f4637f415acd8a1159b551cc696d842dc2ee08",
+      "RawHistogramSHA256": "c4c29fe1e06db21df1f0f0ff2a567572b5151ceb8d0948f1dfae2c017d013640"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.9.6",
+      "Endpoint": "127.0.0.1:55010",
+      "Operation": "set",
+      "PayloadBytes": 65536,
+      "Concurrency": 256,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 6825,
+        "Completed": 6825,
+        "WorkersWithCompletions": 256,
+        "PeakOutstandingCalls": 256,
+        "ElapsedSecondsIncludingDrain": 5.247411666,
+        "OperationsPerSecond": 1300.6412369400714,
+        "ProcessAllocatedBytes": 468321280,
+        "ProcessAllocatedBytesPerOperation": 68618.50256410257,
+        "Collections": [
+          75,
+          45,
+          15
+        ],
+        "SampledPeakWorkingSetBytes": 141705216,
+        "SampledPeakManagedHeapBytes": 99940448,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 52,
+        "MeanLatencyMicroseconds": 192650.81303472526,
+        "MaxLatencyMicroseconds": 340225.375,
+        "P50": {
+          "LowerMicroseconds": 163840,
+          "UpperMicroseconds": 167935
+        },
+        "P95": {
+          "LowerMicroseconds": 327680,
+          "UpperMicroseconds": 335871
+        },
+        "P99": {
+          "LowerMicroseconds": 335872,
+          "UpperMicroseconds": 344063
+        }
+      },
+      "HistogramCount": 6825,
+      "RawReportSHA256": "fcb549e4768c904cd5eaa4e321d35fa12bbdd3fa031dadc4ff61c6612b71e2c5",
+      "RawHistogramSHA256": "00c0285ed3e47bfb4919efedc5026a0e30bf46ea0be20376bf5852b2ee24e2e2"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "RequestOutcome": null,
+      "Version": "3.9.6",
+      "Endpoint": "127.0.0.1:55010",
+      "Operation": "set",
+      "PayloadBytes": 65536,
+      "Concurrency": 32,
+      "RequestedSeconds": 5,
+      "WarmupSeconds": 1,
+      "OperationTimeoutMilliseconds": 5000,
+      "SamplingIntervalMilliseconds": 100,
+      "SessionRetained": true,
+      "AcknowledgedClose": true,
+      "NamespaceRemoved": true,
+      "TimingGate": false,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Measurement": {
+        "Started": 4361,
+        "Completed": 4361,
+        "WorkersWithCompletions": 32,
+        "PeakOutstandingCalls": 32,
+        "ElapsedSecondsIncludingDrain": 5.029610334,
+        "OperationsPerSecond": 867.0651820718166,
+        "ProcessAllocatedBytes": 298432832,
+        "ProcessAllocatedBytesPerOperation": 68432.2017885806,
+        "Collections": [
+          38,
+          19,
+          0
+        ],
+        "SampledPeakWorkingSetBytes": 82673664,
+        "SampledPeakManagedHeapBytes": 17417536,
+        "ProcessLifetimePeakWorkingSetBytes": null,
+        "ResourceSamples": 50,
+        "MeanLatencyMicroseconds": 36851.32725636322,
+        "MaxLatencyMicroseconds": 112087.292,
+        "P50": {
+          "LowerMicroseconds": 32768,
+          "UpperMicroseconds": 33791
+        },
+        "P95": {
+          "LowerMicroseconds": 71680,
+          "UpperMicroseconds": 73727
+        },
+        "P99": {
+          "LowerMicroseconds": 98304,
+          "UpperMicroseconds": 100351
+        }
+      },
+      "HistogramCount": 4361,
+      "RawReportSHA256": "9b51c6f5192cac72671c057997ef0c23e709c7f4edcc87118010c72b1c88cae6",
+      "RawHistogramSHA256": "cf7bd81e898ec1e8e97ee203bc5c1f007cd9df1082d233be1b4e730f82a64b19"
+    }
+  ],
+  "HostMachine": {
+    "OS": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "Architecture": "arm64",
+    "LogicalProcessors": 16,
+    "Processor": "Apple M4 Max",
+    "PhysicalMemoryBytes": 51539607552
+  }
+}

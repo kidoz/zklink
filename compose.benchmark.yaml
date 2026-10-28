@@ -1,0 +1,10 @@
+x-benchmark-labels: &benchmark-labels
+  org.zklink.benchmark-run: ${ZKLINK_LIVE_BENCHMARK_RUN_ID:?The benchmark runner must supply its run ID}
+
+services:
+  zoo1:
+    labels: *benchmark-labels
+  zoo2:
+    labels: *benchmark-labels
+  zoo3:
+    labels: *benchmark-labels

@@ -5,6 +5,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Using Include="Xunit" />
+    <Compile
+      Include="../../benchmarks/ZkLink.Benchmarks/LatencyHistogram.cs"
+      Link="LatencyHistogram.cs"
+    />
     <PackageReference Include="xunit.v3.mtp-v2" />
     <PackageReference Include="NSubstitute" />
     <ProjectReference Include="../../src/ZkLink/ZkLink.csproj" />

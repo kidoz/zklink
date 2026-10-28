@@ -24,6 +24,10 @@ test project:
 bench *args:
     bash dev/run-benchmarks.sh "$@"
 
+# Measure live get/set requests on both pinned versions (seconds per case).
+bench-live seconds="5":
+    bash dev/run-live-benchmarks.sh "$1"
+
 # Check the measured allocation budgets without a timing gate.
 bench-allocations output="artifacts/benchmarks/allocations.json":
     dotnet run --project benchmarks/ZkLink.Benchmarks -c Release -- --allocations "$1"

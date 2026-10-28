@@ -8,8 +8,45 @@ namespace ZkLink.Benchmarks;
 
 internal static class Program
 {
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "The executable boundary must return failure without printing exception text that could contain credentials or paths."
+    )]
     internal static async Task<int> Main(string[] args)
     {
+        if (args.Length > 0 && args[0] == "--live")
+        {
+            try
+            {
+                if (
+                    args
+                    is not [
+                        _,
+                        string seconds,
+                        string operation,
+                        string payload,
+                        string concurrency,
+                        string liveOutput,
+                    ]
+                )
+                {
+                    throw new InvalidOperationException("Invalid live benchmark arguments.");
+                }
+                return await LiveBenchmark
+                    .RunAsync(
+                        LiveSettings.Read(seconds, operation, payload, concurrency, liveOutput)
+                    )
+                    .ConfigureAwait(false);
+            }
+            catch (Exception error)
+            {
+                await Console
+                    .Error.WriteLineAsync("Live benchmark failed: " + error.GetType().Name)
+                    .ConfigureAwait(false);
+                return 1;
+            }
+        }
         if (args is ["--allocations", string output])
         {
             return await AllocationCheck.RunAsync(output).ConfigureAwait(true);
