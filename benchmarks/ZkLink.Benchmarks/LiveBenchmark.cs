@@ -206,7 +206,8 @@ internal static class LiveBenchmark
         string user,
         string password,
         CancellationToken token,
-        int? watchLimit = null
+        int? watchLimit = null,
+        int? eventBudget = null
     )
     {
         var defaults = new ZooKeeperClientOptions { ConnectionString = settings.Endpoint };
@@ -229,7 +230,7 @@ internal static class LiveBenchmark
                     CloseTimeout = CloseGuard,
                     SessionTimeout = SessionTimeout,
                     MaxWatches = watchLimit ?? defaults.MaxWatches,
-                    MaxBufferedEvents = watchLimit ?? defaults.MaxBufferedEvents,
+                    MaxBufferedEvents = eventBudget ?? watchLimit ?? defaults.MaxBufferedEvents,
                 },
                 token
             )

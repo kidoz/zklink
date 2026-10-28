@@ -1,0 +1,374 @@
+{
+  "ObservedOn": "2026-10-28",
+  "Revision": "93690c332dfdbc42e6a582f81cd12bd27ea33581",
+  "WorkingTree": "Recovery benchmark implementation pending; measured source hashes below.",
+  "Scope": "One controlled reconnect per native patch; inspecting proxy and explicit gates, active timings exclude the recorded hold. Process resources include both clients, proxy/path inspection and harness.",
+  "InputSHA256": {
+    "benchmarks/ZkLink.Benchmarks/AllocationCheck.cs": "0ae156d87caba38a6c1d667f11c93917bac92dd7dbe6d6aedc3813b77ebe08d3",
+    "benchmarks/ZkLink.Benchmarks/CodecWorkload.cs": "7757ccbadb26510a7cf61d88e3e83e12f5bde824d4efa855e69c7e0c2044bc86",
+    "benchmarks/ZkLink.Benchmarks/FrameWorkload.cs": "7c8bcaf587c4149b823e53f94ce50cf5288ca33bdf26b4eb14aeaaa4539a6546",
+    "benchmarks/ZkLink.Benchmarks/LatencyHistogram.cs": "6a53f5ebde0e28f8f1291ae2975998334972b5f2c830cb1c5758913ea8b2843b",
+    "benchmarks/ZkLink.Benchmarks/LiveBenchmark.cs": "ee252f16eecb7645c08730c0b7949bfede5fbbaa0b5e11707ecb180d4a2a1d9f",
+    "benchmarks/ZkLink.Benchmarks/LiveInterval.cs": "322823e880173bfc417115f80bb50cad91aa561d82ffcfe8dfd29136d4e94f3a",
+    "benchmarks/ZkLink.Benchmarks/LiveReport.cs": "a034c567b3c78eade4a127ba5c5289fc6426b18d850ca358a5356379913ea153",
+    "benchmarks/ZkLink.Benchmarks/LiveResources.cs": "818d76c8799be9c4835111f236c2af5f8267b3b52df3977dc8eeac8552676e61",
+    "benchmarks/ZkLink.Benchmarks/LiveSettings.cs": "47e80ef2a3bcea026f4b34cd5fab43a2e3724a82d53f6247a34441bb9d29257c",
+    "benchmarks/ZkLink.Benchmarks/Program.cs": "b6ae633f86151bb9927f015202540d178d44ce32c61d605736107fa80494349a",
+    "benchmarks/ZkLink.Benchmarks/ProtocolBenchmarks.cs": "2dd1d066121d6c969885b3a9317308e9eb74cbdd315c992398d158f49448d90d",
+    "benchmarks/ZkLink.Benchmarks/RecoveryProxy.cs": "e289908b1fa7eb8b3957dc8c15a2f87203a8bb4e5d79a230e3bc516bb49a4dc8",
+    "benchmarks/ZkLink.Benchmarks/RecoverySettings.cs": "4df5e2ec474943cb47ce04fdc4a0ebb6e9e366a8645871fd279db3a1ae2d6e86",
+    "benchmarks/ZkLink.Benchmarks/WatchConsumer.cs": "776781651cfafd8e54b28f99625956f7bcb3e66a048be42b5dea7f35d193cb90",
+    "benchmarks/ZkLink.Benchmarks/WatchCounters.cs": "dda05b2393b0c0f1fee81aefc05d1c8a858623bc58f6f95a37d5f6a672d2aee0",
+    "benchmarks/ZkLink.Benchmarks/WatchFanoutBenchmark.cs": "046f035492022d2c453a306f03560b0cfe489d58efb9345a13da3a139ed99b13",
+    "benchmarks/ZkLink.Benchmarks/WatchFanoutInterval.cs": "3018badc47054e1bfe3c9508023f9a245dc430d48a15be8a63cc3efa2036db36",
+    "benchmarks/ZkLink.Benchmarks/WatchRecoveryBenchmark.cs": "c909e322ebf3247ec39ceaace965472c4c5d0cb05141b65736d8ad90ff1a5f38",
+    "benchmarks/ZkLink.Benchmarks/WatchRecoveryRun.cs": "1a33b5d9563850da534601610060eec6f359b4508bb379d84f971c51c9eb797d",
+    "dev/run-live-benchmarks.sh": "3b90f29e16d0665d1cc4fc20abb507ba675d49008c6b2d4895ecc317fc2c185a",
+    "dev/run-live-benchmark-process.py": "c6f9c032941d5955f6769269ec02a9ac86a550eb05745c41e25c03da6cd6fc8d",
+    "HEAD": "93690c332dfdbc42e6a582f81cd12bd27ea33581"
+  },
+  "HostMachine": {
+    "OS": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+    "Architecture": "arm64",
+    "LogicalProcessors": 16,
+    "Processor": "Apple M4 Max",
+    "PhysicalMemoryBytes": 51539607552
+  },
+  "DockerHost": "16 8318709760 7.0.14-linuxkit Docker Desktop aarch64",
+  "FullCases": [
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "Version": "3.8.7",
+      "Watches": 10000,
+      "EventBudget": 20000,
+      "AdmissionProbeSyncTransmissions": 0,
+      "DistinctPaths": 10000,
+      "OwnerSessionRetained": true,
+      "ControlSessionRetained": true,
+      "EphemeralRetained": true,
+      "AcknowledgedClose": true,
+      "FinalCountersZero": true,
+      "NamespaceRemoved": true,
+      "SetupMilliseconds": 4720.2715,
+      "TimingGate": false,
+      "StopwatchFrequency": 1000000000,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Wire": {
+        "Connections": 2,
+        "Handshakes": 2,
+        "AuthenticationRequests": 2,
+        "AddWatchRequests": 10000,
+        "SyncRequests": 313,
+        "RestoreFrames": 8,
+        "RestoreReplies": 8,
+        "RestorePaths": 10000,
+        "DistinctRestorePaths": 10000,
+        "MaximumRestoreFrameBytes": 131072,
+        "SecondHandshakeAt": 2857610173875,
+        "FirstResetAt": 2857624004583,
+        "LastResetReplyAt": 2857642827041,
+        "HeldAt": 2857626700583,
+        "ErrorType": null
+      },
+      "Measurement": {
+        "GapCount": 10000,
+        "PostRecoveryInvalidations": 10000,
+        "ProtectedReads": 10000,
+        "PausedAdmissionRejected": true,
+        "RestoringAdmissionRejected": true,
+        "PausedState": "Connecting",
+        "CutToReconnectPausedObservedMilliseconds": 25.649625,
+        "DeliberatePreHandshakePauseMilliseconds": 1.361333,
+        "ReconnectHandshakeObservedMilliseconds": 1.450209,
+        "ControlledAckHoldMilliseconds": 0.232083,
+        "RawReadinessMilliseconds": 48.105709,
+        "ActiveReadinessMilliseconds": 47.873626,
+        "ActiveRestoreAckForwardingMilliseconds": 18.590375,
+        "AckReleaseToAllGapsMilliseconds": 32.694875,
+        "GapTailAfterReadinessMilliseconds": 2.798166,
+        "GapP50": {
+          "LowerMicroseconds": 31232,
+          "UpperMicroseconds": 31743
+        },
+        "GapP95": {
+          "LowerMicroseconds": 32256,
+          "UpperMicroseconds": 32767
+        },
+        "GapP99": {
+          "LowerMicroseconds": 32256,
+          "UpperMicroseconds": 32767
+        },
+        "ResourcesDuringControlledRecovery": {
+          "ProcessAllocatedBytes": 14033176,
+          "Collections": [
+            2,
+            1,
+            0
+          ],
+          "SampledPeakWorkingSetBytes": 196345856,
+          "SampledPeakManagedHeapBytes": 221239048,
+          "ProcessLifetimePeakWorkingSetBytes": null,
+          "ResourceSamples": 1
+        }
+      },
+      "RawReportSHA256": "cbf98a8a9e44456b2ecf6c3f3cb41030a8cbaba1ea1a5046709439261ca020ff",
+      "RawHistogramSHA256": "027ac732f315517512cd19844ecdd6a383e22b63ceb036ec6c4255fc69753214"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "Version": "3.9.6",
+      "Watches": 10000,
+      "EventBudget": 20000,
+      "AdmissionProbeSyncTransmissions": 0,
+      "DistinctPaths": 10000,
+      "OwnerSessionRetained": true,
+      "ControlSessionRetained": true,
+      "EphemeralRetained": true,
+      "AcknowledgedClose": true,
+      "FinalCountersZero": true,
+      "NamespaceRemoved": true,
+      "SetupMilliseconds": 4265.545,
+      "TimingGate": false,
+      "StopwatchFrequency": 1000000000,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Wire": {
+        "Connections": 2,
+        "Handshakes": 2,
+        "AuthenticationRequests": 2,
+        "AddWatchRequests": 10000,
+        "SyncRequests": 313,
+        "RestoreFrames": 8,
+        "RestoreReplies": 8,
+        "RestorePaths": 10000,
+        "DistinctRestorePaths": 10000,
+        "MaximumRestoreFrameBytes": 131072,
+        "SecondHandshakeAt": 2890293698041,
+        "FirstResetAt": 2890302206666,
+        "LastResetReplyAt": 2890326720166,
+        "HeldAt": 2890304818083,
+        "ErrorType": null
+      },
+      "Measurement": {
+        "GapCount": 10000,
+        "PostRecoveryInvalidations": 10000,
+        "ProtectedReads": 10000,
+        "PausedAdmissionRejected": true,
+        "RestoringAdmissionRejected": true,
+        "PausedState": "Connecting",
+        "CutToReconnectPausedObservedMilliseconds": 38.407875,
+        "DeliberatePreHandshakePauseMilliseconds": 1.153208,
+        "ReconnectHandshakeObservedMilliseconds": 1.22475,
+        "ControlledAckHoldMilliseconds": 0.192625,
+        "RawReadinessMilliseconds": 41.689584,
+        "ActiveReadinessMilliseconds": 41.496959,
+        "ActiveRestoreAckForwardingMilliseconds": 24.320875,
+        "AckReleaseToAllGapsMilliseconds": 31.794583,
+        "GapTailAfterReadinessMilliseconds": 2.642416,
+        "GapP50": {
+          "LowerMicroseconds": 30208,
+          "UpperMicroseconds": 30719
+        },
+        "GapP95": {
+          "LowerMicroseconds": 31232,
+          "UpperMicroseconds": 31743
+        },
+        "GapP99": {
+          "LowerMicroseconds": 31232,
+          "UpperMicroseconds": 31743
+        },
+        "ResourcesDuringControlledRecovery": {
+          "ProcessAllocatedBytes": 14006760,
+          "Collections": [
+            1,
+            0,
+            0
+          ],
+          "SampledPeakWorkingSetBytes": 195444736,
+          "SampledPeakManagedHeapBytes": 226109144,
+          "ProcessLifetimePeakWorkingSetBytes": null,
+          "ResourceSamples": 1
+        }
+      },
+      "RawReportSHA256": "cfb234cc4796627c091ff1473273af7c1efdcae7713ff66d28398fcbb48ac846",
+      "RawHistogramSHA256": "11cb1cef81d21b8679c8cebc46bfecfec1d47d0fd90ffc047cb3203dadd77e00"
+    }
+  ],
+  "SmokeCases": [
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "Version": "3.8.7",
+      "Watches": 100,
+      "EventBudget": 200,
+      "AdmissionProbeSyncTransmissions": 0,
+      "DistinctPaths": 100,
+      "OwnerSessionRetained": true,
+      "ControlSessionRetained": true,
+      "EphemeralRetained": true,
+      "AcknowledgedClose": true,
+      "FinalCountersZero": true,
+      "NamespaceRemoved": true,
+      "SetupMilliseconds": 165.1466,
+      "TimingGate": false,
+      "StopwatchFrequency": 1000000000,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Wire": {
+        "Connections": 2,
+        "Handshakes": 2,
+        "AuthenticationRequests": 2,
+        "AddWatchRequests": 100,
+        "SyncRequests": 4,
+        "RestoreFrames": 1,
+        "RestoreReplies": 1,
+        "RestorePaths": 100,
+        "DistinctRestorePaths": 100,
+        "MaximumRestoreFrameBytes": 9436,
+        "SecondHandshakeAt": 2813359557208,
+        "FirstResetAt": 2813362255541,
+        "LastResetReplyAt": 2813363674333,
+        "HeldAt": 2813363382291,
+        "ErrorType": null
+      },
+      "Measurement": {
+        "GapCount": 100,
+        "PostRecoveryInvalidations": 100,
+        "ProtectedReads": 100,
+        "PausedAdmissionRejected": true,
+        "RestoringAdmissionRejected": true,
+        "PausedState": "Connecting",
+        "CutToReconnectPausedObservedMilliseconds": 33.703875,
+        "DeliberatePreHandshakePauseMilliseconds": 1.165334,
+        "ReconnectHandshakeObservedMilliseconds": 1.256583,
+        "ControlledAckHoldMilliseconds": 0.108125,
+        "RawReadinessMilliseconds": 6.354625,
+        "ActiveReadinessMilliseconds": 6.2465,
+        "ActiveRestoreAckForwardingMilliseconds": 1.310667,
+        "AckReleaseToAllGapsMilliseconds": 1.4055,
+        "GapTailAfterReadinessMilliseconds": 0.240666,
+        "GapP50": {
+          "LowerMicroseconds": 1344,
+          "UpperMicroseconds": 1375
+        },
+        "GapP95": {
+          "LowerMicroseconds": 1376,
+          "UpperMicroseconds": 1407
+        },
+        "GapP99": {
+          "LowerMicroseconds": 1376,
+          "UpperMicroseconds": 1407
+        },
+        "ResourcesDuringControlledRecovery": {
+          "ProcessAllocatedBytes": 195400,
+          "Collections": [
+            0,
+            0,
+            0
+          ],
+          "SampledPeakWorkingSetBytes": 65028096,
+          "SampledPeakManagedHeapBytes": 2430624,
+          "ProcessLifetimePeakWorkingSetBytes": null,
+          "ResourceSamples": 1
+        }
+      },
+      "RawReportSHA256": "74643dd296dbcbf6ecebda4c93fe64c350a3ab80d9ae7a90e32df1b3d4e0a8d5",
+      "RawHistogramSHA256": "3cd8979136d3d1b437df4bd0f83fb107dbac192ba58b04ff2b3ff39b824c6adb"
+    },
+    {
+      "Status": "passed",
+      "Activity": "complete",
+      "ErrorType": null,
+      "ServerErrorCode": null,
+      "Version": "3.9.6",
+      "Watches": 100,
+      "EventBudget": 200,
+      "AdmissionProbeSyncTransmissions": 0,
+      "DistinctPaths": 100,
+      "OwnerSessionRetained": true,
+      "ControlSessionRetained": true,
+      "EphemeralRetained": true,
+      "AcknowledgedClose": true,
+      "FinalCountersZero": true,
+      "NamespaceRemoved": true,
+      "SetupMilliseconds": 174.7855,
+      "TimingGate": false,
+      "StopwatchFrequency": 1000000000,
+      "Runtime": ".NET 10.0.14",
+      "OS": "macOS 27.0.1",
+      "Architecture": "Arm64",
+      "Wire": {
+        "Connections": 2,
+        "Handshakes": 2,
+        "AuthenticationRequests": 2,
+        "AddWatchRequests": 100,
+        "SyncRequests": 4,
+        "RestoreFrames": 1,
+        "RestoreReplies": 1,
+        "RestorePaths": 100,
+        "DistinctRestorePaths": 100,
+        "MaximumRestoreFrameBytes": 9436,
+        "SecondHandshakeAt": 2827517343833,
+        "FirstResetAt": 2827520222333,
+        "LastResetReplyAt": 2827522178041,
+        "HeldAt": 2827521806833,
+        "ErrorType": null
+      },
+      "Measurement": {
+        "GapCount": 100,
+        "PostRecoveryInvalidations": 100,
+        "ProtectedReads": 100,
+        "PausedAdmissionRejected": true,
+        "RestoringAdmissionRejected": true,
+        "PausedState": "Connecting",
+        "CutToReconnectPausedObservedMilliseconds": 87.806,
+        "DeliberatePreHandshakePauseMilliseconds": 1.220542,
+        "ReconnectHandshakeObservedMilliseconds": 2.344208,
+        "ControlledAckHoldMilliseconds": 0.131,
+        "RawReadinessMilliseconds": 8.097,
+        "ActiveReadinessMilliseconds": 7.966,
+        "ActiveRestoreAckForwardingMilliseconds": 1.824708,
+        "AckReleaseToAllGapsMilliseconds": 1.395125,
+        "GapTailAfterReadinessMilliseconds": 0.236333,
+        "GapP50": {
+          "LowerMicroseconds": 1344,
+          "UpperMicroseconds": 1375
+        },
+        "GapP95": {
+          "LowerMicroseconds": 1376,
+          "UpperMicroseconds": 1407
+        },
+        "GapP99": {
+          "LowerMicroseconds": 1376,
+          "UpperMicroseconds": 1407
+        },
+        "ResourcesDuringControlledRecovery": {
+          "ProcessAllocatedBytes": 197488,
+          "Collections": [
+            0,
+            0,
+            0
+          ],
+          "SampledPeakWorkingSetBytes": 64765952,
+          "SampledPeakManagedHeapBytes": 2459480,
+          "ProcessLifetimePeakWorkingSetBytes": null,
+          "ResourceSamples": 1
+        }
+      },
+      "RawReportSHA256": "914bf903fdaaed4ec03b484730733b7668d0b0593d4f76fcc269570050067517",
+      "RawHistogramSHA256": "bd685e3548f88cfd624da846346478e144fe04b573850d8482417aa13f2a60e4"
+    }
+  ]
+}

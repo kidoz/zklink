@@ -32,6 +32,10 @@ bench-live seconds="5":
 bench-watches seconds="5":
     bash dev/run-live-benchmarks.sh --watches "$1"
 
+# Recover persistent watches on distinct paths (10000 by default, 100 for smoke).
+bench-recovery watches="10000":
+    bash dev/run-live-benchmarks.sh --recovery "$1"
+
 # Check the measured allocation budgets without a timing gate.
 bench-allocations output="artifacts/benchmarks/allocations.json":
     dotnet run --project benchmarks/ZkLink.Benchmarks -c Release -- --allocations "$1"

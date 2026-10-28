@@ -134,6 +134,31 @@ jobs:
           path: artifacts/watch-benchmarks
           if-no-files-found: error
 
+  recovery-benchmarks:
+    name: Distinct-path watch recovery benchmark smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install pinned SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      - name: Verify 100-path recovery on both versions
+        env:
+          ZKLINK_BENCHMARK_ARTIFACT_ROOT: ${{ github.workspace }}/artifacts/recovery-benchmarks
+        run: bash dev/run-live-benchmarks.sh --recovery 100
+      - name: Retain recovery benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: watch-recovery-smoke
+          path: artifacts/recovery-benchmarks
+          if-no-files-found: error
+
   operations:
     name: Live node, ACL, transaction, auxiliary and watch operations
     runs-on: ubuntu-latest

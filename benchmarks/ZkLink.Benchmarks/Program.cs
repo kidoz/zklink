@@ -15,10 +15,16 @@ internal static class Program
     )]
     internal static async Task<int> Main(string[] args)
     {
-        if (args.Length > 0 && args[0] is "--live" or "--watch-fanout")
+        if (args.Length > 0 && args[0] is "--live" or "--watch-fanout" or "--watch-recovery")
         {
             try
             {
+                if (args is ["--watch-recovery", string recoveryCount, string recoveryOutput])
+                {
+                    return await WatchRecoveryBenchmark
+                        .RunAsync(RecoverySettings.Read(recoveryCount, recoveryOutput))
+                        .ConfigureAwait(false);
+                }
                 if (
                     args
                     is ["--watch-fanout", string watchSeconds, string consumers, string watchOutput]

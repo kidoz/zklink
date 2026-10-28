@@ -2,14 +2,23 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 kind=requests
-if [[ "${1-}" == --watches ]]; then kind=watches; shift; fi
-if [[ $# -gt 1 ]]; then echo "Usage: $0 [--watches] [seconds-per-case]" >&2; exit 2; fi
-seconds="${1-5}"
-readonly kind
-if [[ ! "${seconds}" =~ ^([1-9]|[12][0-9]|30)$ ]]; then
-  echo "Live benchmark duration must be 1..30 seconds per case." >&2; exit 2
+if [[ "${1-}" == --watches ]]; then kind=watches; shift;
+elif [[ "${1-}" == --recovery ]]; then kind=recovery; shift; fi
+if [[ $# -gt 1 ]]; then echo "Usage: $0 [--watches|--recovery] [seconds-or-watches]" >&2; exit 2; fi
+seconds=5
+watches=10000
+if [[ "${kind}" == recovery ]]; then
+  watches="${1-10000}"
+  if [[ "${watches}" != 100 && "${watches}" != 10000 ]]; then
+    echo "Recovery workload must use 100 or 10000 watches." >&2; exit 2
+  fi
+else
+  seconds="${1-5}"
+  if [[ ! "${seconds}" =~ ^([1-9]|[12][0-9]|30)$ ]]; then
+    echo "Live benchmark duration must be 1..30 seconds per case." >&2; exit 2
+  fi
 fi
-readonly seconds
+readonly kind seconds watches
 for command in docker dotnet python3; do command -v "${command}" >/dev/null; done
 docker info >/dev/null
 docker compose version >/dev/null
@@ -46,10 +55,14 @@ elif Path("/proc/cpuinfo").exists():
             break
 Path(sys.argv[1]).write_text(json.dumps(info, indent=2) + "\n")
 MACHINE
-printf 'Kind: %s\nRequestedSeconds: %s\nWarmupSeconds: 1\nNetwork: loopback host TCP through Docker bridge; plaintext digest\n' "${kind}" "${seconds}" >"${artifacts}/settings.txt"
+readonly startup_guard_seconds=90 process_overhead_seconds=90 recovery_process_guard_seconds=300
+if [[ "${kind}" == recovery ]]; then
+  printf 'Kind: recovery\nWatches: %s\nWarmupSeconds: 0\nProcessGuardSeconds: %s\nNetwork: inspecting loopback TCP proxy through Docker bridge; plaintext digest\n' "${watches}" "${recovery_process_guard_seconds}" >"${artifacts}/settings.txt"
+else
+  printf 'Kind: %s\nRequestedSeconds: %s\nWarmupSeconds: 1\nNetwork: loopback host TCP through Docker bridge; plaintext digest\n' "${kind}" "${seconds}" >"${artifacts}/settings.txt"
+fi
 unset ZOOKEEPER_IMAGE
 export ZOOKEEPER_PORT_1=0 ZOOKEEPER_PORT_2=0 ZOOKEEPER_PORT_3=0
-readonly startup_guard_seconds=90 process_overhead_seconds=90
 project=""
 compose() {
   docker compose -f compose.yaml -f compose.benchmark.yaml --env-file "dev/zookeeper-${version}.env" --project-name "${project}" "$@"
@@ -101,7 +114,15 @@ for version in 3.8.7 3.9.6; do
   if [[ "${leaders}" -ne 1 || "${followers}" -ne 2 ]]; then echo 'No healthy voting ensemble.' >&2; exit 1; fi
   export ZKLINK_LIVE_BENCHMARK_ENDPOINT="$(compose port "${leader}" 2181)"
   printf 'Target: observed leader %s\nEndpoint: %s\n' "${leader}" "${ZKLINK_LIVE_BENCHMARK_ENDPOINT}" >"${artifacts}/${version}-target.txt"
-  if [[ "${kind}" == watches ]]; then
+  if [[ "${kind}" == recovery ]]; then
+    key="${version}-recovery-${watches}"
+    if ! python3 dev/run-live-benchmark-process.py "${recovery_process_guard_seconds}" \
+      dotnet benchmarks/ZkLink.Benchmarks/bin/Release/net10.0/ZkLink.Benchmarks.dll \
+      --watch-recovery "${watches}" "${artifacts}/${key}.json" >"${artifacts}/${key}.log" 2>&1; then
+      cat "${artifacts}/${key}.log"; exit 1
+    fi
+    cat "${artifacts}/${key}.log"
+  elif [[ "${kind}" == watches ]]; then
     for consumers in 1 32 256; do
       key="${version}-watches-${consumers}"
       if ! python3 dev/run-live-benchmark-process.py "$((seconds + process_overhead_seconds))" \
@@ -135,7 +156,9 @@ for version in 3.8.7 3.9.6; do
   compose ps --format json >"${artifacts}/${version}-status.json"
   finish_fixture
   project=""
-  if [[ "${kind}" == watches ]]; then
+  if [[ "${kind}" == recovery ]]; then
+    echo "ZooKeeper ${version}: PASS (distinct-path recovery, native restore/gap counts, all-path validation, close and cleanup)"
+  elif [[ "${kind}" == watches ]]; then
     echo "ZooKeeper ${version}: PASS (3 shared watch fan-out cases, exact delivery, request progress, counters, close and fixture cleanup)"
   else
     echo "ZooKeeper ${version}: PASS (12 live request benchmark cases, validation, acknowledged close and fixture cleanup)"
