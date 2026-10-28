@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-if [[ $# -gt 1 ]]; then echo "Usage: $0 [seconds-per-case]" >&2; exit 2; fi
+kind=requests
+if [[ "${1-}" == --watches ]]; then kind=watches; shift; fi
+if [[ $# -gt 1 ]]; then echo "Usage: $0 [--watches] [seconds-per-case]" >&2; exit 2; fi
 seconds="${1-5}"
+readonly kind
 if [[ ! "${seconds}" =~ ^([1-9]|[12][0-9]|30)$ ]]; then
   echo "Live benchmark duration must be 1..30 seconds per case." >&2; exit 2
 fi
@@ -43,7 +46,7 @@ elif Path("/proc/cpuinfo").exists():
             break
 Path(sys.argv[1]).write_text(json.dumps(info, indent=2) + "\n")
 MACHINE
-printf 'RequestedSeconds: %s\nWarmupSeconds: 1\nNetwork: loopback host TCP through Docker bridge; plaintext digest\n' "${seconds}" >"${artifacts}/settings.txt"
+printf 'Kind: %s\nRequestedSeconds: %s\nWarmupSeconds: 1\nNetwork: loopback host TCP through Docker bridge; plaintext digest\n' "${kind}" "${seconds}" >"${artifacts}/settings.txt"
 unset ZOOKEEPER_IMAGE
 export ZOOKEEPER_PORT_1=0 ZOOKEEPER_PORT_2=0 ZOOKEEPER_PORT_3=0
 readonly startup_guard_seconds=90 process_overhead_seconds=90
@@ -98,6 +101,17 @@ for version in 3.8.7 3.9.6; do
   if [[ "${leaders}" -ne 1 || "${followers}" -ne 2 ]]; then echo 'No healthy voting ensemble.' >&2; exit 1; fi
   export ZKLINK_LIVE_BENCHMARK_ENDPOINT="$(compose port "${leader}" 2181)"
   printf 'Target: observed leader %s\nEndpoint: %s\n' "${leader}" "${ZKLINK_LIVE_BENCHMARK_ENDPOINT}" >"${artifacts}/${version}-target.txt"
+  if [[ "${kind}" == watches ]]; then
+    for consumers in 1 32 256; do
+      key="${version}-watches-${consumers}"
+      if ! python3 dev/run-live-benchmark-process.py "$((seconds + process_overhead_seconds))" \
+        dotnet benchmarks/ZkLink.Benchmarks/bin/Release/net10.0/ZkLink.Benchmarks.dll \
+        --watch-fanout "${seconds}" "${consumers}" "${artifacts}/${key}.json" >"${artifacts}/${key}.log" 2>&1; then
+        cat "${artifacts}/${key}.log"; exit 1
+      fi
+      cat "${artifacts}/${key}.log"
+    done
+  else
   for operation in get set; do
     for payload in 32 65536; do
       for concurrency in 1 32 256; do
@@ -111,6 +125,7 @@ for version in 3.8.7 3.9.6; do
       done
     done
   done
+  fi
   for service in zoo1 zoo2 zoo3; do
     compose exec -T "${service}" zkServer.sh status >"${artifacts}/${version}-${service}-role-after.txt" 2>&1
     expected=follower
@@ -120,5 +135,9 @@ for version in 3.8.7 3.9.6; do
   compose ps --format json >"${artifacts}/${version}-status.json"
   finish_fixture
   project=""
-  echo "ZooKeeper ${version}: PASS (12 live request benchmark cases, validation, acknowledged close and fixture cleanup)"
+  if [[ "${kind}" == watches ]]; then
+    echo "ZooKeeper ${version}: PASS (3 shared watch fan-out cases, exact delivery, request progress, counters, close and fixture cleanup)"
+  else
+    echo "ZooKeeper ${version}: PASS (12 live request benchmark cases, validation, acknowledged close and fixture cleanup)"
+  fi
 done

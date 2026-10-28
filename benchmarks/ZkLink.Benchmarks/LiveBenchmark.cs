@@ -1,17 +1,14 @@
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
 
 namespace ZkLink.Benchmarks;
 
 internal static class LiveBenchmark
 {
-    private static readonly CreateOptions OwnerCreate = new([
+    internal static readonly CreateOptions OwnerCreate = new([
         new(ZooKeeperPermissions.All, "auth", ""),
     ]);
-    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private static readonly TimeSpan ConnectGuard = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan AttemptGuard = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan CloseGuard = TimeSpan.FromSeconds(2);
@@ -193,24 +190,9 @@ internal static class LiveBenchmark
             Architecture = RuntimeInformation.ProcessArchitecture.ToString(),
             Measurement = measurement,
         };
-        await File.WriteAllTextAsync(settings.Output, JsonSerializer.Serialize(report, JsonOptions))
+        await LiveReport
+            .WriteAsync(settings.Output, report, measurement?.Histogram)
             .ConfigureAwait(false);
-        if (measurement is not null)
-        {
-            var csv = new StringBuilder("lower_microseconds,upper_microseconds,count\n");
-            foreach (var bucket in measurement.Histogram)
-            {
-                csv.Append(
-                    CultureInfo.InvariantCulture,
-                    $"{bucket.LowerMicroseconds},{bucket.UpperMicroseconds},{bucket.Count}\n"
-                );
-            }
-            await File.WriteAllTextAsync(
-                    Path.ChangeExtension(settings.Output, ".csv"),
-                    csv.ToString()
-                )
-                .ConfigureAwait(false);
-        }
         Console.WriteLine(
             FormattableString.Invariant(
                 $"live {settings.Version} {(settings.Write ? "set" : "get")} bytes={settings.PayloadBytes} concurrency={settings.Concurrency} status={(passed ? "passed" : "failed")} completed={measurement?.Completed ?? 0} error={failure?.GetType().Name ?? "none"}"
@@ -219,13 +201,15 @@ internal static class LiveBenchmark
         return passed ? 0 : 1;
     }
 
-    private static async Task<ZooKeeperClient> ConnectAsync(
+    internal static async Task<ZooKeeperClient> ConnectAsync(
         LiveSettings settings,
         string user,
         string password,
-        CancellationToken token
+        CancellationToken token,
+        int? watchLimit = null
     )
     {
+        var defaults = new ZooKeeperClientOptions { ConnectionString = settings.Endpoint };
         using var authentication = ZooKeeperAuthentication.Digest(user, password);
         return await ZooKeeperClient
             .ConnectAsync(
@@ -244,13 +228,15 @@ internal static class LiveBenchmark
                     OperationTimeout = LiveSettings.OperationGuard,
                     CloseTimeout = CloseGuard,
                     SessionTimeout = SessionTimeout,
+                    MaxWatches = watchLimit ?? defaults.MaxWatches,
+                    MaxBufferedEvents = watchLimit ?? defaults.MaxBufferedEvents,
                 },
                 token
             )
             .ConfigureAwait(false);
     }
 
-    private static async Task DeleteAsync(
+    internal static async Task DeleteAsync(
         ZooKeeperClient client,
         string root,
         CancellationToken token

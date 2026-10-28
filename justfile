@@ -28,6 +28,10 @@ bench *args:
 bench-live seconds="5":
     bash dev/run-live-benchmarks.sh "$1"
 
+# Measure shared persistent-watch fan-out on both pinned versions (seconds per case).
+bench-watches seconds="5":
+    bash dev/run-live-benchmarks.sh --watches "$1"
+
 # Check the measured allocation budgets without a timing gate.
 bench-allocations output="artifacts/benchmarks/allocations.json":
     dotnet run --project benchmarks/ZkLink.Benchmarks -c Release -- --allocations "$1"

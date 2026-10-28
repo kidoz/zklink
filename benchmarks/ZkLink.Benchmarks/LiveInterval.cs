@@ -21,14 +21,7 @@ internal sealed class LiveInterval
     private long _stopAt;
     private long _startedAt;
     private long _finishedAt;
-    private long _allocatedBefore;
-    private long _allocatedAfter;
-    private readonly int[] _gcBefore = new int[GC.MaxGeneration + 1];
-    private readonly int[] _gcAfter = new int[GC.MaxGeneration + 1];
-    private long _sampledWorkingSet;
-    private long _sampledHeap;
-    private int _samples;
-    private long _lifetimeWorkingSet;
+    private readonly LiveResources _resources = new();
 
     internal LiveInterval(LiveWorker[] workers, bool record)
     {
@@ -46,9 +39,7 @@ internal sealed class LiveInterval
     )
     {
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(token);
-        using var sampling = new CancellationTokenSource();
-        using var process = Process.GetCurrentProcess();
-        await RunOwnedAsync(client, settings, initial, alternate, seconds, stop, sampling, process)
+        await RunOwnedAsync(client, settings, initial, alternate, seconds, stop)
             .ConfigureAwait(false);
     }
 
@@ -58,9 +49,7 @@ internal sealed class LiveInterval
         byte[] initial,
         byte[] alternate,
         int seconds,
-        CancellationTokenSource stop,
-        CancellationTokenSource sampling,
-        Process process
+        CancellationTokenSource stop
     )
     {
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -69,33 +58,27 @@ internal sealed class LiveInterval
                 WorkAsync(worker, client, settings, initial, alternate, gate.Task, stop)
             )
             .ToArray();
-        var sampler = _record
-            ? SampleAsync(process, gate.Task, sampling.Token)
-            : Task.CompletedTask;
-        _allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
-        for (int index = 0; index < _gcBefore.Length; index++)
+        async Task RunWorkersAsync()
         {
-            _gcBefore[index] = GC.CollectionCount(index);
-        }
-        _startedAt = Stopwatch.GetTimestamp();
-        _stopAt = _startedAt + (long)seconds * Stopwatch.Frequency;
-        gate.SetResult();
-        try
-        {
-            await Task.WhenAll(tasks).ConfigureAwait(false);
-        }
-        finally
-        {
-            _finishedAt = Stopwatch.GetTimestamp();
-            await sampling.CancelAsync().ConfigureAwait(false);
-            await sampler.ConfigureAwait(false);
-            _allocatedAfter = GC.GetTotalAllocatedBytes(precise: true);
-            for (int index = 0; index < _gcAfter.Length; index++)
+            _startedAt = Stopwatch.GetTimestamp();
+            _stopAt = _startedAt + (long)seconds * Stopwatch.Frequency;
+            gate.SetResult();
+            try
             {
-                _gcAfter[index] = GC.CollectionCount(index);
+                await Task.WhenAll(tasks).ConfigureAwait(false);
             }
-            process.Refresh();
-            _lifetimeWorkingSet = process.PeakWorkingSet64;
+            finally
+            {
+                _finishedAt = Stopwatch.GetTimestamp();
+            }
+        }
+        if (_record)
+        {
+            await _resources.MeasureAsync(gate.Task, RunWorkersAsync).ConfigureAwait(false);
+        }
+        else
+        {
+            await RunWorkersAsync().ConfigureAwait(false);
         }
         if (
             _workers.Any(static worker =>
@@ -105,7 +88,7 @@ internal sealed class LiveInterval
             || (
                 _record
                 && (
-                    _samples == 0
+                    _resources.Observation is not { ResourceSamples: > 0 }
                     || _workers.Any(static worker => worker.Latency.Count != worker.Completed)
                 )
             )
@@ -208,26 +191,6 @@ internal sealed class LiveInterval
         }
     }
 
-    private async Task SampleAsync(Process process, Task gate, CancellationToken token)
-    {
-        await gate.ConfigureAwait(false);
-        try
-        {
-            while (!token.IsCancellationRequested)
-            {
-                process.Refresh();
-                _sampledWorkingSet = Math.Max(_sampledWorkingSet, process.WorkingSet64);
-                _sampledHeap = Math.Max(
-                    _sampledHeap,
-                    GC.GetTotalMemory(forceFullCollection: false)
-                );
-                _samples++;
-                await Task.Delay(LiveSettings.SampleInterval, token).ConfigureAwait(false);
-            }
-        }
-        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
-    }
-
     internal LiveMeasurement Result()
     {
         var latency = new LatencyHistogram();
@@ -238,6 +201,7 @@ internal sealed class LiveInterval
         long completed = _workers.Sum(static worker => worker.Completed);
         double elapsed =
             _finishedAt > _startedAt ? (_finishedAt - _startedAt) / (double)Stopwatch.Frequency : 0;
+        var resources = _resources.Observation ?? new ResourceObservation(0, [], 0, 0, null, 0);
         return new(
             _workers.Sum(static worker => worker.Started),
             completed,
@@ -245,13 +209,13 @@ internal sealed class LiveInterval
             _peakActive,
             elapsed,
             elapsed > 0 ? completed / elapsed : 0,
-            _allocatedAfter - _allocatedBefore,
-            completed > 0 ? (_allocatedAfter - _allocatedBefore) / (double)completed : 0,
-            _gcAfter.Zip(_gcBefore, static (after, before) => after - before).ToArray(),
-            _sampledWorkingSet,
-            _sampledHeap,
-            _lifetimeWorkingSet > 0 ? _lifetimeWorkingSet : null,
-            _samples,
+            resources.ProcessAllocatedBytes,
+            completed > 0 ? (resources.ProcessAllocatedBytes) / (double)completed : 0,
+            resources.Collections,
+            resources.SampledPeakWorkingSetBytes,
+            resources.SampledPeakManagedHeapBytes,
+            resources.ProcessLifetimePeakWorkingSetBytes,
+            resources.ResourceSamples,
             latency.Count > 0
                 ? latency.TotalTicks * 1_000_000d / Stopwatch.Frequency / latency.Count
                 : 0,

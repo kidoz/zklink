@@ -15,14 +15,30 @@ internal static class Program
     )]
     internal static async Task<int> Main(string[] args)
     {
-        if (args.Length > 0 && args[0] == "--live")
+        if (args.Length > 0 && args[0] is "--live" or "--watch-fanout")
         {
             try
             {
                 if (
                     args
+                    is ["--watch-fanout", string watchSeconds, string consumers, string watchOutput]
+                )
+                {
+                    var settings = LiveSettings.Read(
+                        watchSeconds,
+                        "get",
+                        CodecWorkload.SmallPayloadBytes.ToString(
+                            System.Globalization.CultureInfo.InvariantCulture
+                        ),
+                        consumers,
+                        watchOutput
+                    );
+                    return await WatchFanoutBenchmark.RunAsync(settings).ConfigureAwait(false);
+                }
+                if (
+                    args
                     is not [
-                        _,
+                        "--live",
                         string seconds,
                         string operation,
                         string payload,
