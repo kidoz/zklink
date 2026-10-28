@@ -42,4 +42,13 @@ authenticating to or publishing on NuGet. After a release run succeeds, check th
 NuGet listing and restore the published version into a fresh consumer. Publication
 does not widen the documented server, security or Native AOT qualification scope.
 
+The native mTLS probe requires a refused connection without a client certificate,
+successful connections with the valid certificate before and after it, and the
+owned ZooKeeper server's explicit empty-client-certificate rejection log. TLS 1.3
+can deliver this alert after the platform authentication call returns, exposing
+an I/O connection failure or exhausting the driver's connect-retry deadline.
+Server-certificate rejection probes still require a TLS-classified failure.
+A timeout alone never counts as a successful negative control: the server's
+explicit rejection evidence and both valid-certificate controls are required.
+
 [How-to guides](README.md) · [Documentation home](../README.md)

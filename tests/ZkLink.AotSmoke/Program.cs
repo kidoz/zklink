@@ -99,8 +99,13 @@ internal static class Program
         }
         catch (Exception error)
         {
+            var classification = error is ZooKeeperConnectionException connection
+                ? $" ({connection.Failure})"
+                : "";
             await Console
-                .Error.WriteLineAsync("Native smoke failed: " + error.GetType().Name)
+                .Error.WriteLineAsync(
+                    "Native smoke failed: " + error.GetType().Name + classification
+                )
                 .ConfigureAwait(false);
             return 1;
         }

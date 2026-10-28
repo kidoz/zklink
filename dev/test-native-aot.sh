@@ -134,6 +134,11 @@ for version in 3.8.7 3.9.6; do
         ZKLINK_USER=zklink-native-smoke ZKLINK_PASSWORD="$(openssl rand -hex 16)" \
         python3 dev/run-native-smoke.py "${options[@]}" >"${run}/${fixture_key}-${service}-native.txt" 2>&1
       grep -Fxq 'Native smoke: PASS' "${run}/${fixture_key}-${service}-native.txt"
+      if [[ "${mode}" == mtls && "${service}" == zoo1 ]]; then
+        grep -Fq 'Native missing-client-certificate connection rejected' "${run}/${fixture_key}-${service}-native.txt"
+        compose logs --no-color zoo1 >"${run}/${fixture_key}-missing-client-certificate.log" 2>&1
+        grep -Fq 'Empty client certificate chain' "${run}/${fixture_key}-missing-client-certificate.log"
+      fi
     done
     finish_fixture
     echo "Native ${rid} on ZooKeeper ${fixture_key}: PASS (three nodes, recovery, cancellation, acknowledged close and cleanup)"

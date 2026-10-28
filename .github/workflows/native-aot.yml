@@ -28,7 +28,7 @@ jobs:
             rid: linux-arm64
           - os: windows-2025
             rid: win-x64
-          - os: macos-15
+          - os: macos-26
             rid: osx-arm64
     steps:
       - name: Check out source
