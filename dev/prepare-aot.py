@@ -16,6 +16,7 @@ from aot_artifacts import ROOT, RIDS, native_header, sha256
 
 def input_hashes():
     inputs = [ROOT / "src/ZkLink/ZkLink.csproj", ROOT / "src/ZkLink/packages.lock.json", *sorted((ROOT / "src/ZkLink").rglob("*.cs"))]
+    inputs += [ROOT / name for name in ["Directory.Build.props", "Directory.Packages.props", "NuGet.config", "global.json", "LICENSE", "THIRD-PARTY-NOTICES.md", "src/ZkLink/README.md", "src/ZkLink/PublicAPI.Shipped.txt", "src/ZkLink/PublicAPI.Unshipped.txt"]]
     inputs += list((ROOT / "tests/ZkLink.AotAnalysis").glob("*.cs*")) + list((ROOT / "tests/ZkLink.AotSmoke").glob("*.cs*"))
     inputs += list((ROOT / "samples/ZkLink.Samples.Basic").glob("*.cs"))
     inputs += [ROOT / "tests/ZkLink.IntegrationTests/WatchReconnectProxy.cs", ROOT / "dev/aot_artifacts.py", pathlib.Path(__file__)]
@@ -46,7 +47,7 @@ def main():
     version = f"0.0.0-local.r{revision[:12]}.n{secrets.token_hex(8)}"
     command("sdk", ["dotnet", "--info"])
     command("working-tree", ["git", "status", "--short"])
-    (run / "host.json").write_text(json.dumps({"rid": rid, "os": platform.platform(), "machine": platform.machine(), "python": sys.version, "revision": revision}, indent=2) + "\n", encoding="utf-8")
+    (run / "host.json").write_text(json.dumps({"rid": rid, "os": platform.platform(), "machine": platform.machine(), "libc": platform.libc_ver(), "python": sys.version, "revision": revision}, indent=2) + "\n", encoding="utf-8")
     compiler = shutil.which("clang") or shutil.which("cl")
     if compiler:
         with (run / "native-toolchain.txt").open("w", encoding="utf-8") as output:
@@ -110,6 +111,10 @@ def main():
         binary = output / (name + (".exe" if rid == "win-x64" else ""))
         if not native_header(binary, rid) or (output / "ZkLink.dll").exists():
             raise SystemExit("Expected a native executable with the correct architecture.")
+        dependency_tool = shutil.which("otool" if rid == "osx-arm64" else "ldd" if rid.startswith("linux-") else "dumpbin")
+        if dependency_tool:
+            switches = ["-L"] if rid == "osx-arm64" else [] if rid.startswith("linux-") else ["/dependents"]
+            command(name + "-native-dependencies", [dependency_tool, *switches, str(binary)])
         notices = output / "notices"
         notices.mkdir()
         for source in [ROOT / "LICENSE", ROOT / "THIRD-PARTY-NOTICES.md"]:

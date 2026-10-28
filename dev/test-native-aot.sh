@@ -24,6 +24,7 @@ print(manifest.parent.as_posix() + '\t' + data['rid'])
 PY
 )
 readonly run rid manifest
+rm -f -- "${run}/live-result.txt"
 readonly startup_seconds=100
 docker compose version >"${run}/compose-version.txt"
 docker version >"${run}/docker-version.txt"
@@ -87,6 +88,9 @@ PY
   then
     status=1
   fi
+  if [[ "${status}" -eq 0 && "${completed}" == true ]]; then
+    printf 'PASS (12 native live cases, TLS/mTLS, both server versions)\n' >"${run}/live-result.txt"
+  fi
   exit "${status}"
 }
 trap cleanup EXIT
@@ -135,5 +139,4 @@ for version in 3.8.7 3.9.6; do
     echo "Native ${rid} on ZooKeeper ${fixture_key}: PASS (three nodes, recovery, cancellation, acknowledged close and cleanup)"
   done
 done
-printf 'PASS (12 native live cases, TLS/mTLS, both server versions)\n' >"${run}/live-result.txt"
 completed=true
