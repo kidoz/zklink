@@ -141,10 +141,13 @@ internal static class NativeSecurity
                 when (error.Failure
                         is ZooKeeperConnectionFailure.Tls
                             or ZooKeeperConnectionFailure.Unreachable
+                            or ZooKeeperConnectionFailure.Timeout
                 )
             {
                 // TLS 1.3 can deliver certificate_required after AuthenticateAsClientAsync
-                // succeeds. The owned runner must also verify the server's rejection log.
+                // succeeds; repeated refusals can exhaust the initial-connect deadline.
+                // A timeout alone is not evidence: the owned runner must also verify
+                // the server's explicit rejection, with valid controls on both sides.
                 await Console
                     .Out.WriteLineAsync(
                         $"Native missing-client-certificate connection rejected ({error.Failure}); server evidence required."
