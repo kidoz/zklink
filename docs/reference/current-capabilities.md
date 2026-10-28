@@ -17,7 +17,7 @@ This describes the checkout as of **2026-10-28**. The initial core package versi
 | Analyzers | Six optional ZKL diagnostics, Roslyn compilation tests and a local packed-package consumer check | Released package and cross-platform qualification |
 | Local servers | Pinned three-node plaintext/TLS/mTLS fixtures for 3.8.7 and 3.9.6, expired-certificate negative control | Broader fault fixtures |
 | Observability | BCL traces and metrics, bounded asynchronous diagnostic delivery, finite tags, listener isolation and redaction checks | Exporter integration, sustained-load and cross-platform qualification |
-| Native AOT | Rooted analysis and unrooted packed consumers, native identity checks and secure live harness | Four-RID live qualification and release compatibility metadata |
+| Native AOT | Rooted/unrooted packed consumers and local macOS arm64 TLS/mTLS live evidence on both server patches | Other native target executions, four-RID release qualification and compatibility metadata |
 | Performance | Protocol/framing benchmarks and allocation gates; live get/set concurrency, shared persistent-watch fan-out and 10,000-path recovery measurements with latency/resource observations | Repeated controlled-runner measurements, TLS performance and broader qualification |
 
 See [Tracing and metrics](telemetry.md) for instrument names, timing, privacy and
@@ -72,6 +72,11 @@ The [build workflow](../../.github/workflows/build.yml) defines Linux, Windows,
 and macOS checks. Local macOS arm64 execution is recorded in the repository;
 remote workflow results remain unverified. Proposed Native AOT targets are
 `linux-x64`, `linux-arm64`, `win-x64`, and `osx-arm64`; none is qualified yet.
+
+The [native verification harness](../how-to/verify-native-aot.md) now has local
+`osx-arm64` publish and direct-execution evidence for rooted analysis and twelve
+secure live cases. The other native targets have no observed execution evidence;
+Windows/macOS live CI fixtures and full release qualification remain open.
 
 ## Server targets
 

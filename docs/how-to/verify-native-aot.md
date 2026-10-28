@@ -3,6 +3,7 @@
 Use .NET SDK **10.0.403**, Python 3.12 or newer and the host's native compiler:
 Xcode Command Line Tools on macOS, Visual Studio's Desktop development with C++
 workload on Windows, or Clang and zlib development headers on Linux.
+See [Microsoft's native prerequisites](https://learn.microsoft.com/dotnet/core/deploying/native-aot/#prerequisites).
 
 ```sh
 just aot-publish
@@ -20,6 +21,8 @@ broad roots or source-project references. Both use fresh package caches and sour
 mapping: ZkLink resolves only from the candidate feed, while SDK compiler/runtime
 packages resolve from nuget.org. Generated dependency locks are restored again in
 locked mode. Core trim/AOT analyzers and publish warnings remain enabled.
+These projects sit outside normal solution restore because publication requires
+the fresh candidate feed and a target RID.
 
 Evidence includes candidate/compiler-input hashes, native file format and
 architecture, executable hashes, source inputs, SDK/host information, dependency
