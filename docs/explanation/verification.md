@@ -199,6 +199,14 @@ and machine metadata. These measurements do not qualify live driver throughput,
 request latency, concurrent load or recovery performance. CI gates allocations;
 shared-runner timings remain informational.
 
+The separate [live request benchmark runner](../how-to/run-live-benchmarks.md)
+uses one measured session at 1/32/256 concurrency against each pinned server
+version. It validates every request, retains complete bounded latency histograms
+and observes process allocations, collections and sampled memory. CI checks the
+bounded workload and owned cleanup; timing and resource values remain
+informational local observations. Watch/recovery and TLS performance need their
+own measurements.
+
 ## Release claims need consumer evidence
 
 The build workflow defines checks on Linux, Windows, and macOS. A workflow file

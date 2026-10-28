@@ -45,6 +45,11 @@ remain unavailable. See
 
 ### Added
 
+- `just bench-live [seconds]` measures get/set workloads at 1, 32 and 256
+  concurrent requests on both pinned server versions, with latency histograms,
+  process allocation/GC/memory observations, isolated case processes and a
+  bounded CI smoke selection with verified fixture cleanup.
+
 - A server-free BenchmarkDotNet suite for protocol encoding/decoding and framing,
   with raw results, environment metadata, reviewed allocation budgets and a
   separate allocation CI job. Run `just bench` or `just bench-allocations`.

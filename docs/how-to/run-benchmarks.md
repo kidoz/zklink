@@ -49,8 +49,8 @@ response size changes. Transaction encoding includes its validation passes.
 Framing uses reusable `MemoryStream` instances that complete synchronously.
 Results include framing and copying costs; they do not establish socket, TLS,
 scheduler, session or live ZooKeeper operation performance. Server and network
-settings are recorded as absent. Live concurrency, watch fan-out and large watch
-restoration benchmarks remain separate work.
+settings are recorded as absent. [Live get/set concurrency measurements](run-live-benchmarks.md) have a separate
+runner. Watch fan-out and large watch restoration benchmarks remain separate work.
 
 ## Read the results
 
