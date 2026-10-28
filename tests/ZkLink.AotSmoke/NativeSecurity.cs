@@ -100,7 +100,7 @@ internal static class NativeSecurity
             .ConfigureAwait(false);
         if (settings.Mutual)
         {
-            await RejectAsync(settings.Endpoint, settings.Tls(null)).ConfigureAwait(false);
+            await MissingCertificateAsync().ConfigureAwait(false);
         }
 
         await Console
@@ -124,6 +124,44 @@ internal static class NativeSecurity
             {
                 // Require TLS failure rather than treating timeout or any connection error as success.
             }
+        }
+
+        async Task MissingCertificateAsync()
+        {
+            await ValidCertificateControlAsync().ConfigureAwait(false);
+            try
+            {
+                var unexpected = await settings
+                    .ConnectAsync(settings.Endpoint, token, tls: settings.Tls(null))
+                    .ConfigureAwait(false);
+                await unexpected.DisposeAsync().ConfigureAwait(false);
+                throw new InvalidOperationException("A missing client certificate was accepted.");
+            }
+            catch (ZooKeeperConnectionException error)
+                when (error.Failure
+                        is ZooKeeperConnectionFailure.Tls
+                            or ZooKeeperConnectionFailure.Unreachable
+                )
+            {
+                // TLS 1.3 can deliver certificate_required after AuthenticateAsClientAsync
+                // succeeds. The owned runner must also verify the server's rejection log.
+                await Console
+                    .Out.WriteLineAsync(
+                        $"Native missing-client-certificate connection rejected ({error.Failure}); server evidence required."
+                    )
+                    .ConfigureAwait(false);
+            }
+            await ValidCertificateControlAsync().ConfigureAwait(false);
+        }
+
+        async Task ValidCertificateControlAsync()
+        {
+            var control = await settings
+                .ConnectAsync(settings.Endpoint, token)
+                .ConfigureAwait(false);
+            await using var controlLifetime = control.ConfigureAwait(false);
+            await control.SyncAsync("/", token).ConfigureAwait(false);
+            await NativeSettings.CloseAsync(control, token).ConfigureAwait(false);
         }
     }
 
