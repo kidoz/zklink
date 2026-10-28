@@ -12,6 +12,8 @@ Complete a specific task in an existing checkout.
   timings, retain raw results and check allocation budgets.
 - [Measure live requests](run-live-benchmarks.md) — measure concurrent get/set
   operations, latency distributions and process resources on both server versions.
+- [Measure watch fan-out](run-watch-benchmarks.md) — measure delivery to shared
+  persistent-watch consumers with exact counts, progress and resource checks.
 - [Verify watch pressure](verify-watch-pressure.md) — hold watch events unread,
   verify heartbeat progress, overflow, event order and resource cleanup.
 - [Verify peer partition recovery](verify-peer-partition-recovery.md) — isolate a

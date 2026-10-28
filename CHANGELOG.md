@@ -45,6 +45,11 @@ remain unavailable. See
 
 ### Added
 
+- `just bench-watches [seconds]` measures persistent-watch fan-out to 1, 32 and
+  256 logical consumers on both pinned versions, with exact delivery/progress
+  checks, bounded queues, latency/resource reports, shared live-fixture tooling
+  and a separate CI smoke selection.
+
 - `just bench-live [seconds]` measures get/set workloads at 1, 32 and 256
   concurrent requests on both pinned server versions, with latency histograms,
   process allocation/GC/memory observations, isolated case processes and a

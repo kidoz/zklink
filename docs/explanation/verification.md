@@ -207,6 +207,14 @@ bounded workload and owned cleanup; timing and resource values remain
 informational local observations. Watch/recovery and TLS performance need their
 own measurements.
 
+The [shared watch fan-out runner](../how-to/run-watch-benchmarks.md) measures
+mutation-to-consumer delivery for 1/32/256 persistent handles. Serialized mutations,
+per-consumer counts, protected progress reads and queue-counter boundaries establish
+the measured scope. Complete latency histograms and process resources are retained;
+stream termination, independent namespace cleanup and failed-process fixture
+cleanup are checked. This is a bounded delivery workload, with large watch recovery
+and broader performance qualification still open.
+
 ## Release claims need consumer evidence
 
 The build workflow defines checks on Linux, Windows, and macOS. A workflow file

@@ -123,7 +123,8 @@ expected and verified fresh all-node readiness plus owned fixture removal. A
 separate process-group interruption check verified descendant termination.
 
 The [protocol/framing suite](run-benchmarks.md) remains independently runnable.
-Watch fan-out, large watch restoration, TLS performance and broader release
-qualification remain separate work.
+[Shared watch fan-out](run-watch-benchmarks.md) has a separate measurement command.
+Large watch restoration, TLS performance and broader release qualification remain
+separate work.
 
 [How-to guides](README.md) · [Documentation home](../README.md)
