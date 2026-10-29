@@ -114,15 +114,15 @@ internal sealed class SecurityFixture(Action<string>? progress = null) : IAsyncL
             await DisposeAsync().ConfigureAwait(false);
             throw;
         }
-        // macOS imports into temporary platform storage; without PersistKeySet,
-        // disposing every certificate releases that storage as well as key handles.
+        // Schannel needs a disk-backed key on Windows; macOS uses platform storage.
+        // Without PersistKeySet, disposal releases the temporary imported key.
         X509Certificate2 Load(string name) =>
             X509CertificateLoader.LoadPkcs12FromFile(
                 Path.Combine(directory, name + ".p12"),
                 storePassword,
-                OperatingSystem.IsMacOS()
-                    ? X509KeyStorageFlags.DefaultKeySet
-                    : X509KeyStorageFlags.EphemeralKeySet
+                OperatingSystem.IsLinux()
+                    ? X509KeyStorageFlags.EphemeralKeySet
+                    : X509KeyStorageFlags.DefaultKeySet
             );
     }
 

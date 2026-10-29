@@ -54,13 +54,15 @@ internal sealed class NativeSettings : IDisposable
             settings.OtherCertificate = settings.Own(LoadCertificate("other-client"));
             return settings;
 
+            // Schannel needs a disk-backed key on Windows; macOS uses platform storage.
+            // Without PersistKeySet, disposal releases the temporary imported key.
             X509Certificate2 LoadCertificate(string name) =>
                 X509CertificateLoader.LoadPkcs12FromFile(
                     Path.Combine(directory, name + ".p12"),
                     password,
-                    OperatingSystem.IsMacOS()
-                        ? X509KeyStorageFlags.DefaultKeySet
-                        : X509KeyStorageFlags.EphemeralKeySet
+                    OperatingSystem.IsLinux()
+                        ? X509KeyStorageFlags.EphemeralKeySet
+                        : X509KeyStorageFlags.DefaultKeySet
                 );
         }
         catch
