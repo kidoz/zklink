@@ -22,6 +22,14 @@ using (var assembly = File.OpenRead(typeof(ZooKeeperClient).Assembly.Location))
 }
 
 await Console.Out.WriteLineAsync("Loaded candidate assembly hash: verified.").ConfigureAwait(false);
+if (args is ["--package-check"])
+{
+    await Console
+        .Out.WriteLineAsync("Package identity check: PASS (no live operations).")
+        .ConfigureAwait(false);
+    return 0;
+}
+
 var credentials = SampleCredentials.Read();
 var parsed = SampleArgumentParser.Parse(args, credentials);
 if (parsed.Arguments is not { } arguments)

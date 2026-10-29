@@ -8,6 +8,8 @@ import subprocess
 import sys
 import zipfile
 
+INSPECTOR_GUARD_SECONDS = 30
+
 
 def main():
     inspector, run_path = sys.argv[1:]
@@ -21,7 +23,8 @@ def main():
     negative.mkdir()
 
     def reject(name, arguments):
-        result = subprocess.run(["dotnet", inspector, *map(str, arguments)], capture_output=True, check=False)
+        result = subprocess.run(["dotnet", inspector, *map(str, arguments)], capture_output=True,
+                                timeout=INSPECTOR_GUARD_SECONDS, check=False)
         (negative / f"{name}.txt").write_bytes(result.stdout + result.stderr)
         if result.returncode != 1 or b"Package validation failed" not in result.stderr:
             raise SystemExit(f"Rejection check failed: {name}")

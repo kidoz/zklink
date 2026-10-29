@@ -54,6 +54,45 @@ jobs:
         if: runner.os == 'Linux'
         run: bash dev/test-analyzers-package.sh
 
+  core-package-inspection:
+    name: Core package inspection (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install pinned SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      - name: Set up Python
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: '3.12'
+      - name: Inspect package and installed consumer without servers
+        run: python dev/prepare-core-package.py
+      - name: Retain candidate and inspection evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: core-package-inspection-${{ matrix.os }}
+          path: |
+            artifacts/packages/run.*/feed
+            artifacts/packages/run.*/*.txt
+            artifacts/packages/run.*/*.json
+            artifacts/packages/run.*/rejections
+            artifacts/packages/run.*/consumer/NuGet.Config
+            artifacts/packages/run.*/consumer/obj/packages.lock.json
+            artifacts/packages/run.*/consumer/obj/project.assets.json
+            artifacts/packages/run.*/consumer/bin/Release/net10.0
+          if-no-files-found: error
+
   core-package:
     name: Core package and installed consumer
     runs-on: ubuntu-latest
@@ -67,6 +106,10 @@ jobs:
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           global-json-file: global.json
+      - name: Set up Python
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        with:
+          python-version: '3.12'
       - name: Validate local package and examples on both server versions
         run: bash dev/test-core-package.sh
       - name: Retain candidate and verification evidence
@@ -81,6 +124,8 @@ jobs:
             artifacts/packages/run.*/*.log
             artifacts/packages/run.*/*-compose.yaml
             artifacts/packages/run.*/rejections
+            artifacts/packages/run.*/consumer/NuGet.Config
+            artifacts/packages/run.*/consumer/bin/Release/net10.0
             artifacts/packages/run.*/consumer/obj/packages.lock.json
             artifacts/packages/run.*/consumer/obj/project.assets.json
           if-no-files-found: error

@@ -24,6 +24,10 @@ test project:
 package-check:
     bash dev/test-core-package.sh
 
+# Inspect the packed core and installed consumer without starting servers.
+package-inspect:
+    python3 dev/prepare-core-package.py
+
 # Publish native analysis and packed consumers on the current target host.
 aot-publish:
     python3 dev/prepare-aot.py
