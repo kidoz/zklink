@@ -349,6 +349,17 @@ public sealed class SoakTests : IAsyncLifetime
                         finally
                         {
                             using var cleanup = new CancellationTokenSource(CleanupGuard);
+                            // The namespace owner and maintenance client can use different
+                            // followers. Establish the maintenance session's view with a
+                            // quorum write before taking its recursive cleanup snapshot.
+                            await _fixture
+                                .Client.SetDataAsync(
+                                    _fixture.Root,
+                                    null,
+                                    ZNodeVersion.Any,
+                                    cleanup.Token
+                                )
+                                .ConfigureAwait(true);
                             await DeleteTreeAsync(root, cleanup.Token).ConfigureAwait(true);
                             await SoakMetrics
                                 .PortsClosedAsync(
