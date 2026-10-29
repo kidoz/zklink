@@ -12,6 +12,14 @@ not establish broader security, Native AOT or production qualification. See
 
 ## [Unreleased]
 
+### Added
+
+- Windows/macOS native live CI uses disposable three-voter Java ensembles for
+  both pinned ZooKeeper versions, with Gradle-verified dependencies, portable
+  certificate generation, authenticated readiness and owned process cleanup.
+  `just aot-portable-check` runs the same native checks without Docker or the
+  OpenSSL CLI; remote platform qualification remains separately recorded.
+
 ## [0.1.0] - 2026-10-28
 
 ### Fixed

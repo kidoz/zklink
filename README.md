@@ -49,6 +49,7 @@ Install [just](https://just.systems/) and .NET SDK **10.0.403**. Docker with Com
 | `just package-check` | Inspect the core package and symbols, then run installed-package examples on both server versions |
 | `just aot-publish` | Publish rooted analysis and packed Native AOT consumers on the current target host |
 | `just aot-check` | Directly run native consumers against both server versions over TLS/mTLS |
+| `just aot-portable-check` | Run the same native matrix on portable JVM fixtures without Docker or the OpenSSL CLI |
 | `bash dev/test-jute-oracle.sh` | Use the Gradle wrapper to compare Java fixtures and verify C# requests |
 | `just zk-check [version]` | Validate the selected ZooKeeper configuration |
 | `just zk-up [version]` | Start the selected ensemble and wait for readiness |

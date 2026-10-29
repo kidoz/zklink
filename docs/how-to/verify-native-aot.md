@@ -33,7 +33,39 @@ checks its running process image hash, RID and disabled dynamic-code capabilitie
 
 ## Run native operations against disposable servers
 
-Docker with Compose and OpenSSL are also required for the owned live fixtures:
+Windows and macOS CI use portable JVM fixtures. Install **Temurin JDK 25.0.5+8**
+in addition to the native prerequisites above, then run from the repository root:
+
+```sh
+python dev/test-portable-aot.py
+```
+
+On macOS/Linux, `just aot-portable-check` runs the same command. It needs neither
+Docker nor Bash nor the OpenSSL CLI. The pinned Gradle wrapper verifies separate
+ZooKeeper 3.8.7 and 3.9.6 dependency graphs; JDK `keytool` generates disposable
+certificates and PKCS12 stores. Each fixture starts three loopback voters and an
+expired-certificate standalone control, using Java NIO and JSSE.
+
+The runner checks exact runtime jar hashes, actual server patches and a
+leader/two-follower role set before authenticated create/read/delete readiness.
+It runs all twelve existing native TLS/mTLS cases, then repeats authenticated
+readiness and stops its own JVMs. Private keys, passwords and server data stay
+outside retained artifacts and are removed on success, failure or a handled
+interruption. Runtime hashes, process/port records, public configuration,
+certificate details, cleanup results and native logs live under
+`artifacts/portable-aot/run.*/`; success requires `portable-result.json` to report
+`passed: true`. A changed jar or fixture source is rejected. See the
+[portable fixture project](../../tests/ZkLink.JavaEnsemble/README.md) for dependency
+locks and verification metadata.
+
+To reuse a matching native candidate with unchanged inputs:
+
+```sh
+python dev/test-portable-aot.py --native-manifest artifacts/aot/run.EXAMPLE/native.json
+```
+
+Linux CI retains the existing Docker fixture runner. Docker with Compose and
+the OpenSSL CLI are required for this alternative:
 
 ```sh
 just aot-check
@@ -59,8 +91,11 @@ replay application writes.
 
 The first node of each fixture also checks wrong server names, unknown roots,
 expired certificates and TLS directed at a plaintext port. mTLS additionally
-rejects a missing client certificate. These require a TLS failure rather than
-accepting any connection error. The disposable PKI uses custom roots and explicit
+rejects a missing client certificate. Name/trust/expiry/plaintext controls require
+a typed TLS failure. Missing-certificate checks use valid-certificate controls
+before and after the rejection, plus fresh server evidence of an empty client
+certificate chain; a timeout alone does not establish rejection. The disposable
+PKI uses custom roots and explicit
 revocation `NoCheck`; production defaults remain unchanged.
 
 Each case has a 90-second application deadline and an outer 120-second process
@@ -94,11 +129,11 @@ Inspect `native.json`, `package.json`, publish/direct-execution logs, per-server
 after all twelve native cases and cleanup complete.
 
 The [Native AOT workflow](../../.github/workflows/native-aot.yml) defines publish,
-rooted execution and smoke identity checks on all four RIDs, with separate Linux
-x64/arm64 live jobs. Windows/macOS live CI fixtures remain open. Configuration
-does not establish remote execution evidence.
+rooted execution and smoke identity checks on all four RIDs. Live jobs use Docker
+on Linux x64/arm64 and portable JVM fixtures on Windows x64/macOS arm64.
+Configuration does not establish remote execution evidence.
 
-Local macOS arm64 execution is the initial verification target. Four-RID live
+Local macOS arm64 execution now includes both fixture backends. Four-RID live
 qualification, sent-request cancellation/unknown outcomes, broader secure
 recovery, revocation/rotation and optional DI qualification remain open. Core
 `IsAotCompatible` metadata stays disabled; these checks do not declare release

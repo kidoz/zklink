@@ -76,7 +76,8 @@ remote workflow results remain unverified. Proposed Native AOT targets are
 The [native verification harness](../how-to/verify-native-aot.md) now has local
 `osx-arm64` publish and direct-execution evidence for rooted analysis and twelve
 secure live cases. The other native targets have no observed execution evidence;
-Windows/macOS live CI fixtures and full release qualification remain open.
+Windows/macOS live CI now has portable JVM fixtures, also verified locally on
+macOS arm64; remote execution and full release qualification remain open.
 
 ## Server targets
 
