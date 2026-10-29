@@ -66,7 +66,8 @@ public sealed class SoakTests : IAsyncLifetime
                     .Range(0, random.Next(MinimumJobs, MaximumJobs + 1))
                     .Select(_ => Plan(random))
                     .ToArray();
-                await GuardedRoundAsync(jobs, totals, token).ConfigureAwait(true);
+                await GuardedRoundAsync(jobs, totals, evidence, elapsed, token)
+                    .ConfigureAwait(true);
                 await metrics.QuiescentAsync(token).ConfigureAwait(true);
                 totals.Rounds++;
                 if (totals.Rounds == SoakEvidence.WarmupRounds)
@@ -94,7 +95,7 @@ public sealed class SoakTests : IAsyncLifetime
         }
         catch (Exception failure)
         {
-            await evidence.FailureAsync(failure, totals).ConfigureAwait(true);
+            await evidence.FailureAsync(failure, totals, elapsed.Elapsed).ConfigureAwait(true);
             throw;
         }
     }
@@ -118,15 +119,23 @@ public sealed class SoakTests : IAsyncLifetime
     private async Task GuardedRoundAsync(
         WorkItem[] jobs,
         SoakTotals totals,
+        SoakEvidence evidence,
+        Stopwatch elapsed,
         CancellationToken token
     )
     {
         using var round = CancellationTokenSource.CreateLinkedTokenSource(token);
         round.CancelAfter(RoundGuard);
-        await RoundAsync(jobs, totals, round.Token).ConfigureAwait(true);
+        await RoundAsync(jobs, totals, evidence, elapsed, round.Token).ConfigureAwait(true);
     }
 
-    private async Task RoundAsync(WorkItem[] jobs, SoakTotals totals, CancellationToken token)
+    private async Task RoundAsync(
+        WorkItem[] jobs,
+        SoakTotals totals,
+        SoakEvidence evidence,
+        Stopwatch elapsed,
+        CancellationToken token
+    )
     {
         string root = _fixture.Root + "/r-" + totals.Rounds.ToString(CultureInfo.InvariantCulture);
         FaultProxy? source = null;
@@ -312,6 +321,13 @@ public sealed class SoakTests : IAsyncLifetime
             await _fixture.Client.SyncAsync(root, token).ConfigureAwait(true);
             Assert.Null(await _fixture.Client.ExistsAsync(leasePath, token).ConfigureAwait(true));
         }
+        catch (Exception failure)
+        {
+            // Preserve the primary error and its observation time before cleanup
+            // can delay reporting or throw a different exception.
+            await evidence.FailureAsync(failure, totals, elapsed.Elapsed).ConfigureAwait(true);
+            throw;
+        }
         finally
         {
             recovery?.ReleaseRestore();
@@ -341,10 +357,9 @@ public sealed class SoakTests : IAsyncLifetime
                     {
                         try
                         {
-                            if (recovery is not null)
-                            {
-                                await recovery.DisposeAsync().ConfigureAwait(true);
-                            }
+                            await (
+                                recovery?.DisposeAsync().AsTask() ?? Task.CompletedTask
+                            ).ConfigureAwait(true);
                         }
                         finally
                         {

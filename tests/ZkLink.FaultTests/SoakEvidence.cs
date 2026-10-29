@@ -198,6 +198,7 @@ internal sealed class SoakEvidence : IAsyncDisposable
     private long _baselineHeap;
     private int _baselineThreads;
     private int _samples;
+    private Exception? _reportedFailure;
     internal TimeSpan SampleInterval { get; }
 
     internal SoakEvidence(SoakSettings settings)
@@ -239,7 +240,7 @@ internal sealed class SoakEvidence : IAsyncDisposable
         }
         Assert.InRange(++_samples, 1, MaximumPeriodicSamples + 4);
         string line = FormattableString.Invariant(
-            $"{{\"kind\":\"{kind}\",\"seed\":{_settings.Seed},\"duration_seconds\":{_settings.Seconds},\"elapsed_ms\":{elapsed.TotalMilliseconds:F0},\"rounds\":{totals.Rounds},\"crud_started\":{totals.CrudStarted},\"crud_succeeded\":{totals.CrudSucceeded},\"canceled_not_sent\":{totals.NotSent},\"canceled_unknown\":{totals.Unknown},\"reconnects\":{totals.Reconnects},\"watch_events\":{totals.WatchEvents},\"retained_heap_bytes\":{heap},\"working_set_bytes\":{workingSet},\"threads\":{threads},\"heap_growth_limit_bytes\":{RetainedHeapAllowance},\"thread_growth_limit\":{ThreadAllowance},\"owned_counters\":0,\"owned_live_tcp\":0,\"owned_listeners\":0}}"
+            $"{{\"kind\":\"{kind}\",\"reported_at_utc\":\"{DateTimeOffset.UtcNow:O}\",\"seed\":{_settings.Seed},\"duration_seconds\":{_settings.Seconds},\"elapsed_ms\":{elapsed.TotalMilliseconds:F0},\"rounds\":{totals.Rounds},\"crud_started\":{totals.CrudStarted},\"crud_succeeded\":{totals.CrudSucceeded},\"canceled_not_sent\":{totals.NotSent},\"canceled_unknown\":{totals.Unknown},\"reconnects\":{totals.Reconnects},\"watch_events\":{totals.WatchEvents},\"retained_heap_bytes\":{heap},\"working_set_bytes\":{workingSet},\"threads\":{threads},\"heap_growth_limit_bytes\":{RetainedHeapAllowance},\"thread_growth_limit\":{ThreadAllowance},\"owned_counters\":0,\"owned_live_tcp\":0,\"owned_listeners\":0}}"
         );
         await _writer.WriteLineAsync(line.AsMemory(), token).ConfigureAwait(true);
         await _writer.FlushAsync(token).ConfigureAwait(true);
@@ -257,17 +258,23 @@ internal sealed class SoakEvidence : IAsyncDisposable
         }
     }
 
-    internal async Task FailureAsync(Exception failure, SoakTotals totals)
+    internal async Task FailureAsync(Exception failure, SoakTotals totals, TimeSpan elapsed)
     {
+        if (ReferenceEquals(failure, _reportedFailure))
+        {
+            return;
+        }
         // The type and counters are safe; exception messages can contain user data.
         var request = failure as IZooKeeperRequestFailure;
         string errorCode = request?.ErrorCode?.ToString(CultureInfo.InvariantCulture) ?? "null";
         string outcome = request is null ? "null" : $"\"{request.Outcome}\"";
+        string operation = request is null ? "null" : $"\"{request.Request.Operation}\"";
         string line = FormattableString.Invariant(
-            $"{{\"kind\":\"failure\",\"seed\":{_settings.Seed},\"round\":{totals.Rounds},\"error_type\":\"{failure.GetType().Name}\",\"error_code\":{errorCode},\"request_outcome\":{outcome},\"crud_started\":{totals.CrudStarted},\"crud_succeeded\":{totals.CrudSucceeded}}}"
+            $"{{\"kind\":\"failure\",\"reported_at_utc\":\"{DateTimeOffset.UtcNow:O}\",\"elapsed_ms\":{elapsed.TotalMilliseconds:F0},\"seed\":{_settings.Seed},\"round\":{totals.Rounds},\"error_type\":\"{failure.GetType().Name}\",\"error_code\":{errorCode},\"request_operation\":{operation},\"request_outcome\":{outcome},\"crud_started\":{totals.CrudStarted},\"crud_succeeded\":{totals.CrudSucceeded}}}"
         );
         await _writer.WriteLineAsync(line).ConfigureAwait(true);
         await _writer.FlushAsync().ConfigureAwait(true);
+        _reportedFailure = failure;
     }
 
     public ValueTask DisposeAsync() => _writer.DisposeAsync();

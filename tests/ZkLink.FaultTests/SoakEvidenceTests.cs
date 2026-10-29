@@ -13,47 +13,101 @@ public sealed class SoakEvidenceTests
     private const int DurationSeconds = 30;
     private const int Seed = 1729;
 
-    [Fact(Timeout = TestTimeoutMilliseconds)]
-    public async Task FailureJournalPreservesCodeAndOutcomeWithoutSensitiveRequestMetadata()
+    [Theory(Timeout = TestTimeoutMilliseconds)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FailureJournalPreservesSafeTimingAndOutcomeWithoutSensitiveRequestMetadata(
+        bool timeout
+    )
     {
         const string SensitiveMarker = "soak-failure-private-marker";
+        const int FailureElapsedMilliseconds = 1234;
         string directory = Path.Combine(
             Path.GetTempPath(),
             "zklink-soak-unit-" + Guid.NewGuid().ToString("N")
         );
         Directory.CreateDirectory(directory);
         string file = Path.Combine(directory, "failure.jsonl");
+        var before = DateTimeOffset.UtcNow;
+        var elapsed = TimeSpan.FromMilliseconds(FailureElapsedMilliseconds);
         try
         {
             var evidence = new SoakEvidence(new SoakSettings(DurationSeconds, Seed, file));
             await using (evidence.ConfigureAwait(true))
             {
                 var request = new ZooKeeperRequestInfo(
-                    ZooKeeperOperation.Delete,
+                    timeout ? ZooKeeperOperation.Sync : ZooKeeperOperation.Delete,
                     path: "/" + SensitiveMarker
                 );
+                ZooKeeperException failure = timeout
+                    ? new ZooKeeperTimeoutException(request, RequestOutcome.Unknown)
+                    : new ZooKeeperException(
+                        request,
+                        RequestOutcome.Rejected,
+                        (int)ZooKeeperErrorCode.NotEmpty
+                    );
                 await evidence
-                    .FailureAsync(
-                        new ZooKeeperException(
-                            request,
-                            RequestOutcome.Rejected,
-                            (int)ZooKeeperErrorCode.NotEmpty
-                        ),
-                        new SoakTotals()
-                    )
+                    .FailureAsync(failure, new SoakTotals(), elapsed)
+                    .ConfigureAwait(true);
+                // Outer propagation must not duplicate the same error. A different
+                // cleanup failure must retain the original error and add its own record.
+                await evidence
+                    .FailureAsync(failure, new SoakTotals(), elapsed)
+                    .ConfigureAwait(true);
+                await evidence
+                    .FailureAsync(new IOException(SensitiveMarker), new SoakTotals(), elapsed)
                     .ConfigureAwait(true);
             }
-            string text = await File.ReadAllTextAsync(file, TestContext.Current.CancellationToken)
+            string[] lines = await File.ReadAllLinesAsync(
+                    file,
+                    TestContext.Current.CancellationToken
+                )
                 .ConfigureAwait(true);
-            Assert.DoesNotContain(SensitiveMarker, text, StringComparison.Ordinal);
-            using var json = JsonDocument.Parse(text);
+            Assert.Equal(2, lines.Length);
+            Assert.DoesNotContain(
+                SensitiveMarker,
+                string.Join(Environment.NewLine, lines),
+                StringComparison.Ordinal
+            );
+            using var cleanup = JsonDocument.Parse(lines[1]);
             Assert.Equal(
-                (int)ZooKeeperErrorCode.NotEmpty,
-                json.RootElement.GetProperty("error_code").GetInt32()
+                nameof(IOException),
+                cleanup.RootElement.GetProperty("error_type").GetString()
             );
             Assert.Equal(
-                nameof(RequestOutcome.Rejected),
+                JsonValueKind.Null,
+                cleanup.RootElement.GetProperty("request_operation").ValueKind
+            );
+            Assert.Equal(
+                JsonValueKind.Null,
+                cleanup.RootElement.GetProperty("request_outcome").ValueKind
+            );
+            using var json = JsonDocument.Parse(lines[0]);
+            var code = json.RootElement.GetProperty("error_code");
+            if (timeout)
+            {
+                Assert.Equal(JsonValueKind.Null, code.ValueKind);
+            }
+            else
+            {
+                Assert.Equal((int)ZooKeeperErrorCode.NotEmpty, code.GetInt32());
+            }
+            Assert.Equal(
+                timeout ? nameof(RequestOutcome.Unknown) : nameof(RequestOutcome.Rejected),
                 json.RootElement.GetProperty("request_outcome").GetString()
+            );
+            Assert.Equal(
+                timeout ? nameof(ZooKeeperOperation.Sync) : nameof(ZooKeeperOperation.Delete),
+                json.RootElement.GetProperty("request_operation").GetString()
+            );
+            Assert.Equal(
+                elapsed.TotalMilliseconds,
+                json.RootElement.GetProperty("elapsed_ms").GetDouble()
+            );
+            Assert.InRange(
+                json.RootElement.GetProperty("reported_at_utc").GetDateTimeOffset(),
+                before,
+                DateTimeOffset.UtcNow
             );
         }
         finally
