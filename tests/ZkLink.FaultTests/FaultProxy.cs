@@ -25,6 +25,8 @@ internal sealed class FaultProxy : IAsyncDisposable
     private readonly bool _holdRestore;
     private readonly Task _run;
     private readonly TaskCompletionSource _restoreRelease = NewSignal();
+    private readonly TaskCompletionSource _syncHeld = NewSignal();
+    private readonly TaskCompletionSource _syncRelease = NewSignal();
     private TcpClient? _client;
     private TcpClient? _upstream;
     private bool _armed;
@@ -38,6 +40,9 @@ internal sealed class FaultProxy : IAsyncDisposable
     private int _forwardedPings;
     private int? _selectedXid;
     private int _creates;
+    private int _syncs;
+    private bool _syncArmed;
+    private int? _syncXid;
     private int _connectionAttempts;
     private int _handshakeReplies;
     private int _lastNegotiatedMilliseconds;
@@ -55,6 +60,9 @@ internal sealed class FaultProxy : IAsyncDisposable
     internal Task ServerClosed => _serverClosed.Task;
     internal int WithheldError { get; private set; }
     internal int CreateTransmissions => Volatile.Read(ref _creates);
+    internal int SyncTransmissions => Volatile.Read(ref _syncs);
+    internal Task SyncReplyHeld => _syncHeld.Task;
+    internal int SyncReplyError { get; private set; }
     internal int ConnectionAttempts => Volatile.Read(ref _connectionAttempts);
     internal string Endpoint { get; }
     internal bool IncomingPartitionActive => Volatile.Read(ref _incomingPartition) != 0;
@@ -116,6 +124,20 @@ internal sealed class FaultProxy : IAsyncDisposable
     }
 
     internal void ReleaseRestore() => _restoreRelease.TrySetResult();
+
+    internal void ArmSyncReply()
+    {
+        lock (_gate)
+        {
+            if (_syncArmed)
+            {
+                throw new InvalidOperationException("Only one sync reply may be held.");
+            }
+            _syncArmed = true;
+        }
+    }
+
+    internal void ReleaseSyncReply() => _syncRelease.TrySetResult();
 
     private async Task RunAsync()
     {
@@ -280,6 +302,23 @@ internal sealed class FaultProxy : IAsyncDisposable
                         handshake = false;
                         continue;
                     }
+                    if (
+                        !incoming
+                        && !handshake
+                        && length >= RequestHeaderBytes
+                        && BinaryPrimitives.ReadInt32BigEndian(packet.AsSpan(sizeof(int)))
+                            == (int)ZooKeeperOperation.Sync
+                    )
+                    {
+                        Interlocked.Increment(ref _syncs);
+                        lock (_gate)
+                        {
+                            if (_syncArmed && _syncXid is null)
+                            {
+                                _syncXid = BinaryPrimitives.ReadInt32BigEndian(packet);
+                            }
+                        }
+                    }
                     if (!handshake && length >= HeaderBytes)
                     {
                         int xid = BinaryPrimitives.ReadInt32BigEndian(packet);
@@ -300,9 +339,11 @@ internal sealed class FaultProxy : IAsyncDisposable
                         else
                         {
                             bool discard;
+                            bool holdSync;
                             lock (_gate)
                             {
                                 discard = _selectedXid == xid && !_replyDiscarded;
+                                holdSync = _syncXid == xid;
                                 if (discard)
                                 {
                                     _replyDiscarded = true;
@@ -315,6 +356,15 @@ internal sealed class FaultProxy : IAsyncDisposable
                                 );
                                 _withheld.TrySetResult();
                                 continue;
+                            }
+                            if (holdSync)
+                            {
+                                // Keep following replies behind this frame in wire order.
+                                SyncReplyError = BinaryPrimitives.ReadInt32BigEndian(
+                                    packet.AsSpan(sizeof(int) + sizeof(long))
+                                );
+                                _syncHeld.TrySetResult();
+                                await _syncRelease.Task.WaitAsync(token).ConfigureAwait(false);
                             }
                             if (
                                 _holdRestore
