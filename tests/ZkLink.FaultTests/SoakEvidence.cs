@@ -260,8 +260,11 @@ internal sealed class SoakEvidence : IAsyncDisposable
     internal async Task FailureAsync(Exception failure, SoakTotals totals)
     {
         // The type and counters are safe; exception messages can contain user data.
+        var request = failure as IZooKeeperRequestFailure;
+        string errorCode = request?.ErrorCode?.ToString(CultureInfo.InvariantCulture) ?? "null";
+        string outcome = request is null ? "null" : $"\"{request.Outcome}\"";
         string line = FormattableString.Invariant(
-            $"{{\"kind\":\"failure\",\"seed\":{_settings.Seed},\"round\":{totals.Rounds},\"error_type\":\"{failure.GetType().Name}\",\"crud_started\":{totals.CrudStarted},\"crud_succeeded\":{totals.CrudSucceeded}}}"
+            $"{{\"kind\":\"failure\",\"seed\":{_settings.Seed},\"round\":{totals.Rounds},\"error_type\":\"{failure.GetType().Name}\",\"error_code\":{errorCode},\"request_outcome\":{outcome},\"crud_started\":{totals.CrudStarted},\"crud_succeeded\":{totals.CrudSucceeded}}}"
         );
         await _writer.WriteLineAsync(line).ConfigureAwait(true);
         await _writer.FlushAsync().ConfigureAwait(true);

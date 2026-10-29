@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Text.Json;
 
 namespace ZkLink.FaultTests;
 
@@ -11,6 +12,55 @@ public sealed class SoakEvidenceTests
     private const int RetainedAllocationBytes = 32 * 1024 * 1024;
     private const int DurationSeconds = 30;
     private const int Seed = 1729;
+
+    [Fact(Timeout = TestTimeoutMilliseconds)]
+    public async Task FailureJournalPreservesCodeAndOutcomeWithoutSensitiveRequestMetadata()
+    {
+        const string SensitiveMarker = "soak-failure-private-marker";
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            "zklink-soak-unit-" + Guid.NewGuid().ToString("N")
+        );
+        Directory.CreateDirectory(directory);
+        string file = Path.Combine(directory, "failure.jsonl");
+        try
+        {
+            var evidence = new SoakEvidence(new SoakSettings(DurationSeconds, Seed, file));
+            await using (evidence.ConfigureAwait(true))
+            {
+                var request = new ZooKeeperRequestInfo(
+                    ZooKeeperOperation.Delete,
+                    path: "/" + SensitiveMarker
+                );
+                await evidence
+                    .FailureAsync(
+                        new ZooKeeperException(
+                            request,
+                            RequestOutcome.Rejected,
+                            (int)ZooKeeperErrorCode.NotEmpty
+                        ),
+                        new SoakTotals()
+                    )
+                    .ConfigureAwait(true);
+            }
+            string text = await File.ReadAllTextAsync(file, TestContext.Current.CancellationToken)
+                .ConfigureAwait(true);
+            Assert.DoesNotContain(SensitiveMarker, text, StringComparison.Ordinal);
+            using var json = JsonDocument.Parse(text);
+            Assert.Equal(
+                (int)ZooKeeperErrorCode.NotEmpty,
+                json.RootElement.GetProperty("error_code").GetInt32()
+            );
+            Assert.Equal(
+                nameof(RequestOutcome.Rejected),
+                json.RootElement.GetProperty("request_outcome").GetString()
+            );
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
 
     [Fact(Timeout = TestTimeoutMilliseconds)]
     public async Task RetainedAllocationBreachesTheRecordedHeapBound()
