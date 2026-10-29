@@ -16,7 +16,7 @@ from aot_artifacts import ROOT, RIDS, native_header, sha256
 
 def input_hashes():
     inputs = [ROOT / "src/ZkLink/ZkLink.csproj", ROOT / "src/ZkLink/packages.lock.json", *sorted((ROOT / "src/ZkLink").rglob("*.cs"))]
-    inputs += [ROOT / name for name in ["Directory.Build.props", "Directory.Packages.props", "NuGet.config", "global.json", "LICENSE", "THIRD-PARTY-NOTICES.md", "src/ZkLink/README.md", "src/ZkLink/PublicAPI.Shipped.txt", "src/ZkLink/PublicAPI.Unshipped.txt"]]
+    inputs += [ROOT / name for name in ["Directory.Build.props", "Directory.Packages.props", "NuGet.Config", "global.json", "LICENSE", "THIRD-PARTY-NOTICES.md", "src/ZkLink/README.md", "src/ZkLink/PublicAPI.Shipped.txt", "src/ZkLink/PublicAPI.Unshipped.txt"]]
     inputs += list((ROOT / "tests/ZkLink.AotAnalysis").glob("*.cs*")) + list((ROOT / "tests/ZkLink.AotSmoke").glob("*.cs*"))
     inputs += list((ROOT / "samples/ZkLink.Samples.Basic").glob("*.cs"))
     inputs += [ROOT / "tests/ZkLink.IntegrationTests/WatchReconnectProxy.cs", ROOT / "dev/aot_artifacts.py", pathlib.Path(__file__)]
