@@ -4,6 +4,8 @@ Look up the repository's current code, tooling, and verification scope.
 
 - [Current capabilities](current-capabilities.md) — available behavior, planned
   features, server targets, and release status.
+- [Production release readiness](release-readiness.md) — release scope, evidence,
+  blockers and the requirements for qualifying the final core package.
 - [Development reference](development.md) — SDK, commands, test projects, fixture
   settings, and repository layout.
 - [Analyzer rules](../../src/ZkLink.Analyzers/README.md) — ZKL0001–ZKL0006,

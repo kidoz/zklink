@@ -76,7 +76,8 @@ client as well as the driver.
 Samples are streamed to JSONL at intervals of at least ten seconds, increasing
 for longer runs to bound periodic samples at 1,440. The harness retains aggregate
 state instead of an activity history. A failure record contains the safe error
-type, seed and counters. Managed output excludes credentials, paths and payloads.
+type, raw server error code and request outcome when available, seed and counters.
+Managed output excludes credentials, paths and payloads.
 
 ## Bounds, interruption and evidence
 
@@ -85,8 +86,11 @@ allow ten seconds. Requests, connect, close and independent cleanup also have
 finite deadlines. The process guard is the requested duration plus two minutes.
 The test itself has a fixed maximum guard beyond the longest permitted duration.
 
-Managed cleanup disposes watches, clients and proxies, observes outstanding work
-and removes the round namespace. The shell exit trap runs fresh authenticated
+Managed cleanup disposes watches, clients and proxies and observes outstanding
+work. Before reading the round namespace for deletion, the independent cleanup
+session performs a write on its fixture-owned parent, establishing its view
+through the quorum. It then removes the round namespace; unexpected cleanup
+errors remain failures. The shell exit trap runs fresh authenticated
 probes on all three members, then removes the owned fixture and volumes even
 when the test process fails. The printed artifact directory retains exact server
 versions, configuration, SDK/revision, seed, test results, the JSONL resource

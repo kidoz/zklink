@@ -4,7 +4,7 @@ The connection methods on `ZooKeeperClient` are `ConnectAsync`, `Session`,
 `SubscribeStateChanges`, `WaitForConnectionAsync`, `UpdateEndpointsAsync`,
 `SyncAsync`, `CloseAsync` and `DisposeAsync`. Network methods return `Task` and
 accept a final `CancellationToken`. Exact declarations are in the
-[API baseline](../../src/ZkLink/PublicAPI.Unshipped.txt).
+[released API baseline](../../src/ZkLink/PublicAPI.Shipped.txt).
 
 Node CRUD, children/stat and ACL methods are described in the [node reference](nodes.md).
 Session ephemerals, descendant counts and identities are described in the
@@ -26,8 +26,8 @@ client, except that endpoint updates affect future connection attempts.
 | `EnableTtlNodes` | False; operator assertion that every endpoint enables extended node types; required for TTL creation |
 | `CompatibilityProfile` | `ZooKeeper38`; `ZooKeeper39` enables independent watch modes at one path; assert all endpoints qualify, without negotiated discovery |
 | `SessionTimeout` | 30 seconds requested; actual negotiated timeout governs liveness |
-| `InitialConnectTimeout` | 30 seconds across endpoint attempts |
-| `ConnectAttemptTimeout` | 5 seconds for DNS, TCP, TLS and the handshake; reduced by remaining initial/recovery time |
+| `InitialConnectTimeout` | 30 seconds across endpoint attempts; completion also waits for owned TLS cleanup |
+| `ConnectAttemptTimeout` | 5 seconds for DNS, TCP, TLS and the handshake; reduced by remaining initial/recovery time. Also bounds each platform certificate download where supported |
 | `OperationTimeout` | 30 seconds from invocation, including queue time |
 | `CloseTimeout` | 5 seconds to obtain acknowledgment before cleanup |
 | `MaxInFlightRequests` | 256; range 1–65,536; canceled sent requests retain their slots |
@@ -50,6 +50,13 @@ Frame/data limits do not change the server's Jute limits. Chroot is namespace
 translation; it does not provide ACL isolation or create the chroot node.
 
 ## TLS and authentication
+
+Native certificate validation can delay cancellation. The platform may perform
+several certificate/revocation downloads, each with its own timeout, before
+owned TLS cleanup completes. Consequently initial connection completion can
+exceed `InitialConnectTimeout`; these settings are not a hard wall-clock bound
+on native validation. macOS ignores the configurable download timeout. See
+[online revocation checks and platform limits](../how-to/verify-secure-connections.md#online-revocation-and-connection-cleanup).
 
 TLS completes before the ZooKeeper handshake. `Required` uses platform-selected
 protocols, chain validation, the configured endpoint host as TLS identity and

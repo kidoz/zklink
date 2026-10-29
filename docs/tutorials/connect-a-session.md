@@ -2,7 +2,8 @@
 
 This exercise connects the managed client to a local ZooKeeper ensemble,
 synchronizes `/` and closes with server acknowledgment. It uses the source
-checkout; no NuGet package has been released.
+checkout. Core 0.1.0 is also available as a NuGet package; this exercise runs the
+sample sources from the repository.
 
 ## Start the local servers
 

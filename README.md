@@ -19,6 +19,11 @@ The initial release targets .NET 10. APIs may change before 1.0. Optional DI and
 analyzer packages remain available from source. See the [release guide](docs/how-to/release-nuget.md)
 for verification and publishing details.
 
+The [production release checklist](docs/reference/release-readiness.md) records
+the evidence and fixes still required for 1.0.0. Current work prioritizes core
+correctness, production TLS behavior, sustained resource checks and validation
+of the final package across the declared client platforms.
+
 ## Current repository state
 
 - **Solution:** `ZkLink.slnx` with the core, dependency-injection and analyzer libraries, five .NET test projects and a runnable connection sample.

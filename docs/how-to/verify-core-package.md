@@ -24,9 +24,9 @@ The check inspects the package for the core `net10.0` assembly, XML API
 documentation, package README, MIT license and third-party notices. Unexpected
 assets and runtime package dependencies are rejected. Assembly references must
 belong to the installed .NET runtime. SDK package validation and the existing
-public API analyzer run during the build. No released-package compatibility
-baseline exists yet. The core's public API baseline records the
-initial 0.1.0 release.
+public API analyzer run during the build. Package compatibility comparison
+against published 0.1.0 remains to be added. The core's public API baseline
+records the initial 0.1.0 release.
 
 The symbol check verifies the portable PDB identity and checksum against the DLL,
 repository revision and Source Link mapping, and the checksum of every embedded

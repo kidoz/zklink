@@ -5,7 +5,9 @@ ZkLink is a managed C# client for Apache ZooKeeper under development, targeting
 close with acknowledgment, use node/ACL operations and typed transactions, and
 query session ephemerals, descendant counts and authenticated identities.
 One-shot watched reads and persistent/recursive subscriptions with reconnect
-gap reporting are available. No NuGet package is available.
+gap reporting are available. Core 0.1.0 is published; see
+[Production release readiness](reference/release-readiness.md) for the remaining
+requirements before a production-qualified release.
 
 The documentation follows [Diátaxis](https://diataxis.fr/), with four sections
 organized around what you need to do.

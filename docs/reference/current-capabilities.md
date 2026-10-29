@@ -1,6 +1,8 @@
 # Current capabilities
 
-This describes the checkout as of **2026-10-28**. The initial core package version is **0.1.0**.
+This describes the checkout as of **2026-10-29**. The initial core package version is **0.1.0**.
+See [Production release readiness](release-readiness.md) for the current core
+release scope, blocking evidence and delivery order.
 
 ## Code and verification
 
@@ -12,7 +14,7 @@ This describes the checkout as of **2026-10-28**. The initial core package versi
 | Public types | Immutable snapshots, endpoints, create options, ACLs, versions, request failures, watch handles/events and removal results; contract tests and local core package consumer | Compatibility validation against future released versions |
 | Sessions and operations | Connect/authenticate/sync, snapshots/subscriptions, heartbeat, same-session recovery, cancellation, close, node/ACL methods, typed transactions, auxiliary queries, opt-in TTL creation and watches | Broader live recovery, asymmetric peer faults and observer qualification |
 | Watches | One-shot reads, persistent/recursive subscriptions, buffered events, shared removal, cancellation cleanup, bounded restoration and explicit reconnect gaps | Broader fault and concurrency qualification |
-| Security | TCP/TLS, custom roots/client certificates, live client TLS/mTLS operations, digest replay, certificate rejection and distinct digest/X.509 ACLs | Revocation, rotation, quorum TLS, additional auth schemes and cross-platform qualification |
+| Security | TCP/TLS, custom roots/client certificates, live TLS/mTLS/digest/ACL checks; managed default-online revocation checks on four client targets and bounded platform certificate downloads | Deployment-specific revocation, native online revocation, rotation and final-candidate qualification; quorum TLS and additional auth are separately scoped |
 | Dependency injection | Optional `AddZkLink` registration with one host-owned singleton and asynchronous startup/shutdown | Installed-package and DI-specific Native AOT qualification |
 | Analyzers | Six optional ZKL diagnostics, Roslyn compilation tests and a local packed-package consumer check | Released package and cross-platform qualification |
 | Local servers | Pinned three-node plaintext/TLS/mTLS fixtures for 3.8.7 and 3.9.6, expired-certificate negative control | Broader fault fixtures |
@@ -59,7 +61,9 @@ CRUD, repeated client lifecycles, cancellation outcomes and same-session watch
 recovery. Resource checkpoints check owned counters/connections and compare
 retained managed heap and threads against a recorded baseline. The harness
 supports configurable durations; a passing short run does not establish the
-24-hour release requirement or cross-platform qualification.
+24-hour release requirement or cross-platform qualification. The release-duration
+attempt on 29 October stopped after about two hours on 3.8.7 with a `SyncAsync`
+timeout; fixture rollback completed, and the cause remains under investigation.
 
 ## Frameworks and platforms
 
@@ -121,8 +125,11 @@ watch recovery, server/client certificate rejection and X.509 ACL identity
 isolation. `just zk-security-concurrency` adds three bounded rounds of seven
 synchronized rejection attempts per patch, with repeated valid-control requests.
 The earlier intermittent concurrency timeout has not been reproduced or explained;
-these short runs do not qualify sustained load. These are macOS arm64 client observations; remote CI and other
-client platforms remain unverified. See [Verify secure connections](../how-to/verify-secure-connections.md). SASL and read-only
+these short runs do not qualify sustained load. Linux CI has also passed the
+secure fixture and bounded-concurrency jobs. The separate native checks cover
+TLS/mTLS on all four client targets; these live fixtures use `NoCheck` and do
+not establish production online-revocation behavior. See
+[Verify secure connections](../how-to/verify-secure-connections.md). SASL and read-only
 mode are outside the planned initial client scope; coordination recipes and
 administration require separate designs.
 

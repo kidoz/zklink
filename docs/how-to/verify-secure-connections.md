@@ -17,8 +17,9 @@ Each secure node must pass an authenticated create/read/delete probe through
 its TLS client port before the .NET checks run.
 
 Security cases share one test collection so certificate rejection and positive
-controls run independently. Negative probes have a one-second connection budget
-with the same rejection assertions and outer timeout guards; sustained concurrent
+controls run independently. Functional negative probes have an eight-second
+initial and attempt budget with the same rejection assertions and outer timeout
+guards; sustained concurrent
 TLS failure traffic is outside this functional check.
 
 Run the separate bounded concurrency check with:
@@ -67,6 +68,47 @@ from a stopped server. Quorum traffic between containers is plaintext: this
 fixture verifies client TLS, without qualifying quorum TLS, revocation services,
 certificate rotation, SASL, Native AOT or production security. Remote CI and
 other client operating systems require their own observed results.
+
+## Online revocation and connection cleanup
+
+Run the platform revocation checks without Docker or a ZooKeeper installation:
+
+```sh
+dotnet test --project tests/ZkLink.Protocol.Tests -c Release --filter-class '*RevocationTests'
+```
+
+These tests use real `SslStream` connections, generated private issuers and
+loopback CRL/OCSP responders. They verify the default `Online` policy: a valid
+status allows a ZooKeeper handshake, sync and acknowledged close; revoked,
+unavailable and incorrectly signed status responses fail before ZooKeeper
+application bytes are sent. Explicit `NoCheck` controls establish that chain,
+name and protocol setup are otherwise valid. Each case has a separate issuer,
+TLS identity and responder URL; macOS also uses separate loopback responder
+hostnames to isolate platform caches. No root is installed in a system store.
+
+Held-response tests cancel the caller or advance the driver deadline after a
+status lookup starts, then require failure and owned cleanup without a ready
+client. The driver sets the platform's certificate URL retrieval timeout to
+`ConnectAttemptTimeout` and rechecks cancellation before transferring a
+completed transport. Online checking and hostname/trust validation remain
+enabled.
+
+Certificate URL timeouts apply to individual downloads, not necessarily the
+whole chain. Several OCSP, CRL or issuer downloads can extend native validation
+past the requested connection deadline. Cancellation completion waits for that
+work and owned cleanup. macOS ignores `UrlRetrievalTimeout`; the OS controls its
+retrieval behavior. The tests supply OCSP as well as CRLs because CRL-only
+private-chain revocation is not qualified on macOS. An unavailable status
+remains a failure; the driver does not switch to `NoCheck` or plaintext.
+
+These controlled-peer checks qualify the observed managed-client behavior.
+The separate two-version ZooKeeper and native fixtures still use `NoCheck`;
+production revocation services, multi-issuer deployments, certificate rotation
+and online revocation under Native AOT require their own evidence.
+
+See Microsoft's [certificate URL timeout API](https://learn.microsoft.com/dotnet/api/system.security.cryptography.x509certificates.x509chainpolicy.urlretrievaltimeout)
+and [platform cryptography limits](https://learn.microsoft.com/dotnet/standard/security/cross-platform-cryptography#x509chain),
+and the [.NET 10.0.14 private-chain revocation tests](https://github.com/dotnet/runtime/blob/v10.0.14/src/libraries/System.Security.Cryptography/tests/X509Certificates/RevocationTests/DynamicRevocationTests.cs).
 
 The [Apache TLS settings](https://zookeeper.apache.org/doc/r3.9.6/zookeeperAdmin.html#sc_authOptions)
 describe the server configuration. macOS imports the test client keys into
