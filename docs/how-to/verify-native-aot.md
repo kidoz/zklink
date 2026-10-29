@@ -131,11 +131,26 @@ after all twelve native cases and cleanup complete.
 The [Native AOT workflow](../../.github/workflows/native-aot.yml) defines publish,
 rooted execution and smoke identity checks on all four RIDs. Live jobs use Docker
 on Linux x64/arm64 and portable JVM fixtures on Windows x64/macOS arm64.
-Configuration does not establish remote execution evidence.
+The [2026-10-29 verification run](https://github.com/kidoz/zklink/actions/runs/40830418800)
+passed all eight jobs at commit `0cbf9cb3995b8c5ee5905613983023fa3a113a30`:
 
-Local macOS arm64 execution now includes both fixture backends. Four-RID live
-qualification, sent-request cancellation/unknown outcomes, broader secure
-recovery, revocation/rotation and optional DI qualification remain open. Core
+| Target | Packed native publication and direct execution | TLS/mTLS live cases | Live fixture |
+| --- | --- | --- | --- |
+| `linux-x64` | Passed | 12 passed | Docker |
+| `linux-arm64` | Passed | 12 passed | Docker |
+| `win-x64` | Passed | 12 passed | Portable JVM |
+| `osx-arm64` | Passed | 12 passed | Portable JVM |
+
+Downloaded artifacts were checked against their recorded package, symbol and
+executable hashes. Both consumers publish without trim/AOT warnings; native
+identity succeeds and managed execution is rejected. The live artifacts include
+48 completed native cases, 64 final authenticated readiness probes, eight
+missing-client-certificate rejection proofs and cleanup of all sixteen fixtures.
+Each target covers both exact server versions and all three voters.
+
+Local macOS arm64 execution also includes both fixture backends. Sent-request
+cancellation/unknown outcomes, broader secure recovery, revocation/rotation,
+optional DI and full release qualification remain open. Core
 `IsAotCompatible` metadata stays disabled; these checks do not declare release
 support.
 

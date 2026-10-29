@@ -17,7 +17,7 @@ This describes the checkout as of **2026-10-28**. The initial core package versi
 | Analyzers | Six optional ZKL diagnostics, Roslyn compilation tests and a local packed-package consumer check | Released package and cross-platform qualification |
 | Local servers | Pinned three-node plaintext/TLS/mTLS fixtures for 3.8.7 and 3.9.6, expired-certificate negative control | Broader fault fixtures |
 | Observability | BCL traces and metrics, bounded asynchronous diagnostic delivery, finite tags, listener isolation and redaction checks | Exporter integration, sustained-load and cross-platform qualification |
-| Native AOT | Rooted/unrooted packed consumers and local macOS arm64 TLS/mTLS live evidence on both server patches | Other native target executions, four-RID release qualification and compatibility metadata |
+| Native AOT | Rooted/unrooted packed consumers, direct native execution and twelve TLS/mTLS live cases per target on Linux x64/arm64, Windows x64 and macOS arm64 | Broader native recovery/cancellation, full release qualification and compatibility metadata |
 | Performance | Protocol/framing benchmarks and allocation gates; live get/set concurrency, shared persistent-watch fan-out and 10,000-path recovery measurements with latency/resource observations | Repeated controlled-runner measurements, TLS performance and broader qualification |
 
 See [Tracing and metrics](telemetry.md) for instrument names, timing, privacy and
@@ -69,15 +69,13 @@ against shipped/unshipped baseline files; the core's shipped baseline records
 the initial 0.1.0 API.
 
 The [build workflow](../../.github/workflows/build.yml) defines Linux, Windows,
-and macOS checks. Local macOS arm64 execution is recorded in the repository;
-remote workflow results remain unverified. Proposed Native AOT targets are
-`linux-x64`, `linux-arm64`, `win-x64`, and `osx-arm64`; none is qualified yet.
-
-The [native verification harness](../how-to/verify-native-aot.md) now has local
-`osx-arm64` publish and direct-execution evidence for rooted analysis and twelve
-secure live cases. The other native targets have no observed execution evidence;
-Windows/macOS live CI now has portable JVM fixtures, also verified locally on
-macOS arm64; remote execution and full release qualification remain open.
+and macOS checks. The separate [native verification harness](../how-to/verify-native-aot.md#evidence-and-remaining-qualification)
+passed all eight jobs on 2026-10-29 for `linux-x64`, `linux-arm64`, `win-x64`
+and `osx-arm64`: packed rooted/unrooted publication, direct native identity and
+twelve secure live cases per target. Linux uses Docker fixtures; Windows/macOS
+use portable JVM fixtures. Retained artifacts cover 48 live cases and 64 final
+authenticated readiness probes across both server versions. Full release
+qualification and core `IsAotCompatible` metadata remain open.
 
 ## Server targets
 

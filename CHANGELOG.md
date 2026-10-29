@@ -19,6 +19,15 @@ not establish broader security, Native AOT or production qualification. See
   certificate generation, authenticated readiness and owned process cleanup.
   `just aot-portable-check` runs the same native checks without Docker or the
   OpenSSL CLI; remote platform qualification remains separately recorded.
+- Recorded successful native publication and direct execution on all four
+  targets, plus 48 secure live cases across both pinned server versions.
+
+### Fixed
+
+- Native publication uses the tracked NuGet configuration filename casing on
+  case-sensitive filesystems.
+- Windows security fixtures import client certificates with temporary platform
+  key storage required by Schannel, releasing owned certificates on disposal.
 
 ## [0.1.0] - 2026-10-28
 
