@@ -273,7 +273,7 @@ public sealed class TransportSecurityTests
         return resolver;
     }
 
-    private static async Task ServeSessionAsync(Stream stream, CancellationToken token)
+    internal static async Task ServeSessionAsync(Stream stream, CancellationToken token)
     {
         var limits = new ProtocolLimits();
         var reader = new FrameReader(stream, limits);

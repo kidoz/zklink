@@ -33,6 +33,8 @@ internal sealed class HostResolver : IHostResolver
 internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRandom random)
     : ITransportConnector
 {
+    private static readonly TimeSpan MinimumRetrievalTimeout = TimeSpan.FromMilliseconds(1);
+
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Reliability",
         "CA2000",
@@ -82,6 +84,17 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
                         EnabledSslProtocols = SslProtocols.None,
                         CertificateRevocationCheckMode = tls.RevocationMode,
                     };
+                    // Native chain evaluation can outlive token cancellation. Bound each
+                    // download where the platform supports it; macOS ignores this value.
+                    var policy = new X509ChainPolicy
+                    {
+                        RevocationMode = tls.RevocationMode,
+                        UrlRetrievalTimeout =
+                            options.Settings.ConnectAttemptTimeout < MinimumRetrievalTimeout
+                                ? MinimumRetrievalTimeout
+                                : options.Settings.ConnectAttemptTimeout,
+                    };
+                    authentication.CertificateChainPolicy = policy;
                     if (tls.ClientCertificate is not null)
                     {
                         authentication.ClientCertificates = new X509CertificateCollection
@@ -91,20 +104,16 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
                     }
                     if (tls.TrustRoots.Count != 0)
                     {
-                        var policy = new X509ChainPolicy
-                        {
-                            TrustMode = X509ChainTrustMode.CustomRootTrust,
-                            RevocationMode = tls.RevocationMode,
-                        };
+                        policy.TrustMode = X509ChainTrustMode.CustomRootTrust;
                         foreach (var root in tls.TrustRoots)
                         {
                             policy.CustomTrustStore.Add(root);
                         }
-                        authentication.CertificateChainPolicy = policy;
                     }
                     await ssl.AuthenticateAsClientAsync(authentication, cancellationToken)
                         .ConfigureAwait(false);
                 }
+                cancellationToken.ThrowIfCancellationRequested();
                 var result = new TransportConnection(
                     (Stream?)ssl ?? network!,
                     endpoint,

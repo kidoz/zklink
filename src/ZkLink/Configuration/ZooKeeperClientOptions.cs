@@ -30,10 +30,15 @@ public sealed class ZooKeeperClientOptions
     public TimeSpan SessionTimeout { get; init; } = TimeSpan.FromSeconds(30);
 
     /// <summary>Gets the total deadline for initial connection across all endpoints.</summary>
+    /// <remarks>Completion also waits for owned TLS cleanup; native certificate validation can delay cancellation.</remarks>
     public TimeSpan InitialConnectTimeout { get; init; } = TimeSpan.FromSeconds(30);
 
     /// <summary>Gets the maximum DNS/TCP/TLS/handshake time for one endpoint attempt.</summary>
-    /// <remarks>After an accepted handshake, authentication and watch restoration use negotiated inbound liveness.</remarks>
+    /// <remarks>
+    /// Also bounds each certificate download where supported by the platform. Native chain evaluation
+    /// can perform multiple downloads or delay cancellation; macOS ignores the download timeout.
+    /// After an accepted handshake, authentication and watch restoration use negotiated inbound liveness.
+    /// </remarks>
     public TimeSpan ConnectAttemptTimeout { get; init; } = TimeSpan.FromSeconds(5);
 
     /// <summary>Gets the application request deadline, including admission delay.</summary>
