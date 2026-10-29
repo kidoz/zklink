@@ -14,6 +14,9 @@ not establish broader security, Native AOT or production qualification. See
 
 ### Added
 
+- Docker-free core package inspection and installed-consumer identity checks,
+  with separate Linux, Windows and macOS CI jobs. `just package-inspect` runs
+  these checks locally; the Linux live consumer matrix remains separate.
 - Windows/macOS native live CI uses disposable three-voter Java ensembles for
   both pinned ZooKeeper versions, with Gradle-verified dependencies, portable
   certificate generation, authenticated readiness and owned process cleanup.

@@ -7,7 +7,7 @@ This describes the checkout as of **2026-10-28**. The initial core package versi
 | Area | Available now | Remaining scope |
 | --- | --- | --- |
 | Build | .NET 10, C# 14, deterministic builds, locked dependencies, warnings as errors, MIT license | Observed cross-platform and release qualification |
-| Core packaging | Version 0.1.0 release workflow, metadata/documentation/notices, portable symbols, Source Link and embedded-source checks; installed-package examples on both server versions | Released-version compatibility validation, secure/native and cross-platform consumer qualification |
+| Core packaging | Version 0.1.0 release workflow, metadata/documentation/notices, portable symbols, Source Link and embedded-source checks; Docker-free inspection and installed-consumer identity checks passed on Linux, Windows and macOS; Linux live examples on both server versions | Released-version compatibility validation, managed TLS package-consumer coverage and full release qualification |
 | Protocol | Internal codecs for all 27 implemented opcodes, handshake/multi/framing, path/chroot translation and Gradle-managed Java fixtures | Remaining live qualification |
 | Public types | Immutable snapshots, endpoints, create options, ACLs, versions, request failures, watch handles/events and removal results; contract tests and local core package consumer | Compatibility validation against future released versions |
 | Sessions and operations | Connect/authenticate/sync, snapshots/subscriptions, heartbeat, same-session recovery, cancellation, close, node/ACL methods, typed transactions, auxiliary queries, opt-in TTL creation and watches | Broader live recovery, asymmetric peer faults and observer qualification |

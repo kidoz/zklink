@@ -1,18 +1,22 @@
 # Verify a local core package
 
-Run from the repository root with .NET SDK **10.0.403**, Docker with Compose,
-Python 3 and OpenSSL installed:
+Run package inspection from the repository root with .NET SDK **10.0.403** and
+Python 3.12 or newer. Docker, Bash and OpenSSL are unnecessary for this command:
 
 ```sh
-just package-check
+just package-inspect
+```
+
+Or invoke the portable command directly, including on Windows:
+
+```sh
+python dev/prepare-core-package.py
 ```
 
 The command builds a uniquely versioned `0.0.0-local.*` candidate and companion
 symbol package under `artifacts/packages/run.*/feed/`. It never publishes them.
-Missing prerequisites, failed checks and failed fixture cleanup return a nonzero
-exit code. To verify a specific release candidate, use
-`bash dev/test-core-package.sh 0.1.0`. The release workflow publishes the exact
-package and symbols that this command verifies. A plain
+Missing prerequisites and failed checks return a nonzero exit code. To inspect a
+specific release candidate, use `python dev/prepare-core-package.py 0.1.0`. A plain
 `dotnet pack src/ZkLink -c Release` uses the core project's version and omits the
 consumer checks.
 
@@ -35,7 +39,28 @@ to this candidate. A fresh package cache, exact version constraint and local-onl
 package source prevent reuse of an older candidate. Its generated dependency
 lock is restored again in locked mode. The check requires package-only compile
 and runtime assets, compares the output DLL with the package, and verifies the
-actually loaded assembly hash before connecting.
+actually loaded assembly hash without connecting. The consumer's exact
+`--package-check` mode exits after this identity check, before reading connection
+settings or credentials. An incorrect expected assembly hash must fail.
+
+The `package-consumer.json` receipt records host, revision, source inputs and
+hashes of the package, symbols, installed assemblies, dependency files and local
+NuGet configuration. Inputs must stay unchanged during inspection. The live
+runner rechecks these identities before starting any fixture.
+
+## Run installed-package examples against servers
+
+With Docker and Compose, Bash and OpenSSL also installed, run:
+
+```sh
+just package-check
+```
+
+This command first runs the same package inspection, then starts its live
+fixtures. `bash dev/test-core-package.sh 0.1.0` verifies a specific release
+candidate. The release workflow publishes the exact package and symbols that
+this complete command verifies. Failed fixture cleanup returns a nonzero exit
+code.
 
 The installed consumer runs node operations, transactions, auxiliary queries and
 one-shot, persistent and recursive watch examples against every node of isolated
@@ -49,12 +74,23 @@ Altered local artifacts also verify rejection of extra assets, dependencies,
 wrong versions, damaged symbols, incorrect source links/checksums, source-project
 resolution and mismatched assembly hashes. These failures are expected checks.
 
-Inspect the run directory for `result.txt`, `validation.json`, build/restore logs,
-consumer dependency files, rejection logs and per-server execution/cleanup
-evidence. A separate [CI job](../../.github/workflows/build.yml) retains the
-candidate and this evidence. Local execution does not establish remote CI results,
-cross-platform package qualification, TLS package-consumer coverage, Native AOT
-support or release readiness. Optional DI and analyzer packages have separate
-qualification requirements.
+## Inspect evidence
+
+`inspection-result.txt` records successful package-only checks. The complete
+live command also requires `result.txt`, per-server execution/readiness logs and
+fixture cleanup. Both retain `validation.json`, `package-consumer.json`,
+build/restore logs, consumer dependency files and rejection logs.
+
+The [build workflow](../../.github/workflows/build.yml) defines Docker-free
+inspection on Linux, Windows and macOS and retains each candidate and its
+evidence separately. The Linux live package job still runs against both server
+versions. The [2026-10-29 CI run](https://github.com/kidoz/zklink/actions/runs/40882134428)
+passed all three OS inspection jobs and the six Linux live-consumer cases.
+Downloaded receipts were reviewed against package, symbol, installed assembly
+and dependency-file hashes, positive identity checks and expected rejection
+logs. Final authenticated readiness and fixture cleanup also passed. These
+checks do not establish TLS
+package-consumer coverage, Native AOT support or full release readiness.
+Optional DI and analyzer packages have separate qualification requirements.
 
 [How-to guides](README.md) · [Documentation home](../README.md)
