@@ -23,19 +23,21 @@ core acceptance check.
 
 | Requirement | Observed evidence | Still needed for release |
 | --- | --- | --- |
-| Cross-platform build and packaging | [All 22 CI jobs passed](https://github.com/kidoz/zklink/actions/runs/40882134428), including three OS package-inspection jobs and six Linux installed-consumer cases | Repeat applicable checks against the final candidate and compare compatibility with released 0.1.0 |
-| Native execution | [Four-target native run passed](https://github.com/kidoz/zklink/actions/runs/40896496841): 48 secure live cases with reviewed artifacts | Test the exact final package on every target; close native sent-cancellation/unknown-outcome coverage |
+| Cross-platform build and packaging | [All 23 CI jobs passed](https://github.com/kidoz/zklink/actions/runs/40932010476), including three OS package-inspection jobs and six Linux installed-consumer cases | Repeat applicable checks, including the released-package comparison, against the final candidate |
+| Native execution | [Four-target native run passed](https://github.com/kidoz/zklink/actions/runs/40932010435): 48 secure live cases with reviewed artifacts | Test the exact final package on every target; close native sent-cancellation/unknown-outcome coverage |
 | Production TLS policy | [Managed default-online revocation checks](https://github.com/kidoz/zklink/actions/runs/40900036928/attempts/1) pass on Linux x64/arm64, Windows x64 and macOS arm64; platform downloads are bounded where supported and cancellation is rechecked before transport transfer | Qualify the final candidate and native online-revocation paths; review deployment PKI and documented platform cleanup limits. The ZooKeeper/native fixtures still use `NoCheck`. Triage the previously unexplained concurrent rejection timeout |
 | Required recovery coverage | Scoped follower, leader, quorum, client-traffic and peer-partition checks pass | Add observer-endpoint evidence; audit required authentication, expiry, cancellation and watch cases against actual observations and fix gaps |
-| Sustained resource ownership | Short seeded workloads pass; the release-duration attempt failed after about two hours on 3.8.7 with a `SyncAsync` timeout | Investigate the retained timeout, then complete both durations and review heap, threads, sockets, counters and cleanup. Reconcile measured runtime inputs with the candidate |
+| Sustained resource ownership | Short seeded workloads pass; the release-duration attempt failed after about two hours on 3.8.7 with a `SyncAsync` timeout | Correlate an instrumented replay across hourly cleanup boundaries with the retained timeout, then complete both durations and review heap, threads, sockets, counters and cleanup. Reconcile measured runtime inputs with the candidate |
 | Performance evidence | Existing protocol/allocation, live CRUD, watch fan-out and 10,000-watch recovery suites produce raw reports | Repeat existing commands on a controlled runner and retain a reviewed report. No throughput target or timing gate is inferred from shared-runner smoke results |
 | Final artifact and publication | Core publication, symbols, provenance and fresh-consumer verification have prior 0.1.0 evidence | Build one final candidate and use its package hash across managed/native checks; enforce the complete release-evidence checks before publishing 1.0.0 |
-| API and operator documentation | The shipped baseline records 0.1.0; usage and failure semantics are documented | Review compatibility and intentional changes, freeze the 1.0.0 API, reconcile defaults/support claims and document the tested release matrix |
+| API and operator documentation | The shipped baseline records 0.1.0; SDK comparison and the 401-entry declaration review find no API changes; usage and failure semantics are documented | Review behavioral compatibility and intentional changes, freeze the 1.0.0 API, reconcile defaults/support claims and document the tested release matrix |
 
-For the TLS change, 22 hosted jobs passed. macOS package inspection could not
-acquire a runner; its queued retry was cancelled after the same command passed
-locally on macOS arm64 from the verified commit. This is scoped evidence, not
-an entirely successful hosted workflow.
+The current package checks pass on Linux, Windows and macOS, including the
+published 0.1.0 baseline and expected breaking-change rejections. The independent
+timeout replay stopped after about 45 minutes on 3.8.7 with a primary wait timeout
+and a proxy framing error during cleanup, before its first hourly cleanup.
+Both errors and successful fixture rollback are retained. This does not explain
+the original two-hour timeout or complete sustained qualification.
 
 The current release workflow packs local candidates separately for native
 checks, then builds the versioned publication package later. It also runs a

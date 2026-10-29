@@ -47,6 +47,13 @@ a reconnect gap, actual one-shot and persistent invalidations, protected reads,
 and no create replay through the recovery endpoint. Acknowledged close must
 remove the ephemeral. Independent control deletes the round's namespace.
 
+Each version also runs a controlled deadline check. A proxy holds one successful
+`Sync` reply beyond the unchanged five-second operation deadline. The caller
+must receive `ZooKeeperTimeoutException` with `Unknown`; releasing the frame must
+allow another sync on the same session and generation, with no replay and an
+acknowledged close. Owned counters and sockets must return to zero. This checks
+late-reply handling; it does not reproduce server disk latency.
+
 ## Resource checkpoints
 
 Every round must return active watches, event backlog, application requests,
@@ -76,8 +83,12 @@ client as well as the driver.
 Samples are streamed to JSONL at intervals of at least ten seconds, increasing
 for longer runs to bound periodic samples at 1,440. The harness retains aggregate
 state instead of an activity history. A failure record contains the safe error
-type, raw server error code and request outcome when available, seed and counters.
-Managed output excludes credentials, paths and payloads.
+type, raw server error code, operation and request outcome when available, seed
+and counters. Samples and failures include UTC reporting times; failures also
+include elapsed workload time. Round failures are flushed before owned cleanup;
+a distinct cleanup failure adds a second record without replacing the primary
+one. Propagating the same exception does not duplicate its record. Journals
+exclude exception messages, credentials, paths and payloads.
 
 ## Bounds, interruption and evidence
 
@@ -112,6 +123,25 @@ Separate checks confirmed that the observers detect a retained 32 MiB allocation
 and an open owned TCP connection. Deliberate managed-exception and abrupt-process-exit
 runs failed as expected, retained their settings and verified fresh authenticated
 readiness on all three members before fixture removal. These checks provide
-bounded local evidence; a 24-hour run has not been executed.
+bounded local evidence; a full 24-hour run has not completed.
+
+On 29 October, the release-duration attempt failed after about two hours on
+3.8.7 with a `SyncAsync` timeout. All three hourly cleanup tasks began within
+120 ms of each other just before server disk flush stalls of up to 6.7 seconds.
+The historical journal lacks the UTC request observation needed to establish
+causality. Fixture rollback and removal completed.
+
+Subsequent five-minute seed-1729 workloads passed on both versions. A separate
+90-second workload per version also passed while six 64 MiB scratch files on
+each owned server volume were written and deleted concurrently. The controlled
+late-sync check passed on both patches. These bounded checks did not reproduce
+the historical timeout or qualify the release duration; its cause remains open.
+A deliberate primary-error-plus-cleanup-error probe verified ordered, redacted
+failure records and authenticated all-node rollback.
+
+For a timeout near maintenance activity, retain the UTC failure and native
+server timeline along with container block I/O, VM I/O pressure, memory and disk
+counters. Preserve the failed result and unchanged deadlines when repeating the
+hourly boundary; another short passing run does not resolve it.
 
 [How-to guides](README.md) · [Documentation home](../README.md)

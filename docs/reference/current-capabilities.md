@@ -64,13 +64,23 @@ supports configurable durations; a passing short run does not establish the
 24-hour release requirement or cross-platform qualification. The release-duration
 attempt on 29 October stopped after about two hours on 3.8.7 with a `SyncAsync`
 timeout; fixture rollback completed, and the cause remains under investigation.
+Bounded follow-up workloads and concurrent scratch-file deletion did not
+reproduce it. Controlled late-sync checks now verify `Unknown`, ordered reply
+drain, the same session and no replay on both patches. The longer diagnostic replay stopped after about
+45 minutes on 3.8.7 with a wait timeout followed by a proxy framing error during
+cleanup. Both errors were retained; fixture rollback completed. Its cause and
+the original two-hour timeout remain open.
 
 ## Frameworks and platforms
 
 The current target framework is `net10.0`; the pinned SDK is `10.0.403`. The core
 has no third-party runtime dependencies. Public API declarations are checked
 against shipped/unshipped baseline files; the core's shipped baseline records
-the initial 0.1.0 API.
+the initial 0.1.0 API. Package inspection also compares the packed API with the
+published 0.1.0 package using SDK rules, including parameter names and attributes,
+and verifies rejection of altered incompatible copies. The 401 declared entries
+match the released source baseline; behavioral and final-candidate review remain
+separate requirements.
 
 The [build workflow](../../.github/workflows/build.yml) defines Linux, Windows,
 and macOS checks. The separate [native verification harness](../how-to/verify-native-aot.md#evidence-and-remaining-qualification)

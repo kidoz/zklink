@@ -19,7 +19,7 @@ bash dev/test-core-package.sh 0.1.0
 
 The package check requires the pinned .NET SDK, Docker with Compose, Python 3
 and OpenSSL. It verifies metadata, dependencies, portable symbols and embedded
-sources, then restores an isolated package-only consumer and runs the examples
+sources and SDK API compatibility against published 0.1.0, then restores an isolated package-only consumer and runs the examples
 on all nodes of ZooKeeper 3.8.7 and 3.9.6. It retains the package, symbols, checksums
 and execution/cleanup evidence under `artifacts/packages/run.*/`.
 
@@ -37,8 +37,10 @@ attests its provenance and uploads the packages and evidence. Only then does it
 authenticate to NuGet and push the core package; the adjacent `.snupkg` is sent by
 the same push. An existing version fails rather than being silently skipped.
 
-A manual workflow run uses `0.0.0-manual` and produces verified artifacts without
-authenticating to or publishing on NuGet. After a release run succeeds, check the
+A manual workflow run uses a unique local prerelease derived from the project's
+`VersionPrefix`, preserving its assembly version for comparison with published
+0.1.0. It produces verified artifacts without authenticating to or publishing on
+NuGet. After a release run succeeds, check the
 NuGet listing and restore the published version into a fresh consumer. Publication
 does not widen the documented server, security or Native AOT qualification scope.
 
