@@ -6,13 +6,13 @@ import os
 import pathlib
 import platform
 import re
-import secrets
 import shutil
 import subprocess
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
 from aot_artifacts import ROOT, RIDS, native_header, sha256
+from release_version import local_candidate_version
 
 def input_hashes():
     inputs = [ROOT / "src/ZkLink/ZkLink.csproj", ROOT / "src/ZkLink/packages.lock.json", *sorted((ROOT / "src/ZkLink").rglob("*.cs"))]
@@ -20,6 +20,7 @@ def input_hashes():
     inputs += list((ROOT / "tests/ZkLink.AotAnalysis").glob("*.cs*")) + list((ROOT / "tests/ZkLink.AotSmoke").glob("*.cs*"))
     inputs += list((ROOT / "samples/ZkLink.Samples.Basic").glob("*.cs"))
     inputs += [ROOT / "tests/ZkLink.IntegrationTests/WatchReconnectProxy.cs", ROOT / "dev/aot_artifacts.py", pathlib.Path(__file__)]
+    inputs += [ROOT / "dev/release_version.py"]
     return {str(path.relative_to(ROOT)): sha256(path) for path in inputs if not {"obj", "bin"}.intersection(path.relative_to(ROOT).parts)}
 
 
@@ -44,7 +45,7 @@ def main():
             raise SystemExit(f"{name} failed ({result.returncode}); inspect {run / (name + '.txt')}")
 
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    version = f"0.0.0-local.r{revision[:12]}.n{secrets.token_hex(8)}"
+    version = local_candidate_version(revision)
     command("sdk", ["dotnet", "--info"])
     command("working-tree", ["git", "status", "--short"])
     (run / "host.json").write_text(json.dumps({"rid": rid, "os": platform.platform(), "machine": platform.machine(), "libc": platform.libc_ver(), "python": sys.version, "revision": revision}, indent=2) + "\n", encoding="utf-8")

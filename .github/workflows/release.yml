@@ -95,6 +95,7 @@ jobs:
             artifacts/packages/run.*/*.log
             artifacts/packages/run.*/*-compose.yaml
             artifacts/packages/run.*/rejections
+            artifacts/packages/run.*/compatibility
             artifacts/packages/run.*/consumer/obj/packages.lock.json
             artifacts/packages/run.*/consumer/obj/project.assets.json
           if-no-files-found: error

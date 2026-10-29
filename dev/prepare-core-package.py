@@ -11,8 +11,8 @@ import sys
 import tempfile
 import xml.etree.ElementTree as ET
 
-from core_package_artifacts import ROOT, candidate_nonce, input_hashes, sha256
-from release_version import validate_version
+from core_package_artifacts import ROOT, input_hashes, sha256
+from release_version import local_candidate_version, validate_version
 
 COMMAND_GUARD_SECONDS = 300
 
@@ -22,13 +22,14 @@ def main():
         raise SystemExit("Usage: prepare-core-package.py [package-version]")
     revision = subprocess.check_output(["git", "rev-parse", "--verify", "HEAD"], cwd=ROOT, text=True).strip()
     version = (validate_version(sys.argv[1]) if len(sys.argv) == 2
-               else f"0.0.0-local.r{revision[:12]}.n{candidate_nonce()}")
+               else local_candidate_version(revision))
     artifacts = ROOT / "artifacts/packages"
     artifacts.mkdir(parents=True, exist_ok=True)
     run = pathlib.Path(tempfile.mkdtemp(prefix="run.", dir=artifacts))
     print(f"Core package artifacts: {run}", flush=True)
     initial_inputs = input_hashes()
     environment = os.environ.copy()
+    environment["NUGET_PACKAGES"] = str(run / "build-package-cache")
 
     def command(name, arguments, *, env=environment, expected=0, marker=None):
         log = run / (name + ".txt")
@@ -58,6 +59,8 @@ def main():
     command("validation", ["dotnet", str(inspector), "package", str(package), str(symbols),
                            version, revision, str(validation)], marker="Package validation: PASS")
     report = json.loads(validation.read_text(encoding="utf-8"))
+    command("compatibility", [sys.executable, str(ROOT / "dev/check-core-compatibility.py"), str(run)],
+            marker="API compatibility: PASS")
 
     consumer = run / "consumer"
     samples = consumer / "Samples"
@@ -95,7 +98,7 @@ def main():
             expected=1, marker="The loaded driver does not match the candidate package.")
     if input_hashes() != initial_inputs or subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip() != revision:
         raise SystemExit("Source inputs changed during verification; prepare a fresh candidate.")
-    files = [package, symbols, validation, binary, assembly,
+    files = [package, symbols, validation, run / "compatibility.json", binary, assembly,
              binary.with_suffix(".deps.json"), binary.with_suffix(".runtimeconfig.json"),
              consumer / "obj/packages.lock.json", consumer / "obj/project.assets.json", config_path]
     receipt = {"revision": revision, "version": version,
@@ -104,7 +107,7 @@ def main():
                "inputs": initial_inputs, "artifacts": {path.relative_to(run).as_posix(): sha256(path) for path in files}}
     manifest = run / "package-consumer.json"
     manifest.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
-    (run / "inspection-result.txt").write_text("PASS (package, symbols, installed consumer identity and rejection checks; no live servers)\n", encoding="utf-8")
+    (run / "inspection-result.txt").write_text("PASS (package, symbols, released API compatibility, installed consumer identity and rejection checks; no live servers)\n", encoding="utf-8")
     print(f"Core package inspection: PASS. Manifest: {manifest}", flush=True)
 
 

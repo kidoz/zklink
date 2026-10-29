@@ -4,14 +4,9 @@ import hashlib
 import json
 import pathlib
 import platform
-import secrets
+from release_version import candidate_nonce
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-CANDIDATE_NONCE_BYTES = 8
-
-
-def candidate_nonce():
-    return secrets.token_hex(CANDIDATE_NONCE_BYTES)
 
 
 def sha256(path):
@@ -25,6 +20,7 @@ def input_hashes():
         "src/ZkLink/PublicAPI.Shipped.txt", "src/ZkLink/PublicAPI.Unshipped.txt",
         "dev/core_package_artifacts.py", "dev/prepare-core-package.py",
         "dev/test-core-package.sh", "dev/test-core-package-rejections.py", "dev/release_version.py",
+        "dev/check-core-compatibility.py",
     )]
     for directory in ("src/ZkLink", "tests/ZkLink.PackageValidation", "tests/ZkLink.PackageConsumer"):
         paths.extend(path for path in (ROOT / directory).rglob("*")

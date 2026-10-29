@@ -3,9 +3,14 @@
 import argparse
 import pathlib
 import re
+import secrets
+import subprocess
 import xml.etree.ElementTree as ET
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+CANDIDATE_NONCE_BYTES = 8
+REVISION_PREFIX_LENGTH = 12
+GIT_GUARD_SECONDS = 10
 SEMVER = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?")
 
 
@@ -17,6 +22,19 @@ def validate_version(value):
     ):
         raise ValueError("Expected MAJOR.MINOR.PATCH with optional SemVer prerelease identifiers.")
     return value
+
+
+def candidate_nonce():
+    return secrets.token_hex(CANDIDATE_NONCE_BYTES)
+
+
+def local_candidate_version(revision, root=ROOT):
+    prefix = ET.parse(root / "src/ZkLink/ZkLink.csproj").findtext(".//VersionPrefix")
+    if not prefix or "-" in validate_version(prefix):
+        raise ValueError("A stable numeric VersionPrefix is required for local candidates.")
+    if not re.fullmatch(r"[0-9a-f]{40}", revision):
+        raise ValueError("A full Git revision is required for local candidates.")
+    return f"{prefix}-local.r{revision[:REVISION_PREFIX_LENGTH]}.n{candidate_nonce()}"
 
 
 def validate_release(tag, root=ROOT):
@@ -44,9 +62,12 @@ def main():
     mode.add_argument("--manual", action="store_true")
     args = parser.parse_args()
     try:
-        version = "0.0.0-manual" if args.manual else (
-            validate_release(args.tag) if args.tag is not None else validate_version(args.version)
-        )
+        if args.manual:
+            revision = subprocess.check_output(["git", "rev-parse", "--verify", "HEAD"],
+                                               cwd=ROOT, text=True, timeout=GIT_GUARD_SECONDS).strip()
+            version = local_candidate_version(revision)
+        else:
+            version = validate_release(args.tag) if args.tag is not None else validate_version(args.version)
     except ValueError as error:
         parser.error(str(error))
     print(version)
