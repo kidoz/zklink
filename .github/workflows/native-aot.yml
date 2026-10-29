@@ -72,8 +72,16 @@ jobs:
         include:
           - os: ubuntu-24.04
             rid: linux-x64
+            fixture: docker
           - os: ubuntu-24.04-arm
             rid: linux-arm64
+            fixture: docker
+          - os: windows-2025
+            rid: win-x64
+            fixture: java
+          - os: macos-26
+            rid: osx-arm64
+            fixture: java
     steps:
       - name: Check out source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -88,9 +96,20 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install native prerequisites
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+      - name: Install pinned fixture JDK
+        if: matrix.fixture == 'java'
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '25.0.5+8.0.LTS'
       - name: Publish and run native consumers against both server versions
+        if: matrix.fixture == 'docker'
         run: bash dev/test-native-aot.sh
+      - name: Publish and run native consumers with portable Java fixtures
+        if: matrix.fixture == 'java'
+        run: python dev/test-portable-aot.py
       - name: Retain native live evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -105,4 +124,11 @@ jobs:
             artifacts/aot/run.*/*-compose.yaml
             artifacts/aot/run.*/ZkLink.Aot*/obj/packages.lock.json
             artifacts/aot/run.*/ZkLink.Aot*/obj/project.assets.json
+            artifacts/portable-aot/run.*/*.txt
+            artifacts/portable-aot/run.*/*.json
+            artifacts/portable-aot/run.*/*.log
+            artifacts/portable-aot/run.*/*.properties
+            artifacts/portable-aot/run.*/*.xml
+            artifacts/portable-aot/run.*/gradle.lockfile
+            artifacts/portable-aot/run.*/java/*/dependencies.tsv
           if-no-files-found: error

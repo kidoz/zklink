@@ -32,6 +32,10 @@ aot-publish:
 aot-check:
     bash dev/test-native-aot.sh
 
+# Run the native secure matrix without Docker or the OpenSSL CLI.
+aot-portable-check:
+    PYTHONDONTWRITEBYTECODE=1 python3 dev/test-portable-aot.py
+
 # Run protocol/framing benchmarks and retain raw results (Short job by default).
 bench *args:
     bash dev/run-benchmarks.sh "$@"

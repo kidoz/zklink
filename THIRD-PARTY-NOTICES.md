@@ -48,12 +48,26 @@ The resolved dependency graphs and integrity hashes are in the project `packages
 | Microsoft.Bcl.AsyncInterfaces, System.Diagnostics.EventLog | 6.0.0 | Transitive test only | MIT |
 | Microsoft.Win32.Registry | 5.0.0 | Transitive test only | MIT |
 | System.Security.AccessControl | 6.0.1 | Transitive test only | MIT |
-| Apache ZooKeeper Jute and Java client | 3.9.6 | Optional Java fixture generator/verifier | Apache-2.0 |
+| Apache ZooKeeper Jute, Java client and server | 3.8.7, 3.9.6 | Java oracle and portable native-test ensembles only | Apache-2.0 |
 | SLF4J API | 2.0.17 | Test-only Java logging API; no logging provider loaded | MIT |
+| SLF4J API | 2.0.13 | Portable Java ensemble logging only | MIT |
+| Logback classic/core | 1.3.15 | Portable Java ensemble logging only | EPL-1.0 or LGPL-2.1 |
+| Netty buffer/codec/common/handler/resolver/transport/classes-epoll/native-unix-common | 4.1.137.Final | Portable Java ensemble TLS and transport only | Apache-2.0 |
+| Apache Yetus audience annotations | 0.12.0 | Transitive portable Java ensemble dependency | Apache-2.0 |
+| Apache Commons IO | 2.17.0 | Transitive portable Java ensemble dependency | Apache-2.0 |
+| Dropwizard metrics-core | 4.1.12.1 | Portable Java server metrics only | Apache-2.0 |
+| snappy-java | 1.1.10.5 | Portable Java server snapshot support only | Apache-2.0; bundled upstream notices retained in original jars |
 | Gradle wrapper | 9.8.2 | Java reference build tool | Apache-2.0 |
 
 Apache ZooKeeper is a project of the Apache Software Foundation. Its Jute schema and archive behavior define the wire format. The fixture utilities use published Jute and client classes; no ZooKeeper implementation source or jar is checked into this repository. Gradle downloads the jars into its dependency cache. The upstream source license and notice are preserved under `tests/ZkLink.JavaOracle/licenses/` at the same pinned commit; the Maven Jute jar itself has no license/notice entries. Fixture data is produced by the original utilities under `tests/ZkLink.JavaOracle/src/main/java/`.
 
 Gradle wrapper scripts and their bootstrap jar are checked in using the standard generated wrapper, preserving their upstream license headers. Its distribution checksum is pinned. Exact Java dependencies are locked in `gradle.lockfile`, and jar/POM integrity hashes are in `gradle/verification-metadata.xml`. These tools and dependencies are not included in the managed driver.
+
+The portable native-test fixture at `tests/ZkLink.JavaEnsemble` reuses this pinned
+wrapper with its own two isolated runtime graphs, lock and verification metadata.
+Its helper uses Apache public APIs and runs unmodified server jars; it copies no
+server implementation source. Runtime jars stay in local test artifacts/cache,
+with their upstream license/notice entries intact. CI retains runtime coordinates
+and hashes, configuration and results rather than redistributing those jars.
 
 Java tooling provenance, artifact hash, source commit, exact fixture semantics and reproduction commands are in [the fixture guide](tests/ZkLink.JavaOracle/README.md). Review upstream notices and final redistribution assets again before packaging. No Apache endorsement is implied.

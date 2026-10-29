@@ -1,0 +1,24 @@
+# This is a Gradle generated file for dependency locking.
+# Manual edits can break the build and are not advised.
+# This file is expected to be part of source control.
+# To regenerate this file, run: ./gradlew :dependencies --write-locks
+ch.qos.logback:logback-classic:1.3.15=zooKeeper387,zooKeeper396
+ch.qos.logback:logback-core:1.3.15=zooKeeper387,zooKeeper396
+commons-io:commons-io:2.17.0=zooKeeper387,zooKeeper396
+io.dropwizard.metrics:metrics-core:4.1.12.1=zooKeeper387,zooKeeper396
+io.netty:netty-buffer:4.1.137.Final=zooKeeper387,zooKeeper396
+io.netty:netty-codec:4.1.137.Final=zooKeeper387,zooKeeper396
+io.netty:netty-common:4.1.137.Final=zooKeeper387,zooKeeper396
+io.netty:netty-handler:4.1.137.Final=zooKeeper387,zooKeeper396
+io.netty:netty-resolver:4.1.137.Final=zooKeeper387,zooKeeper396
+io.netty:netty-transport-classes-epoll:4.1.137.Final=zooKeeper387,zooKeeper396
+io.netty:netty-transport-native-unix-common:4.1.137.Final=zooKeeper387,zooKeeper396
+io.netty:netty-transport:4.1.137.Final=zooKeeper387,zooKeeper396
+org.apache.yetus:audience-annotations:0.12.0=zooKeeper387,zooKeeper396
+org.apache.zookeeper:zookeeper-jute:3.8.7=compileClasspath,zooKeeper387
+org.apache.zookeeper:zookeeper-jute:3.9.6=zooKeeper396
+org.apache.zookeeper:zookeeper:3.8.7=compileClasspath,zooKeeper387
+org.apache.zookeeper:zookeeper:3.9.6=zooKeeper396
+org.slf4j:slf4j-api:2.0.13=zooKeeper387,zooKeeper396
+org.xerial.snappy:snappy-java:1.1.10.5=zooKeeper387,zooKeeper396
+empty=annotationProcessor,runtimeClasspath,testAnnotationProcessor,testCompileClasspath,testRuntimeClasspath
