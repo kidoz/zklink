@@ -87,8 +87,13 @@ type, raw server error code, operation and request outcome when available, seed
 and counters. Samples and failures include UTC reporting times; failures also
 include elapsed workload time. Round failures are flushed before owned cleanup;
 a distinct cleanup failure adds a second record without replacing the primary
-one. Propagating the same exception does not duplicate its record. Journals
-exclude exception messages, credentials, paths and payloads.
+one. Propagating the same exception does not duplicate its record. Guarded waits
+include a fixed `wait_site` label. A rejected proxy prefix adds `frame_failure`
+with the original UTC observation time, direction, handshake state, connection
+attempt, frame number, rejected length and configured maximum. Its observation
+time can precede cleanup reporting; reporting order alone does not establish
+which error happened first. Journals exclude exception messages, credentials,
+paths and payloads.
 
 ## Bounds, interruption and evidence
 

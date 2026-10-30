@@ -68,8 +68,10 @@ Bounded follow-up workloads and concurrent scratch-file deletion did not
 reproduce it. Controlled late-sync checks now verify `Unknown`, ordered reply
 drain, the same session and no replay on both patches. The longer diagnostic replay stopped after about
 45 minutes on 3.8.7 with a wait timeout followed by a proxy framing error during
-cleanup. Both errors were retained; fixture rollback completed. Its cause and
-the original two-hour timeout remain open.
+cleanup. Both errors were retained; fixture rollback completed. Journals now
+label guarded waits and preserve safe rejected-frame metadata at its original
+observation time, with server-free regression checks and fresh five-minute
+workloads passing on both versions. Both historical causes remain open.
 
 ## Frameworks and platforms
 
