@@ -56,7 +56,9 @@ public sealed class SoakTests : IAsyncLifetime
         );
         try
         {
-            await metrics.QuiescentAsync(token).ConfigureAwait(true);
+            await SoakDiagnostics
+                .ObserveAsync(metrics.QuiescentAsync(token), SoakWaitSite.QuiescentCounters)
+                .ConfigureAwait(true);
             while (
                 elapsed.Elapsed < TimeSpan.FromSeconds(_settings.Seconds)
                 || totals.Rounds <= SoakEvidence.WarmupRounds
@@ -68,7 +70,9 @@ public sealed class SoakTests : IAsyncLifetime
                     .ToArray();
                 await GuardedRoundAsync(jobs, totals, evidence, elapsed, token)
                     .ConfigureAwait(true);
-                await metrics.QuiescentAsync(token).ConfigureAwait(true);
+                await SoakDiagnostics
+                    .ObserveAsync(metrics.QuiescentAsync(token), SoakWaitSite.QuiescentCounters)
+                    .ConfigureAwait(true);
                 totals.Rounds++;
                 if (totals.Rounds == SoakEvidence.WarmupRounds)
                 {
@@ -235,8 +239,14 @@ public sealed class SoakTests : IAsyncLifetime
                 token
             );
             await using var eventsLifetime = events.ConfigureAwait(true);
-            var nextOnce = onceEvents.MoveNextAsync();
-            var nextGap = events.MoveNextAsync();
+            var nextOnce = SoakDiagnostics.ObserveAsync(
+                onceEvents.MoveNextAsync(),
+                SoakWaitSite.OneShotEvent
+            );
+            var nextGap = SoakDiagnostics.ObserveAsync(
+                events.MoveNextAsync(),
+                SoakWaitSite.ReconnectGap
+            );
             await owner
                 .UpdateEndpointsAsync([new ZooKeeperEndpoint("127.0.0.1", Port(recovery))], token)
                 .ConfigureAwait(true);
@@ -253,8 +263,11 @@ public sealed class SoakTests : IAsyncLifetime
                     ),
                     sentCancellation.Token
                 );
-                await source
-                    .ResponseWithheld.WaitAsync(SoakMetrics.Guard, token)
+                await SoakDiagnostics
+                    .ObserveAsync(
+                        source.ResponseWithheld.WaitAsync(SoakMetrics.Guard, token),
+                        SoakWaitSite.CreateReplyWithheld
+                    )
                     .ConfigureAwait(true);
                 Assert.Equal(FaultProxy.Success, source.WithheldError);
                 await VerifySingleCreateAsync(root, token).ConfigureAwait(true);
@@ -270,7 +283,12 @@ public sealed class SoakTests : IAsyncLifetime
             sourceDisposed = true;
             await source.DisposeAsync().ConfigureAwait(true);
             Assert.Equal(creates + 1, source.CreateTransmissions);
-            await recovery.RestoreHeld.WaitAsync(SoakMetrics.Guard, token).ConfigureAwait(true);
+            await SoakDiagnostics
+                .ObserveAsync(
+                    recovery.RestoreHeld.WaitAsync(SoakMetrics.Guard, token),
+                    SoakWaitSite.RestoreAcknowledgmentHeld
+                )
+                .ConfigureAwait(true);
             upstreamPorts.Add(recovery.UpstreamLocalPort);
             Assert.Equal(ZooKeeperSessionState.Restoring, owner.Session.State);
             var ready = owner.WaitForConnectionAsync(token);
@@ -284,18 +302,31 @@ public sealed class SoakTests : IAsyncLifetime
                 .Client.SetDataAsync(oncePath, new byte[] { 2 }, ZNodeVersion.Any, token)
                 .ConfigureAwait(true);
             recovery.ReleaseRestore();
-            await ready.WaitAsync(SoakMetrics.Guard, token).ConfigureAwait(true);
+            await SoakDiagnostics
+                .ObserveAsync(
+                    ready.WaitAsync(SoakMetrics.Guard, token),
+                    SoakWaitSite.ConnectionReady
+                )
+                .ConfigureAwait(true);
             Assert.Equal(session, owner.Session.SessionId);
             Assert.True(owner.Session.ConnectionGeneration > generation);
             Assert.True(await nextGap.ConfigureAwait(true));
             Assert.Equal(ZooKeeperWatchEventKind.ReconnectedWithGap, events.Current.Kind);
             Assert.True(await nextOnce.ConfigureAwait(true));
             Assert.Equal(ZooKeeperWatchEventKind.NodeDataChanged, onceEvents.Current.Kind);
-            Assert.False(await onceEvents.MoveNextAsync().ConfigureAwait(true));
+            Assert.False(
+                await SoakDiagnostics
+                    .ObserveAsync(onceEvents.MoveNextAsync(), SoakWaitSite.OneShotCompletion)
+                    .ConfigureAwait(true)
+            );
             await _fixture
                 .Client.SetDataAsync(persistentPath, new byte[] { 3 }, ZNodeVersion.Any, token)
                 .ConfigureAwait(true);
-            Assert.True(await events.MoveNextAsync().ConfigureAwait(true));
+            Assert.True(
+                await SoakDiagnostics
+                    .ObserveAsync(events.MoveNextAsync(), SoakWaitSite.PersistentEvent)
+                    .ConfigureAwait(true)
+            );
             Assert.Equal(ZooKeeperWatchEventKind.NodeDataChanged, events.Current.Kind);
             Assert.Equal(
                 (byte)3,
@@ -376,12 +407,15 @@ public sealed class SoakTests : IAsyncLifetime
                                 )
                                 .ConfigureAwait(true);
                             await DeleteTreeAsync(root, cleanup.Token).ConfigureAwait(true);
-                            await SoakMetrics
-                                .PortsClosedAsync(
-                                    listenerPorts.ToArray(),
-                                    upstreamPorts.ToArray(),
-                                    new Uri("tcp://" + Endpoint).Port,
-                                    cleanup.Token
+                            await SoakDiagnostics
+                                .ObserveAsync(
+                                    SoakMetrics.PortsClosedAsync(
+                                        listenerPorts.ToArray(),
+                                        upstreamPorts.ToArray(),
+                                        new Uri("tcp://" + Endpoint).Port,
+                                        cleanup.Token
+                                    ),
+                                    SoakWaitSite.ProxyConnectionsClosed
                                 )
                                 .ConfigureAwait(true);
                         }

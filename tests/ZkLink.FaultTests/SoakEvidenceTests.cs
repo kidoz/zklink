@@ -117,6 +117,152 @@ public sealed class SoakEvidenceTests
     }
 
     [Fact(Timeout = TestTimeoutMilliseconds)]
+    public async Task FailureJournalKeepsWaitSiteAndOriginalFrameObservationWithoutMessages()
+    {
+        const string SensitiveMarker = "private-diagnostic-marker";
+        const int RejectedLength = -1;
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            "zklink-soak-unit-" + Guid.NewGuid().ToString("N")
+        );
+        Directory.CreateDirectory(directory);
+        string file = Path.Combine(directory, "failure.jsonl");
+        var observed = DateTimeOffset.UtcNow;
+        var timeout = new TimeoutException(SensitiveMarker);
+        var frameFailure = new InvalidDataException(SensitiveMarker);
+        var detail = new FaultProxyFrameFailure(
+            observed,
+            true,
+            false,
+            1,
+            2,
+            RejectedLength,
+            FaultProxy.MaximumFrameBytes
+        );
+        frameFailure.Data[typeof(FaultProxyFrameFailure)] = detail;
+        try
+        {
+            var propagated = await Assert
+                .ThrowsAsync<TimeoutException>(() =>
+                    SoakDiagnostics.ObserveAsync(
+                        Task.FromException(timeout),
+                        SoakWaitSite.RestoreAcknowledgmentHeld
+                    )
+                )
+                .ConfigureAwait(true);
+            Assert.Same(timeout, propagated);
+            var evidence = new SoakEvidence(new SoakSettings(DurationSeconds, Seed, file));
+            await using (evidence.ConfigureAwait(true))
+            {
+                await evidence
+                    .FailureAsync(timeout, new SoakTotals(), TimeSpan.Zero)
+                    .ConfigureAwait(true);
+                await evidence
+                    .FailureAsync(frameFailure, new SoakTotals(), TimeSpan.Zero)
+                    .ConfigureAwait(true);
+            }
+            string[] lines = await File.ReadAllLinesAsync(
+                    file,
+                    TestContext.Current.CancellationToken
+                )
+                .ConfigureAwait(true);
+            Assert.Equal(2, lines.Length);
+            Assert.DoesNotContain(
+                SensitiveMarker,
+                string.Join(Environment.NewLine, lines),
+                StringComparison.Ordinal
+            );
+            using var primary = JsonDocument.Parse(lines[0]);
+            Assert.Equal(
+                nameof(SoakWaitSite.RestoreAcknowledgmentHeld),
+                primary.RootElement.GetProperty("wait_site").GetString()
+            );
+            Assert.Equal(
+                JsonValueKind.Null,
+                primary.RootElement.GetProperty("frame_failure").ValueKind
+            );
+            using var cleanup = JsonDocument.Parse(lines[1]);
+            Assert.Equal(
+                JsonValueKind.Null,
+                cleanup.RootElement.GetProperty("wait_site").ValueKind
+            );
+            var frame = cleanup.RootElement.GetProperty("frame_failure");
+            Assert.Equal(observed, frame.GetProperty("observed_at_utc").GetDateTimeOffset());
+            Assert.True(
+                observed <= primary.RootElement.GetProperty("reported_at_utc").GetDateTimeOffset()
+            );
+            Assert.Equal("incoming", frame.GetProperty("direction").GetString());
+            Assert.False(frame.GetProperty("handshake").GetBoolean());
+            Assert.Equal(
+                detail.ConnectionAttempt,
+                frame.GetProperty("connection_attempt").GetInt32()
+            );
+            Assert.Equal(detail.FrameNumber, frame.GetProperty("frame_number").GetInt64());
+            Assert.Equal(RejectedLength, frame.GetProperty("length").GetInt32());
+            Assert.Equal(
+                FaultProxy.MaximumFrameBytes,
+                frame.GetProperty("maximum_length").GetInt32()
+            );
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact(Timeout = TestTimeoutMilliseconds)]
+    public async Task WaitObservationPreservesResultsCancellationAndOtherFailures()
+    {
+        const int Result = 42;
+        Assert.Equal(
+            Result,
+            await SoakDiagnostics
+                .ObserveAsync(Task.FromResult(Result), SoakWaitSite.OneShotEvent)
+                .ConfigureAwait(true)
+        );
+        var timeout = new TimeoutException();
+        Assert.Same(
+            timeout,
+            await Assert
+                .ThrowsAsync<TimeoutException>(() =>
+                    SoakDiagnostics.ObserveAsync(
+                        Task.FromException<bool>(timeout),
+                        SoakWaitSite.PersistentEvent
+                    )
+                )
+                .ConfigureAwait(true)
+        );
+        Assert.Equal(SoakWaitSite.PersistentEvent, timeout.Data[typeof(SoakWaitSite)]);
+        var other = new IOException();
+        Assert.Same(
+            other,
+            await Assert
+                .ThrowsAsync<IOException>(() =>
+                    SoakDiagnostics.ObserveAsync(
+                        Task.FromException(other),
+                        SoakWaitSite.ConnectionReady
+                    )
+                )
+                .ConfigureAwait(true)
+        );
+        Assert.False(other.Data.Contains(typeof(SoakWaitSite)));
+        using var canceled = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken
+        );
+        await canceled.CancelAsync().ConfigureAwait(true);
+        var cancellation = await Assert
+            .ThrowsAnyAsync<OperationCanceledException>(() =>
+                SoakDiagnostics.ObserveAsync(
+                    Task.FromCanceled(canceled.Token),
+                    SoakWaitSite.ConnectionReady
+                )
+            )
+            .ConfigureAwait(true);
+        Assert.Equal(canceled.Token, cancellation.CancellationToken);
+        Assert.False(cancellation.Data.Contains(typeof(SoakWaitSite)));
+    }
+
+    [Fact(Timeout = TestTimeoutMilliseconds)]
     public async Task RetainedAllocationBreachesTheRecordedHeapBound()
     {
         string directory = Path.Combine(

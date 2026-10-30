@@ -11,7 +11,7 @@ namespace ZkLink.FaultTests;
 internal sealed class FaultProxy : IAsyncDisposable
 {
     internal const int Success = 0;
-    private const int MaximumFrameBytes = 1_048_575;
+    internal const int MaximumFrameBytes = 1_048_575;
     private const int HeaderBytes = sizeof(int) + sizeof(long) + sizeof(int);
     private const int ResetXid = -8;
     private const int PingXid = -2;
@@ -234,6 +234,8 @@ internal sealed class FaultProxy : IAsyncDisposable
     )
     {
         bool handshake = true;
+        long frameNumber = 0;
+        int connectionAttempt = ConnectionAttempts;
         var prefix = new byte[sizeof(int)];
         try
         {
@@ -249,9 +251,20 @@ internal sealed class FaultProxy : IAsyncDisposable
                 }
                 await source.ReadExactlyAsync(prefix.AsMemory(1), token).ConfigureAwait(false);
                 int length = BinaryPrimitives.ReadInt32BigEndian(prefix);
+                frameNumber++;
                 if (length is <= 0 or > MaximumFrameBytes)
                 {
-                    throw new InvalidDataException("Fault proxy frame bound exceeded.");
+                    var failure = new InvalidDataException("Fault proxy frame bound exceeded.");
+                    failure.Data[typeof(FaultProxyFrameFailure)] = new FaultProxyFrameFailure(
+                        DateTimeOffset.UtcNow,
+                        incoming,
+                        handshake,
+                        connectionAttempt,
+                        frameNumber,
+                        length,
+                        MaximumFrameBytes
+                    );
+                    throw failure;
                 }
                 var packet = new byte[length];
                 try
