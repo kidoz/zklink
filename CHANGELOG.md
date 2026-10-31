@@ -12,7 +12,23 @@ not establish broader security, Native AOT or production qualification. See
 
 ## [Unreleased]
 
+## [1.0.0] - Unreleased
+
+This candidate remains unpublished while sustained resource and performance
+qualification is in progress. The public API declarations are unchanged from
+0.1.0; the existing shipped baseline is preserved.
+
 ### Added
+
+- Observer-endpoint verification on both pinned server versions, including
+  writes, same-session watch recovery and authenticated cleanup.
+- Native sent-cancellation verification with an independently observed committed
+  write, `Unknown` outcome and no replay; dedicated native online-revocation
+  controls are included in candidate verification.
+- One shared candidate bundle for managed/native verification, with immutable
+  package/symbol checksums, provenance and required production-evidence checks
+  before publication. Public-feed installation and indexed symbols are checked
+  after publishing.
 
 - Docker-free core package inspection and installed-consumer identity checks,
   with separate Linux, Windows and macOS CI jobs. `just package-inspect` runs
@@ -26,6 +42,12 @@ not establish broader security, Native AOT or production qualification. See
   targets, plus 48 secure live cases across both pinned server versions.
 
 ### Fixed
+
+- Bound certificate status downloads by the connection-attempt budget where the
+  platform supports per-request limits, and recheck cancellation before exposing
+  an authenticated transport. macOS native certificate cleanup can outlive the
+  caller's cancellation or deadline; see
+  [secure connections](docs/how-to/verify-secure-connections.md) for the platform limits.
 
 - Native publication uses the tracked NuGet configuration filename casing on
   case-sensitive filesystems.

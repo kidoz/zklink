@@ -148,10 +148,13 @@ identity succeeds and managed execution is rejected. The live artifacts include
 missing-client-certificate rejection proofs and cleanup of all sixteen fixtures.
 Each target covers both exact server versions and all three voters.
 
-Local macOS arm64 execution also includes both fixture backends. Sent-request
-cancellation/unknown outcomes, broader secure recovery, revocation/rotation,
-optional DI and full release qualification remain open. Core
-`IsAotCompatible` metadata stays disabled; these checks do not declare release
-support.
+Local macOS arm64 execution also includes both fixture backends. The
+[shared-candidate verification](https://github.com/kidoz/zklink/actions/runs/41239985235)
+adds sent-request cancellation with an independently observed committed write,
+an `Unknown` outcome and no replay to all 48 secure live cases. Five dedicated
+online-revocation controls also pass on each native target. Deployment-specific
+PKI, certificate rotation, optional DI and full release qualification remain
+open. Core `IsAotCompatible` is enabled in the unpublished 1.0.0 candidate;
+these checks do not declare release support.
 
 [How-to guides](README.md) · [Documentation home](../README.md)

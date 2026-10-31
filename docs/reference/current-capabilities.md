@@ -1,6 +1,7 @@
 # Current capabilities
 
-This describes the checkout as of **2026-10-29**. The initial core package version is **0.1.0**.
+This describes the checkout as of **2026-10-31**. The published core package is
+**0.1.0**; **1.0.0** is an unpublished candidate.
 See [Production release readiness](release-readiness.md) for the current core
 release scope, blocking evidence and delivery order.
 
@@ -12,14 +13,14 @@ release scope, blocking evidence and delivery order.
 | Core packaging | Version 0.1.0 release workflow, metadata/documentation/notices, portable symbols, Source Link and embedded-source checks; Docker-free inspection and installed-consumer identity checks passed on Linux, Windows and macOS; Linux live examples on both server versions | Released-version compatibility validation, managed TLS package-consumer coverage and full release qualification |
 | Protocol | Internal codecs for all 27 implemented opcodes, handshake/multi/framing, path/chroot translation and Gradle-managed Java fixtures | Remaining live qualification |
 | Public types | Immutable snapshots, endpoints, create options, ACLs, versions, request failures, watch handles/events and removal results; contract tests and local core package consumer | Compatibility validation against future released versions |
-| Sessions and operations | Connect/authenticate/sync, snapshots/subscriptions, heartbeat, same-session recovery, cancellation, close, node/ACL methods, typed transactions, auxiliary queries, opt-in TTL creation and watches | Broader live recovery, asymmetric peer faults and observer qualification |
+| Sessions and operations | Connect/authenticate/sync, snapshots/subscriptions, heartbeat, same-session recovery, cancellation, close, node/ACL methods, typed transactions, auxiliary queries, opt-in TTL creation and watches; observer writes and recovery on both pinned versions | Final-candidate sustained qualification |
 | Watches | One-shot reads, persistent/recursive subscriptions, buffered events, shared removal, cancellation cleanup, bounded restoration and explicit reconnect gaps | Broader fault and concurrency qualification |
-| Security | TCP/TLS, custom roots/client certificates, live TLS/mTLS/digest/ACL checks; managed default-online revocation checks on four client targets and bounded platform certificate downloads | Deployment-specific revocation, native online revocation, rotation and final-candidate qualification; quorum TLS and additional auth are separately scoped |
+| Security | TCP/TLS, custom roots/client certificates, live TLS/mTLS/digest/ACL checks; managed and native online-revocation controls on four client targets and bounded platform certificate downloads | Deployment-specific revocation, rotation and final-candidate qualification; quorum TLS and additional auth are separately scoped |
 | Dependency injection | Optional `AddZkLink` registration with one host-owned singleton and asynchronous startup/shutdown | Installed-package and DI-specific Native AOT qualification |
 | Analyzers | Six optional ZKL diagnostics, Roslyn compilation tests and a local packed-package consumer check | Released package and cross-platform qualification |
 | Local servers | Pinned three-node plaintext/TLS/mTLS fixtures for 3.8.7 and 3.9.6, expired-certificate negative control | Broader fault fixtures |
 | Observability | BCL traces and metrics, bounded asynchronous diagnostic delivery, finite tags, listener isolation and redaction checks | Exporter integration, sustained-load and cross-platform qualification |
-| Native AOT | Rooted/unrooted packed consumers, direct native execution and twelve TLS/mTLS live cases per target on Linux x64/arm64, Windows x64 and macOS arm64 | Broader native recovery/cancellation, full release qualification and compatibility metadata |
+| Native AOT | Rooted/unrooted packed consumers, direct native execution and twelve TLS/mTLS live cases per target on Linux x64/arm64, Windows x64 and macOS arm64, including sent-cancellation/`Unknown`; five online-revocation controls per target | Full release qualification; AOT metadata is enabled only in the unpublished 1.0.0 candidate |
 | Performance | Protocol/framing benchmarks and allocation gates; live get/set concurrency, shared persistent-watch fan-out and 10,000-path recovery measurements with latency/resource observations | Repeated controlled-runner measurements, TLS performance and broader qualification |
 
 See [Tracing and metrics](telemetry.md) for instrument names, timing, privacy and
@@ -91,7 +92,11 @@ and `osx-arm64`: packed rooted/unrooted publication, direct native identity and
 twelve secure live cases per target. Linux uses Docker fixtures; Windows/macOS
 use portable JVM fixtures. Retained artifacts cover 48 live cases and 64 final
 authenticated readiness probes across both server versions. Full release
-qualification and core `IsAotCompatible` metadata remain open.
+qualification remains open. The unpublished 1.0.0 candidate enables
+`IsAotCompatible`; it is subject to repeat verification after that metadata
+change. A [later shared-candidate run](https://github.com/kidoz/zklink/actions/runs/41239985235)
+also passes native sent-cancellation/`Unknown` and five dedicated online-revocation
+controls on each target, using the same package bytes as the managed consumers.
 
 ## Server targets
 
@@ -140,7 +145,11 @@ The earlier intermittent concurrency timeout has not been reproduced or explaine
 these short runs do not qualify sustained load. Linux CI has also passed the
 secure fixture and bounded-concurrency jobs. The separate native checks cover
 TLS/mTLS on all four client targets; these live fixtures use `NoCheck` and do
-not establish production online-revocation behavior. See
+not establish production online-revocation behavior. Dedicated managed and native
+loopback responders additionally verify valid, revoked, unavailable and invalidly
+signed status and held-response cancellation on all four hosted targets. On the
+local macOS 27 host, an active VPN, proxy or network filter accompanies failed
+loopback retrieval; causality has not been established. See
 [Verify secure connections](../how-to/verify-secure-connections.md). SASL and read-only
 mode are outside the planned initial client scope; coordination recipes and
 administration require separate designs.
