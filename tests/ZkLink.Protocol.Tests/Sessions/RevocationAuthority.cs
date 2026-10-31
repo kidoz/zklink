@@ -14,6 +14,8 @@ internal sealed class RevocationAuthority : IAsyncDisposable
     private const int SerialBytes = 16;
     private const int MaximumHeaderBytes = 4096;
     private const int MaximumRequests = 16;
+    private const int MaximumAllowedRequests = 128;
+    private readonly int _maximumRequests;
     private const int InitialCrlNumber = 1;
     private const byte InvalidSignatureBit = 0x01;
     private const int UniformResourceIdentifierTag = 6;
@@ -46,16 +48,21 @@ internal sealed class RevocationAuthority : IAsyncDisposable
         bool revoked = false,
         bool unavailable = false,
         bool holdResponse = false,
-        bool invalidSignature = false
+        bool invalidSignature = false,
+        int maximumRequests = MaximumRequests,
+        CancellationToken cancellationToken = default
     )
     {
-        _stop = CancellationTokenSource.CreateLinkedTokenSource(
-            TestContext.Current.CancellationToken
-        );
+        _stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         _stop.CancelAfter(Lifetime);
         _unavailable = unavailable;
         try
         {
+            if (maximumRequests is <= 0 or > MaximumAllowedRequests)
+            {
+                throw new ArgumentOutOfRangeException(nameof(maximumRequests));
+            }
+            _maximumRequests = maximumRequests;
             _listener.Start();
             // Isolate Apple responder caches by host as well as issuer, path and port.
             string responderHost = OperatingSystem.IsMacOS()
@@ -349,7 +356,10 @@ internal sealed class RevocationAuthority : IAsyncDisposable
                             );
                         }
                     }
-                    Assert.InRange(bodyBytes, 0, header.Length - bodyStart);
+                    if (bodyBytes < 0 || bodyBytes > header.Length - bodyStart)
+                    {
+                        throw new InvalidDataException("Revocation request body limit exceeded.");
+                    }
                     while (length < bodyStart + bodyBytes)
                     {
                         int count = await stream
@@ -361,7 +371,10 @@ internal sealed class RevocationAuthority : IAsyncDisposable
                         }
                         length += count;
                     }
-                    Assert.InRange(Interlocked.Increment(ref _requests), 1, MaximumRequests);
+                    if (Interlocked.Increment(ref _requests) > _maximumRequests)
+                    {
+                        throw new InvalidDataException("Revocation request count limit exceeded.");
+                    }
                     _requested.TrySetResult();
                     await _respond.Task.WaitAsync(_stop.Token).ConfigureAwait(false);
                     bool ocsp = headers.Contains("/ocsp", StringComparison.Ordinal);

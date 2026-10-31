@@ -23,7 +23,9 @@ public sealed class RevocationTests
     [Trait("Acceptance", "T20")]
     public async Task DefaultOnlinePolicyFetchesRevocationStatusAndCompletesSession()
     {
-        var authority = new RevocationAuthority();
+        var authority = new RevocationAuthority(
+            cancellationToken: TestContext.Current.CancellationToken
+        );
         await using var authorityLifetime = authority.ConfigureAwait(true);
         await CompleteSessionAsync(authority, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
@@ -39,7 +41,11 @@ public sealed class RevocationTests
         bool unavailable
     )
     {
-        var authority = new RevocationAuthority(revoked, unavailable);
+        var authority = new RevocationAuthority(
+            revoked,
+            unavailable,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
         await using var authorityLifetime = authority.ConfigureAwait(true);
         await CompleteSessionAsync(authority, TestContext.Current.CancellationToken, noCheck: true)
             .ConfigureAwait(true);
@@ -97,7 +103,10 @@ public sealed class RevocationTests
         bool callerCancellation
     )
     {
-        var authority = new RevocationAuthority(holdResponse: true);
+        var authority = new RevocationAuthority(
+            holdResponse: true,
+            cancellationToken: TestContext.Current.CancellationToken
+        );
         await using var authorityLifetime = authority.ConfigureAwait(true);
         int applicationBytes = 0;
         var server = RejectionServer(authority, value => applicationBytes = value);
@@ -172,7 +181,8 @@ public sealed class RevocationTests
         var authority = new RevocationAuthority(
             revoked,
             unavailable,
-            invalidSignature: invalidSignature
+            invalidSignature: invalidSignature,
+            cancellationToken: TestContext.Current.CancellationToken
         );
         await using var authorityLifetime = authority.ConfigureAwait(true);
         int applicationBytes = 0;

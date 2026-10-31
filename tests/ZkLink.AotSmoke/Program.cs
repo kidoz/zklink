@@ -22,7 +22,15 @@ internal static class Program
             using var deadline = new CancellationTokenSource(
                 TimeSpan.FromSeconds(CaseDeadlineSeconds)
             );
-            if (args is not ([] or ["--security-negatives"] or ["--native-check"]))
+            if (
+                args
+                is not (
+                    []
+                    or ["--security-negatives"]
+                    or ["--native-check"]
+                    or ["--revocation-check"]
+                )
+            )
             {
                 throw new InvalidOperationException("Invalid native smoke arguments.");
             }
@@ -56,6 +64,14 @@ internal static class Program
             {
                 await Console
                     .Out.WriteLineAsync("Native identity probe: PASS (no live operations).")
+                    .ConfigureAwait(false);
+                return 0;
+            }
+            if (args is ["--revocation-check"])
+            {
+                await NativeRevocation.VerifyAsync(deadline.Token).ConfigureAwait(false);
+                await Console
+                    .Out.WriteLineAsync("Native online revocation: PASS")
                     .ConfigureAwait(false);
                 return 0;
             }

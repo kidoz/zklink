@@ -102,9 +102,21 @@ private-chain revocation is not qualified on macOS. An unavailable status
 remains a failure; the driver does not switch to `NoCheck` or plaintext.
 
 These controlled-peer checks qualify the observed managed-client behavior.
-The separate two-version ZooKeeper and native fixtures still use `NoCheck`;
-production revocation services, multi-issuer deployments, certificate rotation
-and online revocation under Native AOT require their own evidence.
+The native consumer also runs valid, revoked, unavailable, invalid-signature and
+held-cancellation cases with independent `NoCheck` controls:
+
+```sh
+python3 dev/check-native-revocation.py artifacts/aot/run.<id>/native.json
+```
+
+The [shared-candidate run](https://github.com/kidoz/zklink/actions/runs/41239985235)
+passes all five native cases on Linux x64/arm64, Windows x64 and macOS arm64.
+The separate two-version ZooKeeper fixtures still use `NoCheck`; production
+revocation services, multi-issuer deployments and certificate rotation require
+their own evidence. The local macOS 27 host currently reports unknown status
+without contacting the loopback responder while a VPN, proxy or network filter
+is active. Its cause is unconfirmed; network settings and client policy remain
+unchanged.
 
 See Microsoft's [certificate URL timeout API](https://learn.microsoft.com/dotnet/api/system.security.cryptography.x509certificates.x509chainpolicy.urlretrievaltimeout)
 and [platform cryptography limits](https://learn.microsoft.com/dotnet/standard/security/cross-platform-cryptography#x509chain),
