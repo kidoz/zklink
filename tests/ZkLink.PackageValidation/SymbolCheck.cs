@@ -73,6 +73,11 @@ internal static class SymbolCheck
         );
         return new JsonObject
         {
+            ["symbolServerKey"] =
+                id.Guid.ToString("N").ToUpperInvariant()
+                + uint.MaxValue.ToString("X8", System.Globalization.CultureInfo.InvariantCulture),
+            ["pdbChecksumSha256"] = Convert.ToHexString(checksum.Checksum.AsSpan()),
+            ["pdbFileSha256"] = Convert.ToHexString(SHA256.HashData(pdb)),
             ["pdbMatchesAssembly"] = true,
             ["pdbChecksumVerified"] = true,
             ["sourceLinkUrl"] = expectedUrl,

@@ -13,6 +13,7 @@ import xml.etree.ElementTree as ET
 
 from core_package_artifacts import ROOT, input_hashes, sha256
 from release_version import local_candidate_version, validate_version
+from release_candidate import from_environment, write_candidate
 
 COMMAND_GUARD_SECONDS = 300
 
@@ -21,8 +22,11 @@ def main():
     if len(sys.argv) > 2:
         raise SystemExit("Usage: prepare-core-package.py [package-version]")
     revision = subprocess.check_output(["git", "rev-parse", "--verify", "HEAD"], cwd=ROOT, text=True).strip()
+    candidate = from_environment(revision)
     version = (validate_version(sys.argv[1]) if len(sys.argv) == 2
-               else local_candidate_version(revision))
+               else candidate[1]["version"] if candidate else local_candidate_version(revision))
+    if candidate and version != candidate[1]["version"]:
+        raise SystemExit("Requested version differs from the shared candidate")
     artifacts = ROOT / "artifacts/packages"
     artifacts.mkdir(parents=True, exist_ok=True)
     run = pathlib.Path(tempfile.mkdtemp(prefix="run.", dir=artifacts))
@@ -48,8 +52,12 @@ def main():
     feed = run / "feed"
     feed.mkdir()
     command("restore", ["dotnet", "restore", "src/ZkLink", "--locked-mode"])
-    command("pack", ["dotnet", "pack", "src/ZkLink", "-c", "Release", "--no-restore",
-                     f"-p:Version={version}", "-p:ContinuousIntegrationBuild=true", "-o", str(feed)])
+    if candidate:
+        for name in [*candidate[1]["files"], "candidate.json"]:
+            shutil.copy2(candidate[0] / name, feed / name)
+    else:
+        command("pack", ["dotnet", "pack", "src/ZkLink", "-c", "Release", "--no-restore",
+                         f"-p:Version={version}", "-p:ContinuousIntegrationBuild=true", "-o", str(feed)])
     command("inspector-restore", ["dotnet", "restore", "tests/ZkLink.PackageValidation", "--locked-mode"])
     command("inspector-build", ["dotnet", "build", "tests/ZkLink.PackageValidation", "-c", "Release", "--no-restore"])
     inspector = ROOT / "tests/ZkLink.PackageValidation/bin/Release/net10.0/ZkLink.PackageValidation.dll"
@@ -59,6 +67,8 @@ def main():
     command("validation", ["dotnet", str(inspector), "package", str(package), str(symbols),
                            version, revision, str(validation)], marker="Package validation: PASS")
     report = json.loads(validation.read_text(encoding="utf-8"))
+    if not candidate:
+        write_candidate(feed, version, revision)
     command("compatibility", [sys.executable, str(ROOT / "dev/check-core-compatibility.py"), str(run)],
             marker="API compatibility: PASS")
 
@@ -103,6 +113,7 @@ def main():
              consumer / "obj/packages.lock.json", consumer / "obj/project.assets.json", config_path]
     receipt = {"revision": revision, "version": version,
                "host": {"system": platform.system(), "machine": platform.machine(), "os": platform.platform(), "python": sys.version},
+               "candidateManifestSha256": sha256(feed / "candidate.json"),
                "consumer": binary.relative_to(run).as_posix(), "assemblySha256": report["assemblySha256"],
                "inputs": initial_inputs, "artifacts": {path.relative_to(run).as_posix(): sha256(path) for path in files}}
     manifest = run / "package-consumer.json"

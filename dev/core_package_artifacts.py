@@ -20,7 +20,7 @@ def input_hashes():
         "src/ZkLink/PublicAPI.Shipped.txt", "src/ZkLink/PublicAPI.Unshipped.txt",
         "dev/core_package_artifacts.py", "dev/prepare-core-package.py",
         "dev/test-core-package.sh", "dev/test-core-package-rejections.py", "dev/release_version.py",
-        "dev/check-core-compatibility.py",
+        "dev/check-core-compatibility.py", "dev/release_candidate.py",
     )]
     for directory in ("src/ZkLink", "tests/ZkLink.PackageValidation", "tests/ZkLink.PackageConsumer"):
         paths.extend(path for path in (ROOT / directory).rglob("*")

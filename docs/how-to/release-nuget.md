@@ -1,56 +1,94 @@
 # Release the core NuGet package
 
-The [release workflow](../../.github/workflows/release.yml) publishes `ZkLink`
-and its companion symbol package. The optional dependency-injection and analyzer
-packages have separate qualification and are not published by this workflow.
+The core **1.0.0 remains unqualified**. The publication workflow rejects missing,
+failed or mismatched qualification evidence. Optional dependency-injection and
+analyzer packages retain separate qualification.
 
-Update `VersionPrefix` (and `VersionSuffix` for a prerelease) in
-`src/ZkLink/ZkLink.csproj`. Add a dated `## [VERSION] - YYYY-MM-DD` section to
-`CHANGELOG.md`, review the public API baseline and commit the release source.
-The tag must be `vVERSION`, for example `v0.1.0`.
+Prepare the release source by reviewing compatibility against published 0.1.0,
+updating `VersionPrefix` in `src/ZkLink/ZkLink.csproj`, and adding a dated
+`## [VERSION] - YYYY-MM-DD` changelog section. Reconcile the package description,
+operator documentation and tested support matrix. Compatibility metadata must
+follow observed verification; it does not establish support by itself.
 
-Run the release checks before publishing:
+## Verify one candidate
+
+Run [Release candidate verification](../../.github/workflows/release-candidate.yml)
+on the committed release source with the requested package version. It packs and
+inspects the package once, records its package/symbol checksums and runtime
+inputs in `candidate.json`, and attests those bytes. Managed inspection and
+installed consumers on three OS families and rooted/unrooted Native AOT checks
+on four targets download the same bundle. Native online-revocation and secure
+live checks are required. A supplied but invalid candidate never falls back to
+a fresh package build.
+
+The ordinary build/native workflows can still prepare local development
+candidates. Those independent packages do not qualify a production release.
+
+## Retain and review qualification
+
+Complete the required recovery/security cases, the 24-hour workload on **each**
+pinned server version, and repeated controlled benchmark measurements. Preserve
+failed attempts and their resolutions. Driver or build-input changes require a
+review of which measurements remain applicable.
+
+Prepare `release-evidence.json` with the fields checked by
+[the evidence validator](../../dev/verify-release-evidence.py):
+
+- The immutable candidate manifest checksum and completed candidate workflow run ID.
+- Reviewed managed/native target results and required behavior cases.
+- Resolutions and proof for retained failures, with no unresolved release failures.
+- Both full soak resource series, authenticated cleanup proof and measured input manifests.
+- Controlled protocol, live-operation, watch fan-out and watch-recovery reports,
+  including repetitions, machine/server settings, raw results and baseline comparisons.
+- A checksum map for every referenced evidence file.
+
+Measurements must match the candidate's recorded runtime inputs. The validator
+also rejects short workloads, resource failures and gaps exceeding two minutes
+in the retained resource series. Current full-duration workloads sample about
+once a minute. Reports describe observed measurements; they do not invent
+throughput or latency requirements.
+
+Put the referenced files in `release-evidence.zip`. Bundle safe results and
+metadata; exclude credentials, private keys, session identifiers and request
+payloads. Keep the original forensic evidence separately.
+
+Check the bundle before preparing publication:
 
 ```sh
-python3 -B dev/test-release-version.py
-python3 -B dev/release_version.py --tag v0.1.0
-bash dev/test-core-package.sh 0.1.0
+python3 -B dev/test-release-candidate.py
+python3 -B dev/test-release-evidence.py
+python3 -B dev/verify-release-evidence.py \
+  --evidence artifacts/qualification \
+  --candidate artifacts/candidate \
+  --candidate-sha256 EXPECTED_MANIFEST_SHA256
 ```
 
-The package check requires the pinned .NET SDK, Docker with Compose, Python 3
-and OpenSSL. It verifies metadata, dependencies, portable symbols and embedded
-sources and SDK API compatibility against published 0.1.0, then restores an isolated package-only consumer and runs the examples
-on all nodes of ZooKeeper 3.8.7 and 3.9.6. It retains the package, symbols, checksums
-and execution/cleanup evidence under `artifacts/packages/run.*/`.
+## Publish the verified bytes
 
-The GitHub repository uses an environment named `nuget` with the `NUGET_USER`
-secret set to the NuGet profile name. Its NuGet trusted-publishing policy must
-match repository owner `kidoz`, repository `zklink`, workflow `release.yml` and
-environment `nuget`, with permission to push new packages and versions.
-The workflow exchanges a GitHub OIDC token for a temporary API key immediately
-before pushing. No persistent NuGet API key is stored.
+After all required checks pass, prepare a draft GitHub release for `vVERSION`
+targeting the exact candidate commit. Attach `candidate.json`, the original
+`.nupkg` and `.snupkg`, `release-evidence.json` and `release-evidence.zip`.
+Publishing the GitHub release invokes [Release](../../.github/workflows/release.yml).
+A manual run can inspect an existing draft through its `release_tag` input and
+does not push to NuGet.
 
-Publish a GitHub release for the committed tag. The workflow validates the tag,
-project version and changelog, then waits for the complete build/live verification
-and Native AOT workflows. It independently verifies the exact versioned package,
-attests its provenance and uploads the packages and evidence. Only then does it
-authenticate to NuGet and push the core package; the adjacent `.snupkg` is sent by
-the same push. An existing version fails rather than being silently skipped.
+The publication job downloads these assets and the original candidate workflow
+artifact. It requires the completed verification run to match the release source,
+compares the package and symbols byte for byte, verifies their attestations and
+checks the complete production evidence. It then runs the installed examples
+against both pinned server versions using that same candidate. It does not
+repack the publication package.
 
-A manual workflow run uses a unique local prerelease derived from the project's
-`VersionPrefix`, preserving its assembly version for comparison with published
-0.1.0. It produces verified artifacts without authenticating to or publishing on
-NuGet. After a release run succeeds, check the
-NuGet listing and restore the published version into a fresh consumer. Publication
-does not widen the documented server, security or Native AOT qualification scope.
+The repository's `nuget` environment supplies `NUGET_USER`, and its trusted
+publishing policy must match owner `kidoz`, repository `zklink`, workflow
+`release.yml` and environment `nuget`. The workflow exchanges its GitHub OIDC
+token for a temporary API key immediately before pushing. The adjacent `.snupkg`
+is sent by the same push. Existing versions fail rather than being silently
+skipped.
 
-The native mTLS probe requires a refused connection without a client certificate,
-successful connections with the valid certificate before and after it, and the
-owned ZooKeeper server's explicit empty-client-certificate rejection log. TLS 1.3
-can deliver this alert after the platform authentication call returns, exposing
-an I/O connection failure or exhausting the driver's connect-retry deadline.
-Server-certificate rejection probes still require a TLS-classified failure.
-A timeout alone never counts as a successful negative control: the server's
-explicit rejection evidence and both valid-certificate controls are required.
+After publication, the workflow checks the public package payload against the
+candidate, restores a fresh public-only consumer and verifies the indexed PDB
+against the qualified symbols. Indexing checks are bounded and retain their
+results. Publication does not widen the documented qualification scope.
 
 [How-to guides](README.md) · [Documentation home](../README.md)

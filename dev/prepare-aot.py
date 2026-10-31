@@ -13,6 +13,7 @@ import tempfile
 import xml.etree.ElementTree as ET
 from aot_artifacts import ROOT, RIDS, native_header, sha256
 from release_version import local_candidate_version
+from release_candidate import from_environment, write_candidate
 
 def input_hashes():
     inputs = [ROOT / "src/ZkLink/ZkLink.csproj", ROOT / "src/ZkLink/packages.lock.json", *sorted((ROOT / "src/ZkLink").rglob("*.cs"))]
@@ -20,7 +21,8 @@ def input_hashes():
     inputs += list((ROOT / "tests/ZkLink.AotAnalysis").glob("*.cs*")) + list((ROOT / "tests/ZkLink.AotSmoke").glob("*.cs*"))
     inputs += list((ROOT / "samples/ZkLink.Samples.Basic").glob("*.cs"))
     inputs += [ROOT / "tests/ZkLink.IntegrationTests/WatchReconnectProxy.cs", ROOT / "dev/aot_artifacts.py", pathlib.Path(__file__)]
-    inputs += [ROOT / "dev/release_version.py"]
+    inputs += [ROOT / "dev/release_version.py", ROOT / "dev/release_candidate.py",
+               ROOT / "tests/ZkLink.Protocol.Tests/Sessions/RevocationAuthority.cs"]
     return {str(path.relative_to(ROOT)): sha256(path) for path in inputs if not {"obj", "bin"}.intersection(path.relative_to(ROOT).parts)}
 
 
@@ -45,7 +47,8 @@ def main():
             raise SystemExit(f"{name} failed ({result.returncode}); inspect {run / (name + '.txt')}")
 
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    version = local_candidate_version(revision)
+    candidate = from_environment(revision)
+    version = candidate[1]["version"] if candidate else local_candidate_version(revision)
     command("sdk", ["dotnet", "--info"])
     command("working-tree", ["git", "status", "--short"])
     (run / "host.json").write_text(json.dumps({"rid": rid, "os": platform.platform(), "machine": platform.machine(), "libc": platform.libc_ver(), "python": sys.version, "revision": revision}, indent=2) + "\n", encoding="utf-8")
@@ -54,13 +57,19 @@ def main():
         with (run / "native-toolchain.txt").open("w", encoding="utf-8") as output:
             subprocess.run([compiler, "--version"] if pathlib.Path(compiler).stem != "cl" else [compiler], stdout=output, stderr=subprocess.STDOUT, check=False)
     command("core-restore", ["dotnet", "restore", "src/ZkLink", "--locked-mode"])
-    command("pack", ["dotnet", "pack", "src/ZkLink", "-c", "Release", "--no-restore", f"-p:Version={version}", "-p:ContinuousIntegrationBuild=true", "-o", str(feed)])
+    if candidate:
+        for name in [*candidate[1]["files"], "candidate.json"]:
+            shutil.copy2(candidate[0] / name, feed / name)
+    else:
+        command("pack", ["dotnet", "pack", "src/ZkLink", "-c", "Release", "--no-restore", f"-p:Version={version}", "-p:ContinuousIntegrationBuild=true", "-o", str(feed)])
     command("inspector-restore", ["dotnet", "restore", "tests/ZkLink.PackageValidation", "--locked-mode"])
     command("inspector-build", ["dotnet", "build", "tests/ZkLink.PackageValidation", "-c", "Release", "--no-restore"])
     inspector = ROOT / "tests/ZkLink.PackageValidation/bin/Release/net10.0/ZkLink.PackageValidation.dll"
     package = feed / f"ZkLink.{version}.nupkg"
     command("package-validation", ["dotnet", str(inspector), "package", str(package), str(package.with_suffix(".snupkg")), version, revision, str(run / "package.json")])
     package_report = json.loads((run / "package.json").read_text(encoding="utf-8"))
+    if not candidate:
+        write_candidate(feed, version, revision)
 
     config = ET.Element("configuration")
     sources = ET.SubElement(config, "packageSources")
@@ -77,7 +86,7 @@ def main():
     ET.ElementTree(config).write(config_path, encoding="utf-8", xml_declaration=True)
     (run / "Directory.Build.props").write_text("<Project />\n", encoding="utf-8")
     environment["NUGET_PACKAGES"] = str(run / "package-cache")
-    receipt = {"rid": rid, "revision": revision, "version": version, "packageSha256": package_report["packageSha256"], "consumers": {}}
+    receipt = {"rid": rid, "revision": revision, "version": version, "packageSha256": package_report["packageSha256"], "candidateManifestSha256": sha256(feed / "candidate.json"), "consumers": {}}
     for name in ["ZkLink.AotAnalysis", "ZkLink.AotSmoke"]:
         project = run / name
         project.mkdir()
@@ -91,6 +100,7 @@ def main():
                 if source.name in {"NodeSample.cs", "TransactionSample.cs", "AuxiliarySample.cs", "WatchSample.cs", "SampleNodes.cs", "ISampleStep.cs"}:
                     shutil.copy2(source, examples / source.name)
             shutil.copy2(ROOT / "tests/ZkLink.IntegrationTests/WatchReconnectProxy.cs", project / "WatchReconnectProxy.cs")
+            shutil.copy2(ROOT / "tests/ZkLink.Protocol.Tests/Sessions/RevocationAuthority.cs", project / "RevocationAuthority.cs")
             tree = ET.parse(project / f"{name}.csproj")
             if tree.findall(".//TrimmerRootAssembly") or tree.findall(".//TrimmerRootDescriptor") or tree.findall(".//ProjectReference"):
                 raise SystemExit("The representative consumer must not root the core or reference its source project.")

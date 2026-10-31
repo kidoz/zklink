@@ -1,6 +1,6 @@
 # Production release readiness
 
-Reviewed on **29 October 2026**. Core **0.1.0 is published**. The intended next
+Reviewed on **31 October 2026**. Core **0.1.0 is published**. The intended next
 production release is **1.0.0**, subject to the checks below. It is not yet
 qualified for production. Passing the current CI workflows establishes their
 documented scope; it does not complete these release requirements.
@@ -23,13 +23,13 @@ core acceptance check.
 
 | Requirement | Observed evidence | Still needed for release |
 | --- | --- | --- |
-| Cross-platform build and packaging | [All 23 CI jobs passed](https://github.com/kidoz/zklink/actions/runs/40932010476), including three OS package-inspection jobs and six Linux installed-consumer cases | Repeat applicable checks, including the released-package comparison, against the final candidate |
-| Native execution | [Four-target native run passed](https://github.com/kidoz/zklink/actions/runs/40932010435): 48 secure live cases with reviewed artifacts | Test the exact final package on every target; close native sent-cancellation/unknown-outcome coverage |
-| Production TLS policy | [Managed default-online revocation checks](https://github.com/kidoz/zklink/actions/runs/40900036928/attempts/1) pass on Linux x64/arm64, Windows x64 and macOS arm64; platform downloads are bounded where supported and cancellation is rechecked before transport transfer | Qualify the final candidate and native online-revocation paths; review deployment PKI and documented platform cleanup limits. The ZooKeeper/native fixtures still use `NoCheck`. Triage the previously unexplained concurrent rejection timeout |
-| Required recovery coverage | Scoped follower, leader, quorum, client-traffic and peer-partition checks pass | Add observer-endpoint evidence; audit required authentication, expiry, cancellation and watch cases against actual observations and fix gaps |
-| Sustained resource ownership | Short seeded workloads pass; the release-duration attempt failed after about two hours on 3.8.7 with a `SyncAsync` timeout | Identify the timed-out wait and rejected prefix in the diagnostic replay, then complete both durations and review heap, threads, sockets, counters and cleanup. Reconcile measured runtime inputs with the candidate |
+| Cross-platform build and packaging | [All 33 shared-candidate jobs passed](https://github.com/kidoz/zklink/actions/runs/41239985235), including three OS package-inspection jobs and Linux installed consumers | Repeat applicable checks after final metadata changes, including the released-package comparison |
+| Native execution | The same shared-candidate run passes all four native targets, 48 secure live cases with sent-cancellation/`Unknown`, and five online-revocation controls per target | Repeat after final metadata changes and complete sustained qualification |
+| Production TLS policy | Managed and native checks cover valid, revoked, unavailable and invalidly signed status responses, plus held-response cancellation, on all four targets | Review deployment PKI and documented platform cleanup limits. The live ZooKeeper fixtures use `NoCheck`; online policy has dedicated responders. Triage the previously unexplained concurrent rejection timeout. A local Mac with an active network filter does not fetch loopback status; its cause remains unconfirmed |
+| Required recovery coverage | Scoped follower, leader, quorum, client-traffic and peer-partition checks pass | Observer-role, write, watch-recovery and cleanup checks now pass on both versions, locally and in hosted verification. Finish the required authentication, expiry, cancellation and watch evidence review |
+| Sustained resource ownership | Short seeded workloads pass; the release-duration attempt failed after about two hours on 3.8.7 with a `SyncAsync` timeout | Investigate the retained timeout/frame failures, retain the corrected initial-retry and cross-session write-fence checks, then complete both durations and review heap, threads, sockets, counters and cleanup. Reconcile measured runtime inputs with the candidate |
 | Performance evidence | Existing protocol/allocation, live CRUD, watch fan-out and 10,000-watch recovery suites produce raw reports | Repeat existing commands on a controlled runner and retain a reviewed report. No throughput target or timing gate is inferred from shared-runner smoke results |
-| Final artifact and publication | Core publication, symbols, provenance and fresh-consumer verification have prior 0.1.0 evidence | Build one final candidate and use its package hash across managed/native checks; enforce the complete release-evidence checks before publishing 1.0.0 |
+| Final artifact and publication | Shared-candidate distribution passes hosted verification. Public-feed installation and symbol-server verification pass against published 0.1.0 | Complete final-candidate qualification, then publish those exact package bytes |
 | API and operator documentation | The shipped baseline records 0.1.0; SDK comparison and the 401-entry declaration review find no API changes; usage and failure semantics are documented | Review behavioral compatibility and intentional changes, freeze the 1.0.0 API, reconcile defaults/support claims and document the tested release matrix |
 
 The current package checks pass on Linux, Windows and macOS, including the
@@ -41,10 +41,42 @@ guarded waits and retain rejected-frame metadata at the original observation
 time. Fresh five-minute workloads pass on both versions with these diagnostics;
 the replay failure and original two-hour timeout remain unresolved.
 
-The current release workflow packs local candidates separately for native
-checks, then builds the versioned publication package later. It also runs a
-short CI soak rather than checking completed release-duration evidence. These
-are gaps in the release process even when every current job passes.
+The release-candidate workflow now distributes one package/symbol bundle to
+managed and native consumers. Publication downloads those qualified bytes,
+checks the completed candidate run and attestations, and rejects missing or
+mismatched production evidence. Its fresh public-feed and symbol-server check
+has passed against the published 0.1.0 release. Hosted verification of the shared
+candidate path passes; these changes do not complete sustained qualification.
+
+The working tree now prepares version 1.0.0 and enables AOT compatibility
+analysis for that unpublished candidate. The 401 public API declarations remain
+unchanged from the shipped 0.1.0 baseline. Neither the metadata nor these passing
+checks authorize publication before the remaining evidence is complete.
+
+Verification after the metadata change exposed a watch-pressure counter timeout
+before the next round's event burst. Earlier rounds drained to zero and fixture
+rollback completed. Setup now completes its writes on the watched session before
+registration, and counter timeouts retain expected and observed numeric values.
+The original failure lacks those values, so its exact cause remains unconfirmed;
+the corrected check and a reviewed failure record are required before release.
+
+That preceding candidate run also received `NotEmpty` while deleting a round's
+namespace on 3.9.6, after 534 completed rounds and 11,755 successful CRUD requests.
+The original workload assertions had passed; the cleanup failure remains fatal.
+Follow-up diagnostics preserve child counts, child-version/transaction metadata
+and fixed node-category counts before and after the rejected delete, without
+retaining names. Later short runs pass but do not explain that failure. Local
+short runs interrupted by idle sleep are retained as interrupted evidence;
+continuous qualification rejects their UTC reporting gaps.
+
+The later replay stopped after about 76 minutes because its test required
+exactly one connection attempt, including initial attempts. A controlled test
+now proves that an initial handshake may time out and retry before readiness.
+The revised assertion still rejects unexpected attempts after readiness.
+Hosted verification also exposed an independent-session read assumption;
+verification now uses an acknowledged quorum write before asserting the single
+committed child. Original failed attempts remain retained. The interrupted
+full-duration attempt is incomplete and must not be counted as a pass.
 
 ## Delivery order
 
