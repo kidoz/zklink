@@ -4,6 +4,13 @@ on:
   push:
   pull_request:
   workflow_call:
+    inputs:
+      candidate_artifact:
+        type: string
+        default: ''
+      candidate_manifest_sha256:
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -11,6 +18,8 @@ permissions:
 env:
   DOTNET_CLI_TELEMETRY_OPTOUT: '1'
   TESTINGPLATFORM_TELEMETRY_OPTOUT: '1'
+  ZKLINK_CANDIDATE_DIRECTORY: ${{ inputs.candidate_artifact != '' && format('{0}/artifacts/candidate', github.workspace) || '' }}
+  ZKLINK_CANDIDATE_MANIFEST_SHA256: ${{ inputs.candidate_manifest_sha256 }}
 
 jobs:
   build:
@@ -48,6 +57,8 @@ jobs:
         run: dotnet test --project tests/ZkLink.Analyzers.Tests -c Release --no-build --no-restore
       - name: Test fault proxy
         run: dotnet test --project tests/ZkLink.FaultTests -c Release --no-build --no-restore --filter-trait Fixture=ProxyUnit
+      - name: Test opaque incoming proxy hold
+        run: dotnet test --project tests/ZkLink.IntegrationTests -c Release --no-build --no-restore --filter-class '*WatchReconnectProxyTests'
       - name: Test soak resource observers
         run: dotnet test --project tests/ZkLink.FaultTests -c Release --no-build --no-restore --filter-trait Fixture=SoakUnit
       - name: Verify analyzer package consumer
@@ -75,8 +86,16 @@ jobs:
         uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
         with:
           python-version: '3.12'
+      - name: Test shared candidate identity rejection
+        run: python dev/test-release-candidate.py
       - name: Verify candidate and release version rules
         run: python dev/test-release-version.py
+      - name: Download the shared candidate
+        if: inputs.candidate_artifact != ''
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: ${{ inputs.candidate_artifact }}
+          path: artifacts/candidate
       - name: Inspect package and installed consumer without servers
         run: python dev/prepare-core-package.py
       - name: Retain candidate and inspection evidence
@@ -113,6 +132,12 @@ jobs:
         uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
         with:
           python-version: '3.12'
+      - name: Download the shared candidate
+        if: inputs.candidate_artifact != ''
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: ${{ inputs.candidate_artifact }}
+          path: artifacts/candidate
       - name: Validate local package and examples on both server versions
         run: bash dev/test-core-package.sh
       - name: Retain candidate and verification evidence
@@ -374,4 +399,27 @@ jobs:
         with:
           name: protocol-allocation-baseline
           path: artifacts/jute-oracle/allocation-baseline.json
+          if-no-files-found: error
+
+  observers:
+    name: Observer endpoint qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install pinned SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      - name: Verify both pinned observer endpoints
+        run: python3 dev/test-observer-endpoints.py
+      - name: Retain observer evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: observer-endpoints
+          path: artifacts/observers/run.*
           if-no-files-found: error

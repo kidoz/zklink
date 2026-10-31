@@ -4,6 +4,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Draft or published tag holding the qualified release assets
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -31,38 +36,35 @@ jobs:
           persist-credentials: false
       - name: Test release validation
         run: python3 dev/test-release-version.py
+      - name: Test candidate substitution rejection
+        run: python3 dev/test-release-candidate.py
+      - name: Test production evidence rejection
+        run: python3 dev/test-release-evidence.py
       - name: Resolve package version
         id: version
+        env:
+          QUALIFIED_RELEASE_TAG: ${{ inputs.release_tag }}
         shell: bash
         run: |
           set -euo pipefail
           if [[ "${GITHUB_EVENT_NAME}" == release ]]; then
             version=$(python3 dev/release_version.py --tag "${GITHUB_REF_NAME}")
           else
-            version=$(python3 dev/release_version.py --manual)
+            version=$(python3 dev/release_version.py --tag "${QUALIFIED_RELEASE_TAG}")
           fi
           printf 'version=%s\n' "${version}" >>"${GITHUB_OUTPUT}"
 
-  verification:
-    name: Build, contracts and live verification
-    needs: validate
-    uses: ./.github/workflows/build.yml
-
-  native:
-    name: Native publish and live verification
-    needs: validate
-    uses: ./.github/workflows/native-aot.yml
-
   nuget:
     name: Verify and publish core package
-    needs: [validate, verification, native]
+    needs: validate
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     environment: nuget
     permissions:
       contents: read
       id-token: write
-      attestations: write
+      attestations: read
+      actions: read
     env:
       PACKAGE_VERSION: ${{ needs.validate.outputs.version }}
     steps:
@@ -75,20 +77,24 @@ jobs:
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           global-json-file: global.json
-      - name: Verify the exact release package and installed examples on both versions
+      - name: Download and qualify the immutable release assets
+        id: qualified
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUALIFIED_RELEASE_TAG: ${{ github.event_name == 'release' && github.ref_name || inputs.release_tag }}
+        run: python3 dev/download-qualified-release.py
+      - name: Verify the qualified package and installed examples on both versions
+        env:
+          ZKLINK_CANDIDATE_DIRECTORY: ${{ github.workspace }}/artifacts/qualified-release/feed
+          ZKLINK_CANDIDATE_MANIFEST_SHA256: ${{ steps.qualified.outputs.manifest-sha256 }}
         run: bash dev/test-core-package.sh "${PACKAGE_VERSION}"
-      - name: Attest package provenance
-        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4
-        with:
-          subject-path: |
-            artifacts/packages/run.*/feed/*.nupkg
-            artifacts/packages/run.*/feed/*.snupkg
       - name: Retain release packages and verification evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: zklink-release-packages
           path: |
+            artifacts/qualified-release
             artifacts/packages/run.*/feed
             artifacts/packages/run.*/*.txt
             artifacts/packages/run.*/*.json
@@ -110,10 +116,17 @@ jobs:
         shell: bash
         env:
           NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+          ZKLINK_CANDIDATE_MANIFEST_SHA256: ${{ steps.qualified.outputs.manifest-sha256 }}
         run: |
           set -euo pipefail
           shopt -s nullglob
-          packages=(artifacts/packages/run.*/feed/*.nupkg)
+          python3 - <<'PY'
+          import os, sys
+          sys.path.insert(0, 'dev')
+          from release_candidate import read_candidate
+          read_candidate('artifacts/qualified-release/feed', os.environ['ZKLINK_CANDIDATE_MANIFEST_SHA256'])
+          PY
+          packages=(artifacts/qualified-release/feed/*.nupkg)
           if [[ ${#packages[@]} -ne 1 ]]; then
             echo 'Expected exactly one verified core package.' >&2
             exit 1
@@ -122,3 +135,16 @@ jobs:
           dotnet nuget push "${packages[0]}" \
             --api-key "${NUGET_API_KEY}" \
             --source https://api.nuget.org/v3/index.json
+      - name: Verify public-only installation and indexed companion symbols
+        if: github.event_name == 'release'
+        run: |
+          python3 dev/verify-published-core.py --version "${PACKAGE_VERSION}" \
+            --package "artifacts/qualified-release/feed/ZkLink.${PACKAGE_VERSION}.nupkg" \
+            --symbols "artifacts/qualified-release/feed/ZkLink.${PACKAGE_VERSION}.snupkg"
+      - name: Retain public-feed verification
+        if: always() && github.event_name == 'release'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: zklink-public-consumer
+          path: artifacts/published/run.*
+          if-no-files-found: error

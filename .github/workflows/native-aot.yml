@@ -4,6 +4,13 @@ on:
   push:
   pull_request:
   workflow_call:
+    inputs:
+      candidate_artifact:
+        type: string
+        default: ''
+      candidate_manifest_sha256:
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -11,6 +18,8 @@ permissions:
 env:
   DOTNET_CLI_TELEMETRY_OPTOUT: '1'
   TESTINGPLATFORM_TELEMETRY_OPTOUT: '1'
+  ZKLINK_CANDIDATE_DIRECTORY: ${{ inputs.candidate_artifact != '' && format('{0}/artifacts/candidate', github.workspace) || '' }}
+  ZKLINK_CANDIDATE_MANIFEST_SHA256: ${{ inputs.candidate_manifest_sha256 }}
   PYTHONDONTWRITEBYTECODE: '1'
 
 jobs:
@@ -46,8 +55,16 @@ jobs:
       - name: Install Linux native prerequisites
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+      - name: Download the shared candidate
+        if: inputs.candidate_artifact != ''
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: ${{ inputs.candidate_artifact }}
+          path: artifacts/candidate
       - name: Publish both consumers and directly verify native identity
         run: python dev/prepare-aot.py ${{ matrix.rid }}
+      - name: Verify native online certificate revocation
+        run: python dev/check-native-revocation.py
       - name: Retain native artifacts and analysis evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -57,6 +74,7 @@ jobs:
             artifacts/aot/run.*/feed
             artifacts/aot/run.*/*-publish
             artifacts/aot/run.*/*.txt
+            artifacts/aot/run.*/*.log
             artifacts/aot/run.*/*.json
             artifacts/aot/run.*/ZkLink.Aot*/obj/packages.lock.json
             artifacts/aot/run.*/ZkLink.Aot*/obj/project.assets.json
@@ -104,6 +122,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '25.0.5+8.0.LTS'
+      - name: Download the shared candidate
+        if: inputs.candidate_artifact != ''
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: ${{ inputs.candidate_artifact }}
+          path: artifacts/candidate
       - name: Publish and run native consumers against both server versions
         if: matrix.fixture == 'docker'
         run: bash dev/test-native-aot.sh
@@ -119,6 +143,7 @@ jobs:
             artifacts/aot/run.*/feed
             artifacts/aot/run.*/*-publish
             artifacts/aot/run.*/*.txt
+            artifacts/aot/run.*/*.log
             artifacts/aot/run.*/*.json
             artifacts/aot/run.*/*.log
             artifacts/aot/run.*/*-compose.yaml

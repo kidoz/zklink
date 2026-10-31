@@ -1,0 +1,87 @@
+name: Release candidate verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact candidate package version
+        required: true
+        type: string
+        default: '1.0.0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-candidate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    name: Pack the shared candidate once
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    outputs:
+      manifest-sha256: ${{ steps.identity.outputs.manifest-sha256 }}
+      package-sha256: ${{ steps.identity.outputs.package-sha256 }}
+      version: ${{ steps.identity.outputs.version }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install pinned SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      - name: Test candidate identity rejection
+        run: python3 dev/test-release-candidate.py
+      - name: Pack and inspect the requested version
+        env:
+          CANDIDATE_VERSION: ${{ inputs.version }}
+        run: python3 dev/prepare-core-package.py "${CANDIDATE_VERSION}"
+      - name: Collect the immutable candidate bundle
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+          feeds = list(Path('artifacts/packages').glob('run.*/feed'))
+          if len(feeds) != 1:
+              raise SystemExit('Expected exactly one packed candidate')
+          shutil.copytree(feeds[0], Path('artifacts/candidate'))
+          PY
+      - name: Record candidate identity
+        id: identity
+        run: python3 dev/release_candidate.py export artifacts/candidate
+      - name: Attest the package built by this candidate job
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4
+        with:
+          subject-path: |
+            artifacts/candidate/*.nupkg
+            artifacts/candidate/*.snupkg
+      - name: Retain the shared candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: zklink-candidate
+          path: artifacts/candidate
+          if-no-files-found: error
+
+  managed:
+    name: Managed verification of the shared candidate
+    needs: candidate
+    uses: ./.github/workflows/build.yml
+    with:
+      candidate_artifact: zklink-candidate
+      candidate_manifest_sha256: ${{ needs.candidate.outputs.manifest-sha256 }}
+
+  native:
+    name: Native verification of the shared candidate
+    needs: candidate
+    uses: ./.github/workflows/native-aot.yml
+    with:
+      candidate_artifact: zklink-candidate
+      candidate_manifest_sha256: ${{ needs.candidate.outputs.manifest-sha256 }}
