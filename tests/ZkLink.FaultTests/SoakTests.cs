@@ -146,6 +146,8 @@ public sealed class SoakTests : IAsyncLifetime
         FaultProxy? recovery = null;
         ZooKeeperClient? owner = null;
         bool sourceDisposed = false;
+        int sourceReadyAttempts = 0;
+        int recoveryRestoreAttempts = 0;
         Task<CreateResult>? uncertain = null;
         var listenerPorts = new List<int>();
         var upstreamPorts = new List<int>();
@@ -161,6 +163,7 @@ public sealed class SoakTests : IAsyncLifetime
             owner = await _fixture
                 .ConnectAsync(connectionString: source.Endpoint, cancellationToken: token)
                 .ConfigureAwait(true);
+            sourceReadyAttempts = source.Checkpoint(ProxyConnectionEventKind.ReadyCheckpoint);
             upstreamPorts.Add(source.UpstreamLocalPort);
             long session = owner.Session.SessionId;
             long generation = owner.Session.ConnectionGeneration;
@@ -270,7 +273,8 @@ public sealed class SoakTests : IAsyncLifetime
                     )
                     .ConfigureAwait(true);
                 Assert.Equal(FaultProxy.Success, source.WithheldError);
-                await VerifySingleCreateAsync(root, token).ConfigureAwait(true);
+                await VerifySingleCreateAsync(root, source.WithheldZxid, token)
+                    .ConfigureAwait(true);
                 await sentCancellation.CancelAsync().ConfigureAwait(true);
                 var unknown = await Assert
                     .ThrowsAsync<ZooKeeperOperationCanceledException>(async () =>
@@ -289,6 +293,9 @@ public sealed class SoakTests : IAsyncLifetime
                     SoakWaitSite.RestoreAcknowledgmentHeld
                 )
                 .ConfigureAwait(true);
+            recoveryRestoreAttempts = recovery.Checkpoint(
+                ProxyConnectionEventKind.RestoreCheckpoint
+            );
             upstreamPorts.Add(recovery.UpstreamLocalPort);
             Assert.Equal(ZooKeeperSessionState.Restoring, owner.Session.State);
             var ready = owner.WaitForConnectionAsync(token);
@@ -339,10 +346,12 @@ public sealed class SoakTests : IAsyncLifetime
             var retained = await _fixture.Client.ExistsAsync(leasePath, token).ConfigureAwait(true);
             Assert.NotNull(retained);
             Assert.Equal(session, retained.Value.EphemeralOwner);
-            await VerifySingleCreateAsync(root, token).ConfigureAwait(true);
+            await VerifySingleCreateAsync(root, source.WithheldZxid, token).ConfigureAwait(true);
             Assert.Equal(0, recovery.CreateTransmissions);
-            Assert.Equal(1, source.ConnectionAttempts);
-            Assert.Equal(1, recovery.ConnectionAttempts);
+            // Initial handshake attempts may legitimately time out and retry.
+            // Once ready/restoring, this round expects only the deliberate cut.
+            Assert.Equal(sourceReadyAttempts, source.ConnectionAttempts);
+            Assert.Equal(recoveryRestoreAttempts, recovery.ConnectionAttempts);
             Assert.Null(source.RunFailure);
             Assert.Null(recovery.RunFailure);
             totals.Reconnects++;
@@ -354,6 +363,12 @@ public sealed class SoakTests : IAsyncLifetime
         }
         catch (Exception failure)
         {
+            failure.Data[typeof(SoakConnectionDiagnostics)] = new SoakConnectionDiagnostics(
+                sourceReadyAttempts,
+                recoveryRestoreAttempts,
+                source?.ConnectionSnapshot(),
+                recovery?.ConnectionSnapshot()
+            );
             // Preserve the primary error and its observation time before cleanup
             // can delay reporting or throw a different exception.
             await evidence.FailureAsync(failure, totals, elapsed.Elapsed).ConfigureAwait(true);
@@ -438,28 +453,71 @@ public sealed class SoakTests : IAsyncLifetime
         catch (Exception error) when (error is ZooKeeperException or OperationCanceledException) { }
     }
 
-    private async Task VerifySingleCreateAsync(string root, CancellationToken token)
+    private async Task VerifySingleCreateAsync(
+        string root,
+        long createZxid,
+        CancellationToken token
+    )
     {
-        await _fixture.Client.SyncAsync(root, token).ConfigureAwait(true);
+        // sync is not a quorum operation and cannot establish strict freshness
+        // between independent sessions. An acknowledged write advances this
+        // session beyond the already acknowledged create without retrying it.
+        var fence = await _fixture
+            .Client.SetDataAsync(root, null, ZNodeVersion.Any, token)
+            .ConfigureAwait(true);
+        Assert.True(createZxid > 0 && fence.Mzxid > createZxid);
         Assert.Single(
             (await _fixture.Client.GetChildrenAsync(root, token).ConfigureAwait(true)).Children,
             static child => child.StartsWith(AttemptPrefix, StringComparison.Ordinal)
         );
     }
 
-    private async Task DeleteTreeAsync(string path, CancellationToken token)
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "A failed read used only to diagnose a rejected cleanup delete must not replace the original rejection. The original exception is always rethrown."
+    )]
+    private async Task DeleteTreeAsync(string path, CancellationToken token, int depth = 0)
     {
         try
         {
-            foreach (
-                string child in (
-                    await _fixture.Client.GetChildrenAsync(path, token).ConfigureAwait(true)
-                ).Children
-            )
+            var children = await _fixture.Client.GetChildrenAsync(path, token).ConfigureAwait(true);
+            foreach (string child in children.Children)
             {
-                await DeleteTreeAsync(path + "/" + child, token).ConfigureAwait(true);
+                await DeleteTreeAsync(path + "/" + child, token, depth + 1).ConfigureAwait(true);
             }
-            await _fixture.Client.DeleteAsync(path, ZNodeVersion.Any, token).ConfigureAwait(true);
+            try
+            {
+                await _fixture
+                    .Client.DeleteAsync(path, ZNodeVersion.Any, token)
+                    .ConfigureAwait(true);
+            }
+            catch (ZooKeeperException failure)
+                when (failure.KnownErrorCode == ZooKeeperErrorCode.NotEmpty)
+            {
+                var detail = new SoakCleanupFailure(
+                    DateTimeOffset.UtcNow,
+                    depth,
+                    SoakCleanupSnapshot.Capture(children),
+                    null
+                );
+                failure.Data[typeof(SoakCleanupFailure)] = detail;
+                try
+                {
+                    var after = await _fixture
+                        .Client.GetChildrenAsync(path, token)
+                        .ConfigureAwait(true);
+                    failure.Data[typeof(SoakCleanupFailure)] = detail with
+                    {
+                        After = SoakCleanupSnapshot.Capture(after),
+                    };
+                }
+                catch (Exception)
+                {
+                    // A failed diagnostic read must preserve the original delete failure.
+                }
+                throw;
+            }
         }
         catch (ZooKeeperException error) when (error.KnownErrorCode == ZooKeeperErrorCode.NoNode)
         { }

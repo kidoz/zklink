@@ -91,6 +91,39 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
 
     [Fact(Timeout = 10000)]
     [Trait("Acceptance", "T08")]
+    public async Task InitialHandshakeAttemptCanTimeOutAndRetryBeforeApplicationAdmission()
+    {
+        var first = Peer();
+        first.ReplyHandshake = false;
+        var second = Peer();
+        var pending = _fixture.ConnectAsync(
+            first,
+            SessionFixture.Options(connection: "one:2181,two:2181"),
+            TestContext.Current.CancellationToken
+        );
+        Assert.True((await SessionTestSupport.NextAsync(first).ConfigureAwait(true)).Handshake);
+        _fixture.Connector.Add(second);
+        _fixture.Time.Advance(TimeSpan.FromSeconds(1));
+        var client = await SessionTestSupport.Bounded(pending).ConfigureAwait(true);
+        Assert.True(first.IsDisposed);
+        Assert.True((await SessionTestSupport.NextAsync(second).ConfigureAwait(true)).Handshake);
+        Assert.Equal(2, _fixture.Connector.Attempts.Reader.Count);
+        Assert.Equal(1, client.Session.ConnectionGeneration);
+        Assert.Equal(ZooKeeperSessionState.Connected, client.Session.State);
+        Assert.Equal(0, first.Requests.Count);
+        await client
+            .SyncAsync("/after-initial-retry", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        Assert.Equal(
+            (int)ZooKeeperOperation.Sync,
+            (await SessionTestSupport.NextAsync(second).ConfigureAwait(true)).Opcode
+        );
+        Assert.Equal(0, first.Requests.Count);
+        Assert.Equal(0, second.Requests.Count);
+    }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T08")]
     public async Task EndpointUpdatesAffectFutureAttemptsAndOldTransportIsClosedFirst()
     {
         var first = Peer();

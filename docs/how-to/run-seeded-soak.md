@@ -37,7 +37,10 @@ persistent watches, and creates an ephemeral. Cancellation checks cover:
 
 - A precancelled create returning `NotSent`, with no server node.
 - A successful sequential create whose reply is withheld. Independent control
-  verifies one committed child; cancellation must report `Unknown`.
+  first completes a quorum write with a transaction ID greater than the captured
+  create reply, then verifies exactly one committed child; cancellation must
+  report `Unknown`. A sync acknowledgment alone is insufficient for this
+  cross-session freshness check.
 
 The source forwarding endpoint then closes. A second endpoint holds a real
 watch-reset acknowledgment during same-session recovery. Readiness must remain
@@ -46,6 +49,9 @@ release, the checks require retained session/ephemeral ownership, authentication
 a reconnect gap, actual one-shot and persistent invalidations, protected reads,
 and no create replay through the recovery endpoint. Acknowledged close must
 remove the ephemeral. Independent control deletes the round's namespace.
+Initial connection attempts may retry before readiness. Once each forwarding
+endpoint reaches its readiness checkpoint, unexpected additional attempts fail
+the round.
 
 Each version also runs a controlled deadline check. A proxy holds one successful
 `Sync` reply beyond the unchanged five-second operation deadline. The caller
@@ -94,6 +100,17 @@ attempt, frame number, rejected length and configured maximum. Its observation
 time can precede cleanup reporting; reporting order alone does not establish
 which error happened first. Journals exclude exception messages, credentials,
 paths and payloads.
+
+Failures also retain a bounded connection timeline with fixed event names,
+timestamps, numeric socket errors and attempt counts. The timeline holds at most
+128 events and reports dropped-event counts; it contains no wire bytes or
+endpoint values.
+
+A cleanup delete rejected with `NotEmpty` retains the original rejection and a
+bounded diagnostic snapshot. It records traversal depth, child counts, child
+version/transaction metadata and counts of fixed fixture-node categories before
+and, when a follow-up read succeeds, after the rejection. Names remain excluded.
+The harness does not retry the delete to turn the failed round into a pass.
 
 ## Bounds, interruption and evidence
 

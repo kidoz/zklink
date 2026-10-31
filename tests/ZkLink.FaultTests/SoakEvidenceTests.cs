@@ -140,6 +140,45 @@ public sealed class SoakEvidenceTests
             FaultProxy.MaximumFrameBytes
         );
         frameFailure.Data[typeof(FaultProxyFrameFailure)] = detail;
+        timeout.Data[typeof(SoakConnectionDiagnostics)] = new SoakConnectionDiagnostics(
+            2,
+            1,
+            new ProxyConnectionSnapshot(
+                2,
+                0,
+                [
+                    new ProxyConnectionEvent(
+                        observed,
+                        2,
+                        ProxyConnectionEventKind.ReadyCheckpoint,
+                        null,
+                        null
+                    ),
+                ]
+            ),
+            null
+        );
+        timeout.Data[SensitiveMarker] = SensitiveMarker;
+        const int CleanupChildren = 6;
+        const int CleanupChildVersion = 8;
+        const long CleanupParentZxid = 16;
+        var cleanupSnapshot = SoakCleanupSnapshot.Capture(
+            new ZNodeChildren(
+                ["attempt-0000000001", "lease", "once", "persistent", "n-0", SensitiveMarker],
+                default(ZNodeStat) with
+                {
+                    NumChildren = CleanupChildren,
+                    Cversion = CleanupChildVersion,
+                    Pzxid = CleanupParentZxid,
+                }
+            )
+        );
+        timeout.Data[typeof(SoakCleanupFailure)] = new SoakCleanupFailure(
+            observed,
+            0,
+            cleanupSnapshot,
+            cleanupSnapshot
+        );
         try
         {
             var propagated = await Assert
@@ -173,6 +212,52 @@ public sealed class SoakEvidenceTests
                 StringComparison.Ordinal
             );
             using var primary = JsonDocument.Parse(lines[0]);
+            var cleanupDetail = primary.RootElement.GetProperty("cleanup_failure");
+            Assert.Equal(
+                observed,
+                cleanupDetail.GetProperty("observed_at_utc").GetDateTimeOffset()
+            );
+            var beforeCleanup = cleanupDetail.GetProperty("before");
+            Assert.Equal(
+                CleanupChildren,
+                beforeCleanup.GetProperty("returned_children").GetInt32()
+            );
+            Assert.Equal(CleanupChildren, beforeCleanup.GetProperty("stat_children").GetInt32());
+            Assert.Equal(
+                CleanupChildVersion,
+                beforeCleanup.GetProperty("child_version").GetInt32()
+            );
+            Assert.Equal(CleanupParentZxid, beforeCleanup.GetProperty("parent_zxid").GetInt64());
+            Assert.Equal(1, beforeCleanup.GetProperty("attempts").GetInt32());
+            Assert.Equal(1, beforeCleanup.GetProperty("leases").GetInt32());
+            Assert.Equal(2, beforeCleanup.GetProperty("watch_nodes").GetInt32());
+            Assert.Equal(1, beforeCleanup.GetProperty("work_nodes").GetInt32());
+            Assert.Equal(1, beforeCleanup.GetProperty("other_nodes").GetInt32());
+            Assert.Equal(
+                beforeCleanup.GetRawText(),
+                cleanupDetail.GetProperty("after").GetRawText()
+            );
+            var connections = primary.RootElement.GetProperty("connection_diagnostics");
+            Assert.Equal(2, connections.GetProperty("source_ready_attempts").GetInt32());
+            Assert.Equal(1, connections.GetProperty("recovery_restore_attempts").GetInt32());
+            Assert.Equal(JsonValueKind.Null, connections.GetProperty("recovery").ValueKind);
+            var recordedSource = connections.GetProperty("source");
+            Assert.Equal(2, recordedSource.GetProperty("attempts").GetInt32());
+            Assert.Equal(0, recordedSource.GetProperty("dropped_events").GetInt32());
+            var connectionEvent = Assert.Single(
+                recordedSource.GetProperty("events").EnumerateArray()
+            );
+            Assert.Equal(
+                observed,
+                connectionEvent.GetProperty("observed_at_utc").GetDateTimeOffset()
+            );
+            Assert.Equal(
+                nameof(ProxyConnectionEventKind.ReadyCheckpoint),
+                connectionEvent.GetProperty("kind").GetString()
+            );
+            Assert.Equal(2, connectionEvent.GetProperty("attempt").GetInt32());
+            Assert.Equal(JsonValueKind.Null, connectionEvent.GetProperty("incoming").ValueKind);
+            Assert.Equal(JsonValueKind.Null, connectionEvent.GetProperty("socket_error").ValueKind);
             Assert.Equal(
                 nameof(SoakWaitSite.RestoreAcknowledgmentHeld),
                 primary.RootElement.GetProperty("wait_site").GetString()

@@ -276,8 +276,13 @@ internal sealed class SoakEvidence : IAsyncDisposable
         string frameFailure =
             (failure.Data[typeof(FaultProxyFrameFailure)] as FaultProxyFrameFailure)?.ToJson()
             ?? "null";
+        string connections =
+            (failure.Data[typeof(SoakConnectionDiagnostics)] as SoakConnectionDiagnostics)?.ToJson()
+            ?? "null";
+        string cleanup =
+            (failure.Data[typeof(SoakCleanupFailure)] as SoakCleanupFailure)?.ToJson() ?? "null";
         string line = FormattableString.Invariant(
-            $"{{\"kind\":\"failure\",\"reported_at_utc\":\"{DateTimeOffset.UtcNow:O}\",\"elapsed_ms\":{elapsed.TotalMilliseconds:F0},\"seed\":{_settings.Seed},\"round\":{totals.Rounds},\"error_type\":\"{failure.GetType().Name}\",\"wait_site\":{waitSite},\"frame_failure\":{frameFailure},\"error_code\":{errorCode},\"request_operation\":{operation},\"request_outcome\":{outcome},\"crud_started\":{totals.CrudStarted},\"crud_succeeded\":{totals.CrudSucceeded}}}"
+            $"{{\"kind\":\"failure\",\"reported_at_utc\":\"{DateTimeOffset.UtcNow:O}\",\"elapsed_ms\":{elapsed.TotalMilliseconds:F0},\"seed\":{_settings.Seed},\"round\":{totals.Rounds},\"error_type\":\"{failure.GetType().Name}\",\"wait_site\":{waitSite},\"frame_failure\":{frameFailure},\"connection_diagnostics\":{connections},\"cleanup_failure\":{cleanup},\"error_code\":{errorCode},\"request_operation\":{operation},\"request_outcome\":{outcome},\"crud_started\":{totals.CrudStarted},\"crud_succeeded\":{totals.CrudSucceeded}}}"
         );
         await _writer.WriteLineAsync(line).ConfigureAwait(true);
         await _writer.FlushAsync().ConfigureAwait(true);

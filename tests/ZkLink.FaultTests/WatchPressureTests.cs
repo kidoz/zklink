@@ -89,8 +89,9 @@ public sealed class WatchPressureTests : IAsyncLifetime
         for (int round = 0; round < RoundCount; round++)
         {
             string parent = _fixture.Root + "/slow-" + round.ToString(CultureInfo.InvariantCulture);
-            string path = await CreatePathsAsync(parent, token).ConfigureAwait(true);
+            string path = await CreatePathsAsync(owner, parent, token).ConfigureAwait(true);
             var watches = new List<ZooKeeperWatch>();
+            bool roundCompleted = false;
             try
             {
                 await RegisterAsync(owner, parent, path, watches, token).ConfigureAwait(true);
@@ -177,9 +178,27 @@ public sealed class WatchPressureTests : IAsyncLifetime
                 await CountersAsync(capture, token).ConfigureAwait(true);
                 Step("drained-and-capacity-released-round-" + round);
                 Step("released-counts " + Snapshot(capture));
+                roundCompleted = true;
             }
             finally
             {
+                if (!roundCompleted)
+                {
+                    Step(
+                        "pressure-round-failed round="
+                            + round.ToString(CultureInfo.InvariantCulture)
+                            + " state="
+                            + owner.Session.State
+                            + " generation="
+                            + owner.Session.ConnectionGeneration.ToString(
+                                CultureInfo.InvariantCulture
+                            )
+                            + " connection-attempts="
+                            + proxy.ConnectionAttempts.ToString(CultureInfo.InvariantCulture)
+                            + " proxy-error="
+                            + (proxy.RunFailure?.GetType().Name ?? "none")
+                    );
+                }
                 foreach (var watch in watches)
                 {
                     await watch.DisposeAsync().ConfigureAwait(true);
@@ -216,7 +235,7 @@ public sealed class WatchPressureTests : IAsyncLifetime
         var states = owner.SubscribeStateChanges();
         await using var statesLifetime = states.ConfigureAwait(true);
         string parent = _fixture.Root + "/overflow";
-        string path = await CreatePathsAsync(parent, token).ConfigureAwait(true);
+        string path = await CreatePathsAsync(owner, parent, token).ConfigureAwait(true);
         var watches = new List<ZooKeeperWatch>();
         try
         {
@@ -346,14 +365,20 @@ public sealed class WatchPressureTests : IAsyncLifetime
             .ConfigureAwait(true);
     }
 
-    private async Task<string> CreatePathsAsync(string parent, CancellationToken token)
+    private static async Task<string> CreatePathsAsync(
+        ZooKeeperClient owner,
+        string parent,
+        CancellationToken token
+    )
     {
-        await _fixture
-            .Client.CreateAsync(parent, null, LiveZooKeeperFixture.OwnerCreate, token)
+        // Complete setup writes on the watched session before registering. A
+        // different session's acknowledgment does not advance this replica.
+        await owner
+            .CreateAsync(parent, null, LiveZooKeeperFixture.OwnerCreate, token)
             .ConfigureAwait(true);
         string path = parent + "/node";
-        await _fixture
-            .Client.CreateAsync(path, null, LiveZooKeeperFixture.OwnerCreate, token)
+        await owner
+            .CreateAsync(path, null, LiveZooKeeperFixture.OwnerCreate, token)
             .ConfigureAwait(true);
         return path;
     }
@@ -448,26 +473,44 @@ public sealed class WatchPressureTests : IAsyncLifetime
         }
     }
 
-    private static Task CountersAsync(
+    private static async Task CountersAsync(
         TelemetryCapture capture,
         CancellationToken token,
         int watches = 0,
         int backlog = 0
-    ) =>
-        WaitAsync(
-            () =>
-            {
-                capture.Collect();
-                return OwnedCounters.All(capture.Values.ContainsKey)
-                    && capture.Value("zklink.watches.active") == watches
-                    && capture.Value("zklink.events.backlog") == backlog
-                    && capture.Value("zklink.requests.outstanding") == 0
-                    && capture.Value("zklink.requests.bytes") == 0
-                    && capture.Value("zklink.requests.tombstones") == 0;
-            },
-            "owned counters at expected occupancy",
-            token
-        );
+    )
+    {
+        try
+        {
+            await WaitAsync(
+                    () =>
+                    {
+                        capture.Collect();
+                        return OwnedCounters.All(capture.Values.ContainsKey)
+                            && capture.Value("zklink.watches.active") == watches
+                            && capture.Value("zklink.events.backlog") == backlog
+                            && capture.Value("zklink.requests.outstanding") == 0
+                            && capture.Value("zklink.requests.bytes") == 0
+                            && capture.Value("zklink.requests.tombstones") == 0;
+                    },
+                    "owned counters at expected occupancy",
+                    token
+                )
+                .ConfigureAwait(true);
+        }
+        catch (TimeoutException)
+        {
+            Step(
+                "counter-wait-timeout expected-watches="
+                    + watches.ToString(CultureInfo.InvariantCulture)
+                    + " expected-backlog="
+                    + backlog.ToString(CultureInfo.InvariantCulture)
+                    + " actual "
+                    + Snapshot(capture)
+            );
+            throw;
+        }
+    }
 
     private static async Task WaitAsync(
         Func<bool> condition,

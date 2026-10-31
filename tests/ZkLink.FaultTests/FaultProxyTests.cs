@@ -60,6 +60,89 @@ public sealed class FaultProxyTests
         // Proxy disposal also has to observe both blocked forwarding tasks.
     }
 
+    [Fact(Timeout = TestTimeoutMilliseconds)]
+    public async Task ConnectionTimelineIsBoundedAndSnapshotsDoNotAliasLaterEvents()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var proxy = new FaultProxy(
+            $"127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}",
+            false,
+            TestContext.Current.CancellationToken
+        );
+        await using var lifetime = proxy.ConfigureAwait(true);
+        var before = DateTimeOffset.UtcNow;
+        var empty = proxy.ConnectionSnapshot();
+        for (int index = 0; index <= FaultProxy.MaximumConnectionEvents; index++)
+        {
+            Assert.Equal(0, proxy.Checkpoint(ProxyConnectionEventKind.ReadyCheckpoint));
+        }
+        var snapshot = proxy.ConnectionSnapshot();
+        Assert.Empty(empty.Events);
+        Assert.Equal(FaultProxy.MaximumConnectionEvents, snapshot.Events.Count);
+        Assert.Equal(1, snapshot.DroppedEvents);
+        Assert.All(
+            snapshot.Events,
+            item =>
+            {
+                Assert.InRange(item.ObservedAtUtc, before, DateTimeOffset.UtcNow);
+                Assert.Equal(ProxyConnectionEventKind.ReadyCheckpoint, item.Kind);
+                Assert.Null(item.SocketError);
+                Assert.Null(item.Incoming);
+            }
+        );
+    }
+
+    [Fact(Timeout = TestTimeoutMilliseconds)]
+    public async Task WithheldCreateRetainsItsCommitZxidForIndependentWriteFencing()
+    {
+        const int Xid = 41;
+        const long CommitZxid = 12345;
+        const int PrefixBytes = sizeof(int);
+        const int ReplyHeaderBytes = sizeof(int) + sizeof(long) + sizeof(int);
+        var token = TestContext.Current.CancellationToken;
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var proxy = new FaultProxy(
+            $"127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}",
+            false,
+            token
+        );
+        await using var lifetime = proxy.ConfigureAwait(true);
+        using var client = new TcpClient();
+        var endpoint = new Uri("tcp://" + proxy.Endpoint);
+        await client.ConnectAsync(endpoint.Host, endpoint.Port, token).ConfigureAwait(true);
+        using var upstream = await listener.AcceptTcpClientAsync(token).ConfigureAwait(true);
+        var handshake = Frame();
+        var received = new byte[handshake.Length];
+        await client.GetStream().WriteAsync(handshake, token).ConfigureAwait(true);
+        await upstream.GetStream().ReadExactlyAsync(received, token).ConfigureAwait(true);
+        await upstream.GetStream().WriteAsync(handshake, token).ConfigureAwait(true);
+        await client.GetStream().ReadExactlyAsync(received, token).ConfigureAwait(true);
+        proxy.ArmCreateReply();
+        var request = new byte[PrefixBytes + ReplyHeaderBytes];
+        BinaryPrimitives.WriteInt32BigEndian(request, ReplyHeaderBytes);
+        BinaryPrimitives.WriteInt32BigEndian(request.AsSpan(PrefixBytes), Xid);
+        BinaryPrimitives.WriteInt32BigEndian(
+            request.AsSpan(PrefixBytes + sizeof(int)),
+            (int)ZooKeeperOperation.CreateWithStat
+        );
+        await client.GetStream().WriteAsync(request, token).ConfigureAwait(true);
+        await upstream
+            .GetStream()
+            .ReadExactlyAsync(new byte[request.Length], token)
+            .ConfigureAwait(true);
+        var reply = new byte[PrefixBytes + ReplyHeaderBytes];
+        BinaryPrimitives.WriteInt32BigEndian(reply, ReplyHeaderBytes);
+        BinaryPrimitives.WriteInt32BigEndian(reply.AsSpan(PrefixBytes), Xid);
+        BinaryPrimitives.WriteInt64BigEndian(reply.AsSpan(PrefixBytes + sizeof(int)), CommitZxid);
+        await upstream.GetStream().WriteAsync(reply, token).ConfigureAwait(true);
+        await proxy.ResponseWithheld.WaitAsync(TimeSpan.FromSeconds(5), token).ConfigureAwait(true);
+        Assert.Equal(FaultProxy.Success, proxy.WithheldError);
+        Assert.Equal(CommitZxid, proxy.WithheldZxid);
+        Assert.Equal(1, proxy.CreateTransmissions);
+    }
+
     public static TheoryData<bool, bool, int> RejectedFrames
     {
         get

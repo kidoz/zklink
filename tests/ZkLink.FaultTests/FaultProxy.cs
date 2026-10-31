@@ -11,6 +11,9 @@ namespace ZkLink.FaultTests;
 internal sealed class FaultProxy : IAsyncDisposable
 {
     internal const int Success = 0;
+    internal const int MaximumConnectionEvents = 128;
+    private readonly Queue<ProxyConnectionEvent> _connectionEvents = new();
+    private int _droppedConnectionEvents;
     internal const int MaximumFrameBytes = 1_048_575;
     private const int HeaderBytes = sizeof(int) + sizeof(long) + sizeof(int);
     private const int ResetXid = -8;
@@ -59,6 +62,7 @@ internal sealed class FaultProxy : IAsyncDisposable
     internal Task RestoreHeld => _restoreHeld.Task;
     internal Task ServerClosed => _serverClosed.Task;
     internal int WithheldError { get; private set; }
+    internal long WithheldZxid { get; private set; }
     internal int CreateTransmissions => Volatile.Read(ref _creates);
     internal int SyncTransmissions => Volatile.Read(ref _syncs);
     internal Task SyncReplyHeld => _syncHeld.Task;
@@ -111,6 +115,39 @@ internal sealed class FaultProxy : IAsyncDisposable
         _run = RunAsync();
     }
 
+    internal ProxyConnectionSnapshot ConnectionSnapshot()
+    {
+        lock (_gate)
+        {
+            return new(ConnectionAttempts, _droppedConnectionEvents, _connectionEvents.ToArray());
+        }
+    }
+
+    internal int Checkpoint(ProxyConnectionEventKind kind)
+    {
+        RecordConnection(kind);
+        return ConnectionAttempts;
+    }
+
+    private void RecordConnection(
+        ProxyConnectionEventKind kind,
+        bool? incoming = null,
+        int? socketError = null
+    )
+    {
+        lock (_gate)
+        {
+            if (_connectionEvents.Count == MaximumConnectionEvents)
+            {
+                _connectionEvents.Dequeue();
+                _droppedConnectionEvents++;
+            }
+            _connectionEvents.Enqueue(
+                new(DateTimeOffset.UtcNow, ConnectionAttempts, kind, incoming, socketError)
+            );
+        }
+    }
+
     internal void ArmCreateReply()
     {
         lock (_gate)
@@ -151,6 +188,7 @@ internal sealed class FaultProxy : IAsyncDisposable
                     .ConfigureAwait(false);
                 using var upstream = new TcpClient();
                 Interlocked.Increment(ref _connectionAttempts);
+                RecordConnection(ProxyConnectionEventKind.Accepted);
                 NetworkStream downstreamStream;
                 NetworkStream upstreamStream;
                 try
@@ -158,6 +196,7 @@ internal sealed class FaultProxy : IAsyncDisposable
                     await upstream
                         .ConnectAsync(_target.Host, _target.Port, _stop.Token)
                         .ConfigureAwait(false);
+                    RecordConnection(ProxyConnectionEventKind.UpstreamConnected);
                     client.NoDelay = true;
                     upstream.NoDelay = true;
                     // Capture both streams before forwarding can observe EOF or
@@ -170,14 +209,19 @@ internal sealed class FaultProxy : IAsyncDisposable
                         ((IPEndPoint)upstream.Client.LocalEndPoint!).Port
                     );
                 }
-                catch (SocketException)
+                catch (SocketException failure)
                 {
+                    RecordConnection(
+                        ProxyConnectionEventKind.UpstreamFailed,
+                        socketError: (int)failure.SocketErrorCode
+                    );
                     // The member can temporarily close its client port during election.
                     // Close this downstream attempt and accept the driver's next attempt.
                     continue;
                 }
                 catch (InvalidOperationException) when (!client.Connected || !upstream.Connected)
                 {
+                    RecordConnection(ProxyConnectionEventKind.EarlyDisconnect);
                     continue;
                 }
                 lock (_gate)
@@ -196,6 +240,7 @@ internal sealed class FaultProxy : IAsyncDisposable
                     {
                         _client = null;
                         _upstream = null;
+                        RecordConnection(ProxyConnectionEventKind.ForwardingEnded);
                     }
                 }
             }
@@ -243,6 +288,7 @@ internal sealed class FaultProxy : IAsyncDisposable
             {
                 if (await source.ReadAsync(prefix.AsMemory(0, 1), token).ConfigureAwait(false) == 0)
                 {
+                    RecordConnection(ProxyConnectionEventKind.EndOfStream, incoming);
                     if (incoming)
                     {
                         _serverClosed.TrySetResult();
@@ -270,6 +316,10 @@ internal sealed class FaultProxy : IAsyncDisposable
                 try
                 {
                     await source.ReadExactlyAsync(packet, token).ConfigureAwait(false);
+                    if (handshake)
+                    {
+                        RecordConnection(ProxyConnectionEventKind.HandshakeRead, incoming);
+                    }
                     if (incoming && handshake && length >= sizeof(int) + sizeof(int))
                     {
                         Volatile.Write(
@@ -367,6 +417,9 @@ internal sealed class FaultProxy : IAsyncDisposable
                                 WithheldError = BinaryPrimitives.ReadInt32BigEndian(
                                     packet.AsSpan(sizeof(int) + sizeof(long))
                                 );
+                                WithheldZxid = BinaryPrimitives.ReadInt64BigEndian(
+                                    packet.AsSpan(sizeof(int))
+                                );
                                 _withheld.TrySetResult();
                                 continue;
                             }
@@ -409,6 +462,7 @@ internal sealed class FaultProxy : IAsyncDisposable
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (IOException)
         {
+            RecordConnection(ProxyConnectionEventKind.TransportError, incoming);
             if (incoming && !token.IsCancellationRequested)
             {
                 _serverClosed.TrySetResult();
@@ -423,6 +477,7 @@ internal sealed class FaultProxy : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        RecordConnection(ProxyConnectionEventKind.StopRequested);
         await _stop.CancelAsync().ConfigureAwait(false);
         _listener.Stop();
         lock (_gate)
