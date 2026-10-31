@@ -1,0 +1,60 @@
+# Disposable three-voter ensemble with one non-voting observer.
+x-observer-server: &server
+  image: ${ZOOKEEPER_IMAGE:?A pinned server version is required}
+  restart: "no"
+  labels:
+    org.zklink.observer-run: ${ZKLINK_OBSERVER_RUN_ID:?An owned run ID is required}
+  environment: &environment
+    ZOO_SERVERS: >-
+      server.1=zoo1:2888:3888;2181
+      server.2=zoo2:2888:3888;2181
+      server.3=zoo3:2888:3888;2181
+      server.4=zoo4:2888:3888:observer;2181
+    ZOO_STANDALONE_ENABLED: "false"
+    ZOO_ADMINSERVER_ENABLED: "false"
+    ZOO_INIT_LIMIT: "10"
+    ZOO_SYNC_LIMIT: "5"
+  volumes:
+    - ./dev/zookeeper-healthcheck.sh:/opt/zklink/zookeeper-healthcheck.sh:ro
+  healthcheck:
+    test: ["CMD", "bash", "/opt/zklink/zookeeper-healthcheck.sh"]
+    interval: 10s
+    timeout: 15s
+    start_period: 15s
+    retries: 6
+  stop_grace_period: 10s
+
+services:
+  zoo1:
+    <<: *server
+    hostname: zoo1
+    environment:
+      <<: *environment
+      ZOO_MY_ID: "1"
+    ports:
+      - "127.0.0.1:0:2181"
+  zoo2:
+    <<: *server
+    hostname: zoo2
+    environment:
+      <<: *environment
+      ZOO_MY_ID: "2"
+    ports:
+      - "127.0.0.1:0:2181"
+  zoo3:
+    <<: *server
+    hostname: zoo3
+    environment:
+      <<: *environment
+      ZOO_MY_ID: "3"
+    ports:
+      - "127.0.0.1:0:2181"
+  zoo4:
+    <<: *server
+    hostname: zoo4
+    environment:
+      <<: *environment
+      ZOO_MY_ID: "4"
+      ZOO_PEER_TYPE: observer
+    ports:
+      - "127.0.0.1:0:2181"
