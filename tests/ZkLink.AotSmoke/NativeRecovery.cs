@@ -14,6 +14,7 @@ internal static class NativeRecovery
         CancellationToken token
     )
     {
+        await VerifySentCancellationAsync(settings, control, token).ConfigureAwait(false);
         foreach (
             var mode in new[]
             {
@@ -30,6 +31,124 @@ internal static class NativeRecovery
                 "Native same-session persistent/recursive restore/gap/removal, cancellation and acknowledged-close ephemeral cleanup: verified."
             )
             .ConfigureAwait(false);
+    }
+
+    private static async Task VerifySentCancellationAsync(
+        NativeSettings settings,
+        ZooKeeperClient control,
+        CancellationToken token
+    )
+    {
+        using var guard = CancellationTokenSource.CreateLinkedTokenSource(token);
+        guard.CancelAfter(RecoveryGuard);
+        var bounded = guard.Token;
+        var proxy = new WatchReconnectProxy(settings.Endpoint, inspectFrames: false, bounded);
+        await using var proxyLifetime = proxy.ConfigureAwait(false);
+        var owner = await settings.ConnectAsync(proxy.Endpoint, bounded).ConfigureAwait(false);
+        await using var ownerLifetime = owner.ConfigureAwait(false);
+        string root = SampleNodes.UniquePath("/zklink-native-unknown-");
+        const string AttemptPrefix = "attempt-";
+        Task<CreateResult>? uncertain = null;
+        await control
+            .CreateAsync(
+                root,
+                null,
+                new CreateOptions([new ZooKeeperAcl(ZooKeeperPermissions.All, "auth", "")]),
+                bounded
+            )
+            .ConfigureAwait(false);
+        try
+        {
+            long session = owner.Session.SessionId;
+            long generation = owner.Session.ConnectionGeneration;
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(bounded);
+            proxy.HoldIncoming();
+            uncertain = owner.CreateAsync(
+                root + "/" + AttemptPrefix,
+                null,
+                new CreateOptions(
+                    [new ZooKeeperAcl(ZooKeeperPermissions.All, "auth", "")],
+                    CreateMode.PersistentSequential
+                ),
+                cancellation.Token
+            );
+            await proxy.IncomingHeld.WaitAsync(bounded).ConfigureAwait(false);
+            // An independent authenticated session proves the write reached and
+            // committed at the server before caller cancellation is requested.
+            while (
+                (await control.GetChildrenAsync(root, bounded).ConfigureAwait(false)).Children.Count
+                == 0
+            )
+            {
+                await Task.Delay(CleanupPoll, bounded).ConfigureAwait(false);
+            }
+            await cancellation.CancelAsync().ConfigureAwait(false);
+            try
+            {
+                await uncertain.ConfigureAwait(false);
+                throw new InvalidOperationException("A committed held reply completed the caller.");
+            }
+            catch (ZooKeeperOperationCanceledException failure)
+            {
+                NativeSettings.Require(
+                    failure.Outcome == RequestOutcome.Unknown
+                        && failure.Request.Operation == ZooKeeperOperation.CreateWithStat
+                        && failure.CancellationToken == cancellation.Token
+                );
+            }
+            proxy.DropAndPause();
+            proxy.ReleaseIncoming();
+            proxy.Resume();
+            await owner.WaitForConnectionAsync(bounded).ConfigureAwait(false);
+            // WaitForConnection can observe the previous Connected snapshot before
+            // the closed socket is read. A protected operation is the next barrier.
+            while (owner.Session.ConnectionGeneration == generation)
+            {
+                await Task.Delay(CleanupPoll, bounded).ConfigureAwait(false);
+            }
+            await owner.WaitForConnectionAsync(bounded).ConfigureAwait(false);
+            NativeSettings.Require(owner.Session.SessionId == session);
+            await owner.SyncAsync(root, bounded).ConfigureAwait(false);
+            var children = (
+                await control.GetChildrenAsync(root, bounded).ConfigureAwait(false)
+            ).Children;
+            NativeSettings.Require(
+                children.Count == 1
+                    && children[0].StartsWith(AttemptPrefix, StringComparison.Ordinal)
+            );
+            await NativeSettings.CloseAsync(owner, bounded).ConfigureAwait(false);
+            await Console
+                .Out.WriteLineAsync(
+                    "Native sent cancellation: PASS (Unknown, same session, one committed child, no replay)."
+                )
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            proxy.ReleaseIncoming();
+            proxy.Resume();
+            if (uncertain is not null)
+            {
+                try
+                {
+                    await uncertain.ConfigureAwait(false);
+                }
+                catch (ZooKeeperException) { }
+                catch (OperationCanceledException) { }
+            }
+            using var cleanup = new CancellationTokenSource(RecoveryGuard);
+            foreach (
+                string child in (
+                    await control.GetChildrenAsync(root, cleanup.Token).ConfigureAwait(false)
+                ).Children
+            )
+            {
+                await control
+                    .DeleteAsync(root + "/" + child, ZNodeVersion.Any, cleanup.Token)
+                    .ConfigureAwait(false);
+            }
+            await control.DeleteAsync(root, ZNodeVersion.Any, cleanup.Token).ConfigureAwait(false);
+        }
     }
 
     private static async Task VerifyModeAsync(

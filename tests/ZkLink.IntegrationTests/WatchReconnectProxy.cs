@@ -30,6 +30,33 @@ internal sealed class WatchReconnectProxy : IAsyncDisposable
     );
     private int _restoreReplies;
     private readonly bool _inspectFrames;
+    private int _incomingBlocked;
+    private readonly TaskCompletionSource _incomingHeld = new(
+        TaskCreationOptions.RunContinuationsAsynchronously
+    );
+    private readonly TaskCompletionSource _incomingRelease = new(
+        TaskCreationOptions.RunContinuationsAsynchronously
+    );
+    internal Task IncomingHeld => _incomingHeld.Task;
+
+    internal void HoldIncoming()
+    {
+        if (
+            _inspectFrames
+            || _incomingRelease.Task.IsCompleted
+            || Interlocked.Exchange(ref _incomingBlocked, 1) != 0
+        )
+        {
+            throw new InvalidOperationException("Only one opaque incoming hold is supported.");
+        }
+    }
+
+    internal void ReleaseIncoming()
+    {
+        Volatile.Write(ref _incomingBlocked, 0);
+        _incomingRelease.TrySetResult();
+    }
+
     internal Task RestoreReplyHeld => _restoreHeld.Task;
     internal int RestoreReplies => Volatile.Read(ref _restoreReplies);
     internal string Endpoint { get; }
@@ -133,7 +160,7 @@ internal sealed class WatchReconnectProxy : IAsyncDisposable
         var outgoing = PumpAsync(client, upstream, lifetime.Token);
         var incoming = _inspectFrames
             ? ForwardServerFramesAsync(upstream, client, lifetime.Token)
-            : PumpAsync(upstream, client, lifetime.Token);
+            : PumpAsync(upstream, client, lifetime.Token, incoming: true);
         await Task.WhenAny(outgoing, incoming).ConfigureAwait(false);
         await lifetime.CancelAsync().ConfigureAwait(false);
         await Task.WhenAll(outgoing, incoming).ConfigureAwait(false);
@@ -198,7 +225,12 @@ internal sealed class WatchReconnectProxy : IAsyncDisposable
         }
     }
 
-    private static async Task PumpAsync(Stream source, Stream destination, CancellationToken token)
+    private async Task PumpAsync(
+        Stream source,
+        Stream destination,
+        CancellationToken token,
+        bool incoming = false
+    )
     {
         var bytes = new byte[BufferBytes];
         try
@@ -208,6 +240,11 @@ internal sealed class WatchReconnectProxy : IAsyncDisposable
                 int count = await source.ReadAsync(bytes, token).ConfigureAwait(false);
                 if (count == 0)
                     return;
+                if (incoming && Volatile.Read(ref _incomingBlocked) != 0)
+                {
+                    _incomingHeld.TrySetResult();
+                    await _incomingRelease.Task.WaitAsync(token).ConfigureAwait(false);
+                }
                 await destination.WriteAsync(bytes.AsMemory(0, count), token).ConfigureAwait(false);
             }
         }
