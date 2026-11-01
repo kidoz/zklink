@@ -48,6 +48,17 @@ guarded waits and retain rejected-frame metadata at the original observation
 time. Fresh five-minute workloads pass on both versions with these diagnostics;
 the replay failure and original two-hour timeout remain unresolved.
 
+Controlled checks reproduce a reporting defect in the fault harness: a terminal
+proxy framing error can leave a recovery signal pending until its guard expires,
+then surface again during disposal. The revised waits propagate the original
+error and its observation metadata before cleanup. This identifies a masking
+mechanism; the old run did not retain the rejected frame metadata needed to
+identify its trigger. Separate deadline checks cover committed Delete replies,
+explicit uncertain outcomes and ordered late-reply recovery without replay.
+[Hosted verification passed](https://github.com/kidoz/zklink/actions/runs/41293302220)
+on all four managed targets and both pinned server versions. These bounded
+experiments do not establish the cause of either historical failure.
+
 The release-candidate workflow now distributes one package/symbol bundle to
 managed and native consumers. Publication downloads those qualified bytes,
 checks the completed candidate run and attestations, and rejects missing or

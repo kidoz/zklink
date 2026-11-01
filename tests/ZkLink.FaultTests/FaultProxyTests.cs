@@ -137,7 +137,9 @@ public sealed class FaultProxyTests
         BinaryPrimitives.WriteInt32BigEndian(reply.AsSpan(PrefixBytes), Xid);
         BinaryPrimitives.WriteInt64BigEndian(reply.AsSpan(PrefixBytes + sizeof(int)), CommitZxid);
         await upstream.GetStream().WriteAsync(reply, token).ConfigureAwait(true);
-        await proxy.ResponseWithheld.WaitAsync(TimeSpan.FromSeconds(5), token).ConfigureAwait(true);
+        await proxy
+            .WaitForSignalAsync(proxy.ResponseWithheld, TimeSpan.FromSeconds(5), token)
+            .ConfigureAwait(true);
         Assert.Equal(FaultProxy.Success, proxy.WithheldError);
         Assert.Equal(CommitZxid, proxy.WithheldZxid);
         Assert.Equal(1, proxy.CreateTransmissions);

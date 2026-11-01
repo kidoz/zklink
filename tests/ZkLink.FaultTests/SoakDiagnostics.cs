@@ -108,7 +108,7 @@ internal static class SoakDiagnostics
         {
             await wait.ConfigureAwait(true);
         }
-        catch (TimeoutException failure)
+        catch (Exception failure) when (failure is TimeoutException or InvalidDataException)
         {
             failure.Data[typeof(SoakWaitSite)] = site;
             throw;

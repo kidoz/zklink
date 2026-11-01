@@ -268,7 +268,11 @@ public sealed class SoakTests : IAsyncLifetime
                 );
                 await SoakDiagnostics
                     .ObserveAsync(
-                        source.ResponseWithheld.WaitAsync(SoakMetrics.Guard, token),
+                        source.WaitForSignalAsync(
+                            source.ResponseWithheld,
+                            SoakMetrics.Guard,
+                            token
+                        ),
                         SoakWaitSite.CreateReplyWithheld
                     )
                     .ConfigureAwait(true);
@@ -289,7 +293,7 @@ public sealed class SoakTests : IAsyncLifetime
             Assert.Equal(creates + 1, source.CreateTransmissions);
             await SoakDiagnostics
                 .ObserveAsync(
-                    recovery.RestoreHeld.WaitAsync(SoakMetrics.Guard, token),
+                    recovery.WaitForSignalAsync(recovery.RestoreHeld, SoakMetrics.Guard, token),
                     SoakWaitSite.RestoreAcknowledgmentHeld
                 )
                 .ConfigureAwait(true);
@@ -311,7 +315,7 @@ public sealed class SoakTests : IAsyncLifetime
             recovery.ReleaseRestore();
             await SoakDiagnostics
                 .ObserveAsync(
-                    ready.WaitAsync(SoakMetrics.Guard, token),
+                    recovery.WaitForSignalAsync(ready, SoakMetrics.Guard, token),
                     SoakWaitSite.ConnectionReady
                 )
                 .ConfigureAwait(true);

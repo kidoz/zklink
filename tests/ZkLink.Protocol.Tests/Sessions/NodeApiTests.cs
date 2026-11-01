@@ -116,37 +116,48 @@ public sealed class NodeApiTests : IAsyncLifetime
         Assert.Equal(0, _peer.Requests.Count);
     }
 
-    [Fact(Timeout = TestTimeoutMilliseconds)]
+    [Theory(Timeout = TestTimeoutMilliseconds)]
+    [InlineData(ZooKeeperOperation.Delete)]
+    [InlineData(ZooKeeperOperation.Sync)]
     [Trait("Acceptance", "T12")]
     [Trait("Acceptance", "T14")]
     [Trait("Acceptance", "T16")]
-    public async Task SentDeleteTimeoutRetainsMetadataAndDrainsLateReplyWithoutReplay()
+    public async Task SentEmptyReplyDeadlineHasExactBoundaryAndDrainsLateReplyWithoutReplay(
+        ZooKeeperOperation operation
+    )
     {
         var token = TestContext.Current.CancellationToken;
         long generation = Client.Session.ConnectionGeneration;
-        var delete = Client.DeleteAsync("/node", ZNodeVersion.Any, token);
-        var deleted = await NextPathAsync((int)ZooKeeperOperation.Delete, "/app/node")
-            .ConfigureAwait(true);
+        var pending =
+            operation == ZooKeeperOperation.Delete
+                ? Client.DeleteAsync("/node", ZNodeVersion.Any, token)
+                : Client.SyncAsync("/node", token);
+        var sent = await NextPathAsync((int)operation, "/app/node").ConfigureAwait(true);
 
-        _fixture.Time.Advance(SessionFixture.Options().OperationTimeout);
+        var finalTick = TimeSpan.FromTicks(1);
+        _fixture.Time.Advance(SessionFixture.Options().OperationTimeout - finalTick);
+        Assert.False(pending.IsCompleted);
+        Assert.Equal(1, Client.Manager.Scheduler.PendingCount);
+        Assert.Equal(0, _peer.Requests.Count);
+        _fixture.Time.Advance(finalTick);
         var timeout = await Assert
-            .ThrowsAsync<ZooKeeperTimeoutException>(() => delete)
+            .ThrowsAsync<ZooKeeperTimeoutException>(() => pending)
             .ConfigureAwait(true);
         Assert.Equal(RequestOutcome.Unknown, timeout.Outcome);
-        Assert.Equal(ZooKeeperOperation.Delete, timeout.Request.Operation);
+        Assert.Equal(operation, timeout.Request.Operation);
         Assert.Equal("/node", timeout.Request.Path);
-        Assert.Equal(deleted.Xid, timeout.Request.RequestId);
+        Assert.Equal(sent.Xid, timeout.Request.RequestId);
         Assert.Equal(1, Client.Manager.Scheduler.PendingCount);
 
-        // The sole in-flight slot belongs to the timed-out delete until its reply drains.
+        // The sole in-flight slot belongs to the timed-out request until its reply drains.
         var sync = Client.SyncAsync("/node", token);
         Assert.False(sync.IsCompleted);
         Assert.Equal(2, Client.Manager.Scheduler.PendingCount);
         Assert.Equal(0, _peer.Requests.Count);
-        _peer.Reply(deleted);
+        _peer.Reply(sent);
         var next = await NextPathAsync((int)ZooKeeperOperation.Sync, "/app/node")
             .ConfigureAwait(true);
-        Assert.NotEqual(deleted.Xid, next.Xid);
+        Assert.NotEqual(sent.Xid, next.Xid);
         Assert.False(sync.IsCompleted);
         _peer.Reply(next);
         await sync.ConfigureAwait(true);

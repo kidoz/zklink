@@ -30,6 +30,8 @@ internal sealed class FaultProxy : IAsyncDisposable
     private readonly TaskCompletionSource _restoreRelease = NewSignal();
     private readonly TaskCompletionSource _syncHeld = NewSignal();
     private readonly TaskCompletionSource _syncRelease = NewSignal();
+    private readonly TaskCompletionSource _deleteHeld = NewSignal();
+    private readonly TaskCompletionSource _deleteRelease = NewSignal();
     private TcpClient? _client;
     private TcpClient? _upstream;
     private bool _armed;
@@ -46,6 +48,9 @@ internal sealed class FaultProxy : IAsyncDisposable
     private int _syncs;
     private bool _syncArmed;
     private int? _syncXid;
+    private int _deletes;
+    private bool _deleteArmed;
+    private int? _deleteXid;
     private int _connectionAttempts;
     private int _handshakeReplies;
     private int _lastNegotiatedMilliseconds;
@@ -67,6 +72,10 @@ internal sealed class FaultProxy : IAsyncDisposable
     internal int SyncTransmissions => Volatile.Read(ref _syncs);
     internal Task SyncReplyHeld => _syncHeld.Task;
     internal int SyncReplyError { get; private set; }
+    internal Task DeleteReplyHeld => _deleteHeld.Task;
+    internal int DeleteReplyError { get; private set; }
+    internal int? DeleteReplyXid => _deleteXid;
+    internal int DeleteTransmissions => Volatile.Read(ref _deletes);
     internal int ConnectionAttempts => Volatile.Read(ref _connectionAttempts);
     internal string Endpoint { get; }
     internal bool IncomingPartitionActive => Volatile.Read(ref _incomingPartition) != 0;
@@ -148,6 +157,22 @@ internal sealed class FaultProxy : IAsyncDisposable
         }
     }
 
+    internal async Task WaitForSignalAsync(Task signal, TimeSpan guard, CancellationToken token)
+    {
+        // A terminal forwarding error must reach the active check before its
+        // guard expires or disposal replaces the primary failure. Ordinary EOF
+        // ends one connection, while _run continues accepting reconnects.
+        var stopped = _stop.Token;
+        var completed = await Task.WhenAny(signal, _run)
+            .WaitAsync(guard, token)
+            .ConfigureAwait(false);
+        await completed.ConfigureAwait(false);
+        if (ReferenceEquals(completed, _run))
+        {
+            throw new OperationCanceledException("Fault proxy stopped before the signal.", stopped);
+        }
+    }
+
     internal void ArmCreateReply()
     {
         lock (_gate)
@@ -175,6 +200,20 @@ internal sealed class FaultProxy : IAsyncDisposable
     }
 
     internal void ReleaseSyncReply() => _syncRelease.TrySetResult();
+
+    internal void ArmDeleteReply()
+    {
+        lock (_gate)
+        {
+            if (_deleteArmed)
+            {
+                throw new InvalidOperationException("Only one delete reply may be held.");
+            }
+            _deleteArmed = true;
+        }
+    }
+
+    internal void ReleaseDeleteReply() => _deleteRelease.TrySetResult();
 
     private async Task RunAsync()
     {
@@ -382,6 +421,23 @@ internal sealed class FaultProxy : IAsyncDisposable
                             }
                         }
                     }
+                    if (
+                        !incoming
+                        && !handshake
+                        && length >= RequestHeaderBytes
+                        && BinaryPrimitives.ReadInt32BigEndian(packet.AsSpan(sizeof(int)))
+                            == (int)ZooKeeperOperation.Delete
+                    )
+                    {
+                        Interlocked.Increment(ref _deletes);
+                        lock (_gate)
+                        {
+                            if (_deleteArmed && _deleteXid is null)
+                            {
+                                _deleteXid = BinaryPrimitives.ReadInt32BigEndian(packet);
+                            }
+                        }
+                    }
                     if (!handshake && length >= HeaderBytes)
                     {
                         int xid = BinaryPrimitives.ReadInt32BigEndian(packet);
@@ -403,10 +459,12 @@ internal sealed class FaultProxy : IAsyncDisposable
                         {
                             bool discard;
                             bool holdSync;
+                            bool holdDelete;
                             lock (_gate)
                             {
                                 discard = _selectedXid == xid && !_replyDiscarded;
                                 holdSync = _syncXid == xid;
+                                holdDelete = _deleteXid == xid;
                                 if (discard)
                                 {
                                     _replyDiscarded = true;
@@ -431,6 +489,15 @@ internal sealed class FaultProxy : IAsyncDisposable
                                 );
                                 _syncHeld.TrySetResult();
                                 await _syncRelease.Task.WaitAsync(token).ConfigureAwait(false);
+                            }
+                            if (holdDelete)
+                            {
+                                DeleteReplyError = BinaryPrimitives.ReadInt32BigEndian(
+                                    packet.AsSpan(sizeof(int) + sizeof(long))
+                                );
+                                _deleteHeld.TrySetResult();
+                                // Retain wire order for every following reply, including pings.
+                                await _deleteRelease.Task.WaitAsync(token).ConfigureAwait(false);
                             }
                             if (
                                 _holdRestore
