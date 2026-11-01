@@ -70,6 +70,7 @@ Install [just](https://just.systems/) and .NET SDK **10.0.403**. Docker with Com
 | `just bench-live [seconds]` | Measure live get/set requests at 1/32/256 concurrency on both server versions |
 | `just bench-allocations [output]` | Check measured allocation budgets without timing thresholds |
 | `just zk-soak [seconds] [seed]` | Run seeded client churn, CRUD, cancellation, recovery and resource checkpoints on both versions (default two minutes each) |
+| `just zk-soak-isolated [seconds] [seed]` | Run the same checks in an owned Linux namespace with source, resource, deadline and cleanup supervision |
 | `just zk-watch-pressure-faults` | Verify unread watch queues, heartbeat progress, shared event overflow and resource cleanup on both versions |
 | `just zk-peer-partition-faults` | Isolate leader and follower peer interfaces separately and verify election, majority progress and recovery on both versions |
 | `just zk-partition-faults` | Discard each direction of client traffic independently and verify recovery or local loss on both versions |

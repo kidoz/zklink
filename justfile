@@ -149,3 +149,7 @@ zk-session-expiry:
 # Run a seeded bounded workload on both versions (30..86400 seconds per version).
 zk-soak seconds="120" seed="1729":
     bash dev/test-zookeeper-soak.sh "$1" "$2"
+
+# Run the same workload in an owned Linux namespace with continuous supervision.
+zk-soak-isolated seconds="120" seed="1729":
+    python3 dev/supervise-zookeeper-soak.py --seconds "$1" --seed "$2"

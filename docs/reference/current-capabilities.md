@@ -69,8 +69,12 @@ qualification remains open.
 CRUD, repeated client lifecycles, cancellation outcomes and same-session watch
 recovery. Resource checkpoints check owned counters/connections and compare
 retained managed heap and threads against a recorded baseline. The harness
-supports configurable durations; a passing short run does not establish the
-six-hour-per-version release minimum or cross-platform qualification. The release-duration
+supports configurable durations. `just zk-soak-isolated` adds a pinned Linux
+runtime, private proxy listeners, source/binary integrity checks and bounded
+supervision; native/isolated short workloads and owned driver-exit/interruption
+cleanup pass on both patches locally and in Linux CI. A passing short run does
+not establish the six-hour-per-version release minimum or cross-platform
+qualification. The release-duration
 attempt on 29 October stopped after about two hours on 3.8.7 with a `DeleteAsync`
 timeout; fixture rollback completed, and the cause remains under investigation.
 Bounded follow-up workloads and concurrent scratch-file deletion did not

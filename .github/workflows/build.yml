@@ -325,6 +325,41 @@ jobs:
           path: artifacts/${{ matrix.role }}-faults
           if-no-files-found: error
 
+  isolated-soak:
+    name: Isolated soak and owned failure cleanup
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install pinned SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      - name: Verify supervisor rejection checks
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 dev/test-isolated-soak.py
+      - name: Verify isolated workload on both pinned versions
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+          ZKLINK_MATRIX_ARTIFACT_ROOT: ${{ github.workspace }}/artifacts/isolated-soak
+        run: python3 dev/supervise-zookeeper-soak.py --seconds 30
+      - name: Verify driver exit and supervisor interruption cleanup
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+          ZKLINK_MATRIX_ARTIFACT_ROOT: ${{ github.workspace }}/artifacts/isolated-soak
+        run: python3 dev/test-isolated-soak-failures.py
+      - name: Retain isolated workload and failure evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: isolated-soak-and-cleanup
+          path: artifacts/isolated-soak
+          if-no-files-found: error
+
   authentication-required:
     name: Required digest and unsupported SASL
     runs-on: ubuntu-latest

@@ -20,6 +20,11 @@ qualification is in progress. The public API declarations are unchanged from
 
 ### Added
 
+- `just zk-soak-isolated [seconds] [seed]` runs the soak in a pinned Linux
+  runtime with private proxy listeners, source/binary integrity checks, bounded
+  supervision and retained resource/cleanup evidence. CI checks short workloads,
+  driver termination and supervisor interruption on both server versions.
+
 - Observer-endpoint verification on both pinned server versions, including
   writes, same-session watch recovery and authenticated cleanup.
 - Native sent-cancellation verification with an independently observed committed

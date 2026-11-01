@@ -31,10 +31,16 @@ SETTINGS
   export ZKLINK_SOAK_DURATION_SECONDS ZKLINK_SOAK_SEED
 fi
 readonly runner_guard
+soak_execution="${ZKLINK_SOAK_EXECUTION-host}"
+if [[ "${soak_execution}" != host && ( "${soak_execution}" != isolated || "${role}" != soak ) ]]; then
+  echo "Isolated execution is supported only for the soak fixture" >&2; exit 2
+fi
+build_options=(-m:1)
+if [[ "${soak_execution}" == isolated ]]; then build_options+=(-p:UseMicrosoftTestingPlatformRunner=true); fi
 docker info >/dev/null
 docker compose version >/dev/null
 dotnet restore tests/ZkLink.FaultTests --locked-mode
-dotnet build tests/ZkLink.FaultTests -c Release --no-restore -m:1
+dotnet build tests/ZkLink.FaultTests -c Release --no-restore "${build_options[@]}"
 artifact_root=${ZKLINK_MATRIX_ARTIFACT_ROOT:-${TMPDIR:-/tmp}}
 mkdir -p "${artifact_root}"
 artifacts=$(mktemp -d "${artifact_root%/}/zklink-${role}-faults.XXXXXX")
@@ -68,6 +74,9 @@ compose() {
 cleanup() {
   local cleanup_exit=$?
   trap - EXIT
+  if [[ "${soak_execution}" == isolated && -n "${project}" && -f "${artifacts}/${evidence_key}-driver.json" ]]; then
+    python3 dev/isolated_soak.py --cleanup "${artifacts}/${evidence_key}-driver.json" >>"${artifacts}/${evidence_key}-driver-cleanup.log" 2>&1 || cleanup_exit=1
+  fi
   if [[ -n "${allocation_network}" ]]; then
     allocation_label=$(docker network inspect --format '{{index .Labels "org.zklink.fault-run"}}' "${allocation_network}" 2>/dev/null || true)
     if [[ "${allocation_label}" == "${ZKLINK_FAULT_RUN_ID}" ]]; then
@@ -116,18 +125,35 @@ peer_roles=(none)
 if [[ "${role}" == peer ]]; then peer_roles=(leader follower); fi
 directions=(none)
 if [[ "${role}" == partition ]]; then directions=(outgoing incoming); fi
+versions=(3.8.7 3.9.6)
+if [[ "${soak_execution}" == isolated && -n "${ZKLINK_ISOLATED_SOAK_VERSIONS-}" ]]; then
+  read -r -a versions <<<"${ZKLINK_ISOLATED_SOAK_VERSIONS}"
+  for version in "${versions[@]}"; do
+    if [[ "${version}" != 3.8.7 && "${version}" != 3.9.6 ]]; then echo "Unsupported isolated version" >&2; exit 2; fi
+  done
+fi
 for peer_role in "${peer_roles[@]}"; do
 export ZKLINK_PEER_TARGET_ROLE="${peer_role}"
 for direction in "${directions[@]}"; do
 export ZKLINK_PARTITION_DIRECTION="${direction}"
 for outage in "${outages[@]}"; do
-  for version in 3.8.7 3.9.6; do
+  for version in "${versions[@]}"; do
     evidence_key="${version}"
     if [[ "${role}" == quorum || "${role}" == partition ]]; then evidence_key="${version}-${outage}"; fi
     if [[ "${role}" == peer ]]; then evidence_key="${version}-${peer_role}"; fi
     if [[ "${role}" == partition ]]; then evidence_key="${version}-${direction}-${outage}"; fi
     export ZKLINK_FAULT_RUN_ID="$(python3 -c 'import uuid; print(uuid.uuid4().hex)')"
     project="zklink-${role}-fault-${version//./-}-${ZKLINK_FAULT_RUN_ID}"
+    if [[ "${soak_execution}" == isolated ]]; then
+      python3 - "${artifacts}/${evidence_key}-fixture.json" "${version}" "${project}" "${ZKLINK_FAULT_RUN_ID}" <<'OWNERSHIP'
+import json
+from pathlib import Path
+import sys
+path, version, project, nonce = sys.argv[1:]
+Path(path).write_text(json.dumps({"serverVersion": version, "project": project, "runId": nonce,
+                                 "containerName": project + "-driver"}) + "\n")
+OWNERSHIP
+    fi
     target=""
     second_target=""
     export ZKLINK_FAULT_OUTAGE="${outage}"
@@ -232,6 +258,15 @@ PORTS
       control_endpoints="$(compose port "${observed_leader}" 2181)"
       printf 'Maintenance: observed leader %s\n' "${observed_leader}" >>"${artifacts}/${evidence_key}-selection.txt"
     fi
+    if [[ "${soak_execution}" == isolated ]]; then
+      python3 dev/isolated_soak.py --evidence "${artifacts}" --version "${version}" \
+        --project "${project}" --nonce "${ZKLINK_FAULT_RUN_ID}" \
+        --target "$(compose ps -q "${target}")" --leader "$(compose ps -q "${observed_leader}")" \
+        --seconds "${ZKLINK_SOAK_DURATION_SECONDS}" --seed "${ZKLINK_SOAK_SEED}" \
+        >"${artifacts}/${evidence_key}-tests.txt" 2>&1 || {
+          cat "${artifacts}/${evidence_key}-tests.txt"; exit 1;
+        }
+    else
     ZKLINK_TEST_CONNECTION_STRING="${control_endpoints}" ZKLINK_TEST_SERVER_VERSION="${version}" \
       ZKLINK_FAULT_SECOND_SERVICE="${second_target}" ZKLINK_FAULT_PROJECT="${project}" ZKLINK_FAULT_SERVICE="${target}" ZKLINK_FAULT_ENDPOINT="$(compose port "${target}" 2181)" \
       dotnet test --project tests/ZkLink.FaultTests -c Release --no-build --no-restore \
@@ -239,6 +274,7 @@ PORTS
       --results-directory "${artifacts}/${evidence_key}-results" >"${artifacts}/${evidence_key}-tests.txt" 2>&1 || {
         cat "${artifacts}/${evidence_key}-tests.txt"; exit 1;
       }
+    fi
     cat "${artifacts}/${evidence_key}-tests.txt"
     for service in zoo1 zoo2 zoo3; do
       compose exec -T "${service}" bash /opt/zklink/zookeeper-healthcheck.sh

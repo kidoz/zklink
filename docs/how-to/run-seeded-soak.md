@@ -10,17 +10,16 @@ Choose the duration in seconds per version and the workload seed:
 
 ```sh
 just zk-soak 30 1730
-just zk-soak 21600 1729
 ```
 
 The duration range is 30–86,400 seconds; the seed range is 0–2,147,483,647.
-The longer command requests six continuous hours on each version, the minimum
-for release qualification. Setup, the final round and
+Release qualification requires six continuous hours on each version. Use the
+supervised isolated command below for that run. Setup, the final round and
 cleanup add bounded overhead. Use the SDK pinned in `global.json`, Docker with
 Compose, and Python 3. Host Java and Gradle are unnecessary for this command.
 
 For additional confidence, an optional longer run can use up to 24 hours per
-version: `just zk-soak 86400 1729`. A completed longer run can satisfy the same
+version: `just zk-soak-isolated 86400 1729`. A completed longer run can satisfy the same
 minimum; an interrupted run's checkpoints do not substitute for normal completion
 and verified cleanup. Shortening the duration does not resolve retained failures.
 
@@ -29,6 +28,55 @@ must report the exact version, pass authenticated create/read/delete probes,
 and form one leader with two followers. The first observed follower is the
 forwarding target. The workload closes only its own forwarding connection;
 server processes and network interfaces remain running.
+
+## Isolated Linux execution
+
+Run the same checks with proxy listeners confined to an owned Linux network
+namespace:
+
+```sh
+just zk-soak-isolated 120 1729
+ZKLINK_MATRIX_ARTIFACT_ROOT="$PWD/artifacts/soak" just zk-soak-isolated 21600 1729
+```
+
+This command builds with the pinned host SDK, then executes the test DLL in a
+runtime-only .NET image pinned by digest in `dev/dotnet-soak-runtime.env`. The
+container runs as the invoking nonroot user, mounts the compiled tests read-only,
+and writes to the owned evidence directory. It shares the selected follower's
+network namespace and publishes no additional ports. Maintenance connects to the
+observed leader's private address. It has no Docker socket or privileged access.
+Host loopback traffic cannot connect directly to these proxy listeners.
+
+The supervisor records source and binary hashes, runtime platform/image,
+namespace identity, seed, deadlines and cleanup receipts. It observes the driver
+container, all three server containers, host free space and VM storage pressure,
+disk, memory and I/O counters. These observations include fixture and shared-VM
+costs; they are not performance measurements. The runtime resource journal still
+requires zero owned counters, live proxy connections and listeners.
+
+Execution stops on source or binary changes, runtime failure, less than 5 GiB
+host or 2 GiB VM disk space, or an observation gap exceeding 120 seconds in UTC
+or monotonic time. The command wall-time guard allows the requested duration per version plus
+ten minutes of overhead. Failure cleanup has a separate grace period. The driver has a separate guard of the requested duration plus 150 seconds. On macOS an owned `caffeinate` process prevents idle sleep; forced
+sleep or a closed lid can still interrupt continuity. No power or network settings
+are changed. Runs of at least six hours first require a fresh 30-second check on
+each selected version using the same source inputs and runtime pin.
+
+Interrupt with Ctrl-C or send SIGTERM to the supervisor PID recorded in `status.json`. It gives the
+owned runner up to three minutes for authenticated all-node rollback and teardown,
+then forcibly stops a stuck runner and attempts owned emergency teardown. Emergency
+teardown is a failed cleanup result and does not establish authenticated rollback.
+Evidence remains in the printed directory, including `status.json`, `run.json`,
+`resources.jsonl`, the runner log and each version's driver/resource/cleanup files.
+A successful short run is not release qualification; the supervisor always leaves
+`releaseQualified` false pending candidate and failure-disposition review.
+Failed or interrupted runs are retained and never resumed automatically.
+
+For a focused diagnostic, use
+`python3 dev/supervise-zookeeper-soak.py --seconds 30 --server-version 3.9.6`.
+The normal command always checks both versions. The isolated process evidence
+applies to its recorded Linux architecture; it does not establish native macOS
+or Windows process behavior or explain the historical unexpected peer traffic.
 
 ## Workload and recovery
 
@@ -141,8 +189,9 @@ when the test process fails. The printed artifact directory retains exact server
 versions, configuration, SDK/revision, seed, test results, the JSONL resource
 journal, native logs and cleanup results.
 
-The CI selection uses the default two-minute run on both versions. Longer runs
-use the same command and checks. A short passing run provides bounded soak
+CI keeps the native two-minute selection and separately checks 30-second isolated
+workloads, driver termination and supervisor interruption on both versions. Longer
+runs use the same workload checks. A short passing run provides bounded soak
 evidence; the six-hour minimum on each version needs its own completed results.
 
 ## Observed local runs
