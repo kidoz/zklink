@@ -265,6 +265,77 @@ public sealed class FaultProxyTests
         Assert.Null(proxy.RunFailure);
     }
 
+    public static TheoryData<bool, int> TruncatedFrames
+    {
+        get
+        {
+            var cases = new TheoryData<bool, int>();
+            foreach (bool incoming in new[] { false, true })
+            {
+                for (int sentBytes = 1; sentBytes < Frame().Length; sentBytes++)
+                {
+                    cases.Add(incoming, sentBytes);
+                }
+            }
+            return cases;
+        }
+    }
+
+    [Theory(Timeout = TestTimeoutMilliseconds)]
+    [MemberData(nameof(TruncatedFrames))]
+    public async Task TruncatedFrameAfterHandshakeAllowsCleanReconnect(bool incoming, int sentBytes)
+    {
+        var token = TestContext.Current.CancellationToken;
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var proxy = new FaultProxy(
+            $"127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}",
+            false,
+            token
+        );
+        await using var lifetime = proxy.ConfigureAwait(true);
+        var endpoint = new Uri("tcp://" + proxy.Endpoint);
+        var frame = Frame();
+        var received = new byte[frame.Length];
+        using (var client = new TcpClient())
+        {
+            await client.ConnectAsync(endpoint.Host, endpoint.Port, token).ConfigureAwait(true);
+            using var upstream = await listener.AcceptTcpClientAsync(token).ConfigureAwait(true);
+            await client.GetStream().WriteAsync(frame, token).ConfigureAwait(true);
+            await upstream.GetStream().ReadExactlyAsync(received, token).ConfigureAwait(true);
+            Assert.Equal(frame, received);
+            await upstream.GetStream().WriteAsync(frame, token).ConfigureAwait(true);
+            await client.GetStream().ReadExactlyAsync(received, token).ConfigureAwait(true);
+            Assert.Equal(frame, received);
+
+            var sender = incoming ? upstream : client;
+            var receiver = incoming ? client : upstream;
+            await sender
+                .GetStream()
+                .WriteAsync(frame.AsMemory(0, sentBytes), token)
+                .ConfigureAwait(true);
+            sender.Client.Shutdown(SocketShutdown.Send);
+            // The proxy buffers complete frames: no partial prefix or body may escape.
+            Assert.Equal(
+                0,
+                await receiver.GetStream().ReadAsync(new byte[1], token).ConfigureAwait(true)
+            );
+        }
+
+        using var finalClient = new TcpClient();
+        await finalClient.ConnectAsync(endpoint.Host, endpoint.Port, token).ConfigureAwait(true);
+        using var finalUpstream = await listener.AcceptTcpClientAsync(token).ConfigureAwait(true);
+        await finalClient.GetStream().WriteAsync(frame, token).ConfigureAwait(true);
+        await finalUpstream.GetStream().ReadExactlyAsync(received, token).ConfigureAwait(true);
+        Assert.Equal(frame, received);
+        await finalUpstream.GetStream().WriteAsync(frame, token).ConfigureAwait(true);
+        await finalClient.GetStream().ReadExactlyAsync(received, token).ConfigureAwait(true);
+        Assert.Equal(frame, received);
+        Assert.Equal(2, proxy.ConnectionAttempts);
+        Assert.Equal(2, proxy.HandshakeReplies);
+        Assert.Null(proxy.RunFailure);
+    }
+
     private static byte[] Frame()
     {
         var frame = new byte[3 * sizeof(int)];

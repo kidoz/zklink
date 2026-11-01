@@ -10,13 +10,19 @@ Choose the duration in seconds per version and the workload seed:
 
 ```sh
 just zk-soak 30 1730
-just zk-soak 86400 1729
+just zk-soak 21600 1729
 ```
 
 The duration range is 30–86,400 seconds; the seed range is 0–2,147,483,647.
-The longer command requests 24 hours on each version. Setup, the final round and
+The longer command requests six continuous hours on each version, the minimum
+for release qualification. Setup, the final round and
 cleanup add bounded overhead. Use the SDK pinned in `global.json`, Docker with
 Compose, and Python 3. Host Java and Gradle are unnecessary for this command.
+
+For additional confidence, an optional longer run can use up to 24 hours per
+version: `just zk-soak 86400 1729`. A completed longer run can satisfy the same
+minimum; an interrupted run's checkpoints do not substitute for normal completion
+and verified cleanup. Shortening the duration does not resolve retained failures.
 
 Each version gets a fresh disposable, labeled three-voter fixture. All nodes
 must report the exact version, pass authenticated create/read/delete probes,
@@ -48,7 +54,13 @@ pending and a new request must fail `NotSent` while restoration is held. After
 release, the checks require retained session/ephemeral ownership, authentication,
 a reconnect gap, actual one-shot and persistent invalidations, protected reads,
 and no create replay through the recovery endpoint. Acknowledged close must
-remove the ephemeral. Independent control deletes the round's namespace.
+remove the ephemeral. Independent maintenance uses the observed leader and
+acknowledged write fences before checking deletion and before taking the recursive
+cleanup snapshot. This also drains the leader's predicted child counts after
+session close. A follower-applied fence alone is insufficient for that server
+bookkeeping. The fixture records the maintenance role and rejects a changed leader
+at its final role check; the client under test still uses the forwarding follower.
+Cleanup errors remain failures, with no automatic delete retry.
 Initial connection attempts may retry before readiness. Once each forwarding
 endpoint reaches its readiness checkpoint, unexpected additional attempts fail
 the round.
@@ -131,7 +143,7 @@ journal, native logs and cleanup results.
 
 The CI selection uses the default two-minute run on both versions. Longer runs
 use the same command and checks. A short passing run provides bounded soak
-evidence; the 24-hour release requirement needs its own executed results.
+evidence; the six-hour minimum on each version needs its own completed results.
 
 ## Observed local runs
 
@@ -145,13 +157,21 @@ Separate checks confirmed that the observers detect a retained 32 MiB allocation
 and an open owned TCP connection. Deliberate managed-exception and abrupt-process-exit
 runs failed as expected, retained their settings and verified fresh authenticated
 readiness on all three members before fixture removal. These checks provide
-bounded local evidence; a full 24-hour run has not completed.
+bounded local evidence; they do not establish the six-hour release minimum.
 
 On 29 October, the release-duration attempt failed after about two hours on
-3.8.7 with a `SyncAsync` timeout. All three hourly cleanup tasks began within
+3.8.7 with a `DeleteAsync` timeout. All three hourly cleanup tasks began within
 120 ms of each other just before server disk flush stalls of up to 6.7 seconds.
 The historical journal lacks the UTC request observation needed to establish
 causality. Fixture rollback and removal completed.
+
+The original notes called this a sync timeout because the stack names
+`SyncCoreAsync`. That private reply helper also serves deletes; the retained
+call site identifies `DeleteAsync`. Use request operation metadata and the
+matching source line when classifying a timeout. Controlled-peer checks now
+verify delete-specific `Unknown` metadata, retained in-flight capacity, late
+reply draining and no replay. These checks do not establish the historical
+timeout's cause.
 
 Subsequent five-minute seed-1729 workloads passed on both versions. A separate
 90-second workload per version also passed while six 64 MiB scratch files on

@@ -358,7 +358,10 @@ public sealed class SoakTests : IAsyncLifetime
             totals.WatchEvents += 3;
             await owner.CloseAsync(token).ConfigureAwait(true);
             Assert.Equal(ZooKeeperCloseStatus.Acknowledged, owner.Session.CloseStatus);
-            await _fixture.Client.SyncAsync(root, token).ConfigureAwait(true);
+            // The independent leader must apply the close before checking its view.
+            await _fixture
+                .Client.SetDataAsync(_fixture.Root, null, ZNodeVersion.Any, token)
+                .ConfigureAwait(true);
             Assert.Null(await _fixture.Client.ExistsAsync(leasePath, token).ConfigureAwait(true));
         }
         catch (Exception failure)
@@ -410,9 +413,9 @@ public sealed class SoakTests : IAsyncLifetime
                         finally
                         {
                             using var cleanup = new CancellationTokenSource(CleanupGuard);
-                            // The namespace owner and maintenance client can use different
-                            // followers. Establish the maintenance session's view with a
-                            // quorum write before taking its recursive cleanup snapshot.
+                            // The runner binds maintenance to the observed leader. Its
+                            // write acknowledgment also drains the leader's predicted
+                            // child counts before taking the recursive cleanup snapshot.
                             await _fixture
                                 .Client.SetDataAsync(
                                     _fixture.Root,

@@ -163,4 +163,10 @@ disposal.
 `DisposeAsync` always releases local resources and does not require acknowledgment.
 Unacknowledged close does not prove that the server removed ephemerals.
 
+Acknowledgment does not synchronize every other session's read view. An empty
+child-list snapshot also does not guarantee that a subsequent delete will succeed.
+The driver preserves a server `NotEmpty` response as `Rejected`, without an
+automatic delete retry. See Apache's
+[consistency guarantees](https://zookeeper.apache.org/doc/r3.9.6/zookeeperInternals.html).
+
 [Reference](README.md) · [Documentation home](../README.md)
