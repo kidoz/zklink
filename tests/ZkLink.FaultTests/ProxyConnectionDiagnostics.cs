@@ -20,24 +20,26 @@ internal sealed record ProxyConnectionEvent(
     int Attempt,
     ProxyConnectionEventKind Kind,
     bool? Incoming,
-    int? SocketError
+    int? SocketError,
+    ProxyConnectionIdentity? Connection = null
 )
 {
     internal string ToJson() =>
         FormattableString.Invariant(
-            $"{{\"observed_at_utc\":\"{ObservedAtUtc:O}\",\"attempt\":{Attempt},\"kind\":\"{Kind}\",\"incoming\":{(Incoming is null ? "null" : Incoming.Value ? "true" : "false")},\"socket_error\":{(SocketError?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null")}}}"
+            $"{{\"observed_at_utc\":\"{ObservedAtUtc:O}\",\"attempt\":{Attempt},\"kind\":\"{Kind}\",\"incoming\":{(Incoming is null ? "null" : Incoming.Value ? "true" : "false")},\"socket_error\":{(SocketError?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null")},\"connection\":{Connection?.ToJson() ?? "null"}}}"
         );
 }
 
 internal sealed record ProxyConnectionSnapshot(
     int Attempts,
     int DroppedEvents,
-    IReadOnlyList<ProxyConnectionEvent> Events
+    IReadOnlyList<ProxyConnectionEvent> Events,
+    int? ListenerPort = null
 )
 {
     internal string ToJson() =>
         FormattableString.Invariant(
-            $"{{\"attempts\":{Attempts},\"dropped_events\":{DroppedEvents},\"events\":[{string.Join(",", Events.Select(static item => item.ToJson()))}]}}"
+            $"{{\"listener_port\":{ListenerPort?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null"},\"attempts\":{Attempts},\"dropped_events\":{DroppedEvents},\"events\":[{string.Join(",", Events.Select(static item => item.ToJson()))}]}}"
         );
 }
 

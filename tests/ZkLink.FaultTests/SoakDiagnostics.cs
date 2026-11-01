@@ -78,12 +78,14 @@ internal sealed record FaultProxyFrameFailure(
     int ConnectionAttempt,
     long FrameNumber,
     int Length,
-    int MaximumLength
+    int MaximumLength,
+    ProxyConnectionIdentity? Connection = null,
+    LoopbackPeerAttribution? PeerAttribution = null
 )
 {
     internal string ToJson() =>
         FormattableString.Invariant(
-            $"{{\"observed_at_utc\":\"{ObservedAtUtc:O}\",\"direction\":\"{(Incoming ? "incoming" : "outgoing")}\",\"handshake\":{(Handshake ? "true" : "false")},\"connection_attempt\":{ConnectionAttempt},\"frame_number\":{FrameNumber},\"length\":{Length},\"maximum_length\":{MaximumLength}}}"
+            $"{{\"observed_at_utc\":\"{ObservedAtUtc:O}\",\"direction\":\"{(Incoming ? "incoming" : "outgoing")}\",\"handshake\":{(Handshake ? "true" : "false")},\"connection_attempt\":{ConnectionAttempt},\"frame_number\":{FrameNumber},\"length\":{Length},\"maximum_length\":{MaximumLength},\"connection\":{Connection?.ToJson() ?? "null"},\"peer_attribution\":{PeerAttribution?.ToJson() ?? "null"}}}"
         );
 }
 

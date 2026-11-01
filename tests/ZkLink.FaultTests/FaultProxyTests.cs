@@ -184,6 +184,10 @@ public sealed class FaultProxyTests
         using var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         Exception? failure = null;
+        int listenerPort = 0;
+        int peerPort = 0;
+        int upstreamPort = 0;
+        int targetPort = ((IPEndPoint)listener.LocalEndpoint).Port;
         var before = DateTimeOffset.UtcNow;
         var observedBy = before;
         try
@@ -196,8 +200,11 @@ public sealed class FaultProxyTests
             await using var lifetime = proxy.ConfigureAwait(true);
             using var client = new TcpClient();
             var endpoint = new Uri("tcp://" + proxy.Endpoint);
+            listenerPort = endpoint.Port;
             await client.ConnectAsync(endpoint.Host, endpoint.Port, token).ConfigureAwait(true);
+            peerPort = ((IPEndPoint)client.Client.LocalEndPoint!).Port;
             using var upstream = await listener.AcceptTcpClientAsync(token).ConfigureAwait(true);
+            upstreamPort = ((IPEndPoint)upstream.Client.RemoteEndPoint!).Port;
             var sender = incoming ? upstream.GetStream() : client.GetStream();
             var receiver = incoming ? client.GetStream() : upstream.GetStream();
             if (!handshake)
@@ -229,6 +236,27 @@ public sealed class FaultProxyTests
         Assert.Equal(handshake ? 1 : 2, detail.FrameNumber);
         Assert.Equal(length, detail.Length);
         Assert.Equal(FaultProxy.MaximumFrameBytes, detail.MaximumLength);
+        var identity = Assert.IsType<ProxyConnectionIdentity>(detail.Connection);
+        Assert.Equal(listenerPort, identity.ListenerPort);
+        Assert.Equal(peerPort, identity.PeerPort);
+        Assert.Equal(upstreamPort, identity.UpstreamLocalPort);
+        Assert.Equal(targetPort, identity.TargetPort);
+        if (!incoming)
+        {
+            var attribution = Assert.IsType<LoopbackPeerAttribution>(detail.PeerAttribution);
+            if (LoopbackPeerAttribution.Supported)
+            {
+                Assert.Equal(PeerAttributionStatus.Found, attribution.Status);
+                Assert.Contains(
+                    attribution.Processes,
+                    process => process.Id == Environment.ProcessId
+                );
+            }
+            else
+            {
+                Assert.Equal(PeerAttributionStatus.Unsupported, attribution.Status);
+            }
+        }
     }
 
     [Theory(Timeout = TestTimeoutMilliseconds)]

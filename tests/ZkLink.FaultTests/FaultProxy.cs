@@ -23,6 +23,8 @@ internal sealed class FaultProxy : IAsyncDisposable
     private static readonly TimeSpan LifetimeGuard = TimeSpan.FromSeconds(75);
     private readonly object _gate = new();
     private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
+    private readonly int _listenerPort;
+    private ProxyConnectionIdentity? _connectionIdentity;
     private readonly CancellationTokenSource _stop;
     private readonly Uri _target;
     private readonly bool _holdRestore;
@@ -120,7 +122,8 @@ internal sealed class FaultProxy : IAsyncDisposable
         _stop = CancellationTokenSource.CreateLinkedTokenSource(token);
         _stop.CancelAfter(LifetimeGuard);
         _listener.Start(1);
-        Endpoint = $"127.0.0.1:{((IPEndPoint)_listener.LocalEndpoint).Port}";
+        _listenerPort = ((IPEndPoint)_listener.LocalEndpoint).Port;
+        Endpoint = $"127.0.0.1:{_listenerPort}";
         _run = RunAsync();
     }
 
@@ -128,7 +131,12 @@ internal sealed class FaultProxy : IAsyncDisposable
     {
         lock (_gate)
         {
-            return new(ConnectionAttempts, _droppedConnectionEvents, _connectionEvents.ToArray());
+            return new(
+                ConnectionAttempts,
+                _droppedConnectionEvents,
+                _connectionEvents.ToArray(),
+                _listenerPort
+            );
         }
     }
 
@@ -152,7 +160,14 @@ internal sealed class FaultProxy : IAsyncDisposable
                 _droppedConnectionEvents++;
             }
             _connectionEvents.Enqueue(
-                new(DateTimeOffset.UtcNow, ConnectionAttempts, kind, incoming, socketError)
+                new(
+                    DateTimeOffset.UtcNow,
+                    ConnectionAttempts,
+                    kind,
+                    incoming,
+                    socketError,
+                    _connectionIdentity
+                )
             );
         }
     }
@@ -227,6 +242,16 @@ internal sealed class FaultProxy : IAsyncDisposable
                     .ConfigureAwait(false);
                 using var upstream = new TcpClient();
                 Interlocked.Increment(ref _connectionAttempts);
+                var identity = new ProxyConnectionIdentity(
+                    _listenerPort,
+                    ((IPEndPoint)client.Client.RemoteEndPoint!).Port,
+                    null,
+                    _target.Port
+                );
+                lock (_gate)
+                {
+                    _connectionIdentity = identity;
+                }
                 RecordConnection(ProxyConnectionEventKind.Accepted);
                 NetworkStream downstreamStream;
                 NetworkStream upstreamStream;
@@ -235,7 +260,6 @@ internal sealed class FaultProxy : IAsyncDisposable
                     await upstream
                         .ConnectAsync(_target.Host, _target.Port, _stop.Token)
                         .ConfigureAwait(false);
-                    RecordConnection(ProxyConnectionEventKind.UpstreamConnected);
                     client.NoDelay = true;
                     upstream.NoDelay = true;
                     // Capture both streams before forwarding can observe EOF or
@@ -243,10 +267,14 @@ internal sealed class FaultProxy : IAsyncDisposable
                     // Connected even when it has already created a stream.
                     downstreamStream = client.GetStream();
                     upstreamStream = upstream.GetStream();
-                    Volatile.Write(
-                        ref _upstreamLocalPort,
-                        ((IPEndPoint)upstream.Client.LocalEndPoint!).Port
-                    );
+                    int upstreamPort = ((IPEndPoint)upstream.Client.LocalEndPoint!).Port;
+                    Volatile.Write(ref _upstreamLocalPort, upstreamPort);
+                    identity = identity with { UpstreamLocalPort = upstreamPort };
+                    lock (_gate)
+                    {
+                        _connectionIdentity = identity;
+                    }
+                    RecordConnection(ProxyConnectionEventKind.UpstreamConnected);
                 }
                 catch (SocketException failure)
                 {
@@ -270,7 +298,7 @@ internal sealed class FaultProxy : IAsyncDisposable
                 }
                 try
                 {
-                    await ForwardConnectionAsync(downstreamStream, upstreamStream)
+                    await ForwardConnectionAsync(downstreamStream, upstreamStream, identity)
                         .ConfigureAwait(false);
                 }
                 finally
@@ -294,11 +322,15 @@ internal sealed class FaultProxy : IAsyncDisposable
         }
     }
 
-    private async Task ForwardConnectionAsync(Stream downstream, Stream upstream)
+    private async Task ForwardConnectionAsync(
+        Stream downstream,
+        Stream upstream,
+        ProxyConnectionIdentity identity
+    )
     {
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
-        var outgoing = ForwardAsync(downstream, upstream, false, lifetime.Token);
-        var incoming = ForwardAsync(upstream, downstream, true, lifetime.Token);
+        var outgoing = ForwardAsync(downstream, upstream, false, identity, lifetime.Token);
+        var incoming = ForwardAsync(upstream, downstream, true, identity, lifetime.Token);
         try
         {
             await Task.WhenAny(outgoing, incoming).ConfigureAwait(false);
@@ -314,6 +346,7 @@ internal sealed class FaultProxy : IAsyncDisposable
         Stream source,
         Stream destination,
         bool incoming,
+        ProxyConnectionIdentity identity,
         CancellationToken token
     )
     {
@@ -340,14 +373,22 @@ internal sealed class FaultProxy : IAsyncDisposable
                 if (length is <= 0 or > MaximumFrameBytes)
                 {
                     var failure = new InvalidDataException("Fault proxy frame bound exceeded.");
+                    var observedAtUtc = DateTimeOffset.UtcNow;
+                    LoopbackPeerAttribution? attribution = incoming
+                        ? null
+                        : await LoopbackPeerAttribution
+                            .CaptureAsync(identity, token)
+                            .ConfigureAwait(false);
                     failure.Data[typeof(FaultProxyFrameFailure)] = new FaultProxyFrameFailure(
-                        DateTimeOffset.UtcNow,
+                        observedAtUtc,
                         incoming,
                         handshake,
                         connectionAttempt,
                         frameNumber,
                         length,
-                        MaximumFrameBytes
+                        MaximumFrameBytes,
+                        identity,
+                        attribution
                     );
                     throw failure;
                 }
