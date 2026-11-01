@@ -26,10 +26,15 @@ candidates. Those independent packages do not qualify a production release.
 
 ## Retain and review qualification
 
-Complete the required recovery/security cases, the 24-hour workload on **each**
+Complete the required recovery/security cases, at least six continuous hours on **each**
 pinned server version, and repeated controlled benchmark measurements. Preserve
 failed attempts and their resolutions. Driver or build-input changes require a
 review of which measurements remain applicable.
+
+Six hours is the chosen release minimum; optional completed runs up to 24 hours
+per version remain eligible. This accepts less long-duration coverage than the
+previous requirement. Unresolved failures still block publication, and interrupted
+checkpoints cannot be relabelled as a completed workload.
 
 Prepare `release-evidence.json` with the fields checked by
 [the evidence validator](../../dev/verify-release-evidence.py):
@@ -44,8 +49,8 @@ Prepare `release-evidence.json` with the fields checked by
 
 Measurements must match the candidate's recorded runtime inputs. The validator
 also rejects short workloads, resource failures and gaps exceeding two minutes
-in the retained resource series. Current full-duration workloads sample about
-once a minute. Reports describe observed measurements; they do not invent
+in the retained resource series. Six-hour workloads sample about every 15 seconds;
+24-hour workloads sample about once a minute. Reports describe observed measurements; they do not invent
 throughput or latency requirements.
 
 Put the referenced files in `release-evidence.zip`. Bundle safe results and

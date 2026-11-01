@@ -59,21 +59,25 @@ class ReleaseEvidenceTests(unittest.TestCase):
                                                             runner_settings="review.txt", raw_results="review.txt", baseline_diff="review.txt")
                                                         for suite in gate.BENCHMARK_SUITES]}
         for version in gate.SERVER_VERSIONS:
-            start = datetime.datetime(2026, 10, 31, tzinfo=datetime.timezone.utc)
-            rows = []
-            for index in range(721):
-                elapsed = index * gate.MAXIMUM_SAMPLE_GAP_MILLISECONDS
-                rows.append({"kind": "baseline" if index == 0 else "summary" if index == 720 else "checkpoint",
-                             "reported_at_utc": (start + datetime.timedelta(milliseconds=elapsed)).isoformat(),
-                             "elapsed_ms": elapsed, "duration_seconds": gate.SOAK_SECONDS, "seed": 1729,
-                             "rounds": index + 5, "crud_started": (index + 5) * 2, "crud_succeeded": (index + 5) * 2,
-                             "canceled_not_sent": index + 5, "canceled_unknown": index + 5, "reconnects": index + 5,
-                             "owned_counters": 0, "owned_live_tcp": 0, "owned_listeners": 0,
-                             "retained_heap_bytes": 1000, "heap_growth_limit_bytes": 16 * 1024 * 1024,
-                             "threads": 1, "thread_growth_limit": 32})
             name = version + ".jsonl"
-            self.proof(name, "\n".join(map(json.dumps, rows)) + "\n")
+            self.soak_series(name, gate.MINIMUM_SOAK_SECONDS)
             self.record["soak"].append(checked(version=version, cleanup_verified=True, series=name))
+
+    def soak_series(self, name, duration):
+        start = datetime.datetime(2026, 10, 31, tzinfo=datetime.timezone.utc)
+        final_elapsed = duration * gate.MILLISECONDS_PER_SECOND
+        samples = [*range(0, final_elapsed, gate.MAXIMUM_SAMPLE_GAP_MILLISECONDS), final_elapsed]
+        rows = []
+        for index, elapsed in enumerate(samples):
+            rows.append({"kind": "baseline" if index == 0 else "summary" if elapsed == final_elapsed else "checkpoint",
+                         "reported_at_utc": (start + datetime.timedelta(milliseconds=elapsed)).isoformat(),
+                         "elapsed_ms": elapsed, "duration_seconds": duration, "seed": 1729,
+                         "rounds": index + 5, "crud_started": (index + 5) * 2, "crud_succeeded": (index + 5) * 2,
+                         "canceled_not_sent": index + 5, "canceled_unknown": index + 5, "reconnects": index + 5,
+                         "owned_counters": 0, "owned_live_tcp": 0, "owned_listeners": 0,
+                         "retained_heap_bytes": 1000, "heap_growth_limit_bytes": 16 * 1024 * 1024,
+                         "threads": 1, "thread_growth_limit": 32})
+        self.proof(name, "\n".join(map(json.dumps, rows)) + "\n")
 
     def proof(self, name, text):
         (self.bundle / name).write_text(text)
@@ -85,6 +89,34 @@ class ReleaseEvidenceTests(unittest.TestCase):
 
     def test_complete_synthetic_bundle_exercises_the_acceptance_path(self):
         self.assertEqual(self.verify()["candidate_manifest_sha256"], self.candidate_hash)
+
+    def test_longer_completed_soaks_remain_eligible(self):
+        for entry in self.record["soak"]:
+            self.soak_series(entry["series"], gate.MAXIMUM_SOAK_SECONDS)
+        self.assertEqual(self.verify()["candidate_manifest_sha256"], self.candidate_hash)
+
+    def test_one_second_below_minimum_is_rejected(self):
+        self.soak_series(self.record["soak"][0]["series"], gate.MINIMUM_SOAK_SECONDS - 1)
+        with self.assertRaisesRegex(ValueError, "Short or unsupported soak duration"):
+            self.verify()
+
+    def test_declaring_a_longer_duration_does_not_extend_measured_coverage(self):
+        name = self.record["soak"][0]["series"]
+        rows = [json.loads(line) for line in (self.bundle / name).read_text().splitlines()]
+        for row in rows:
+            row["duration_seconds"] = gate.MAXIMUM_SOAK_SECONDS
+        self.proof(name, "\n".join(map(json.dumps, rows)) + "\n")
+        with self.assertRaisesRegex(ValueError, "Short or unsupported soak duration"):
+            self.verify()
+
+    def test_interrupted_longer_run_does_not_qualify_from_checkpoints_alone(self):
+        name = self.record["soak"][0]["series"]
+        self.soak_series(name, gate.MAXIMUM_SOAK_SECONDS)
+        minimum_elapsed = gate.MINIMUM_SOAK_SECONDS * gate.MILLISECONDS_PER_SECOND
+        rows = [json.loads(line) for line in (self.bundle / name).read_text().splitlines()]
+        self.proof(name, "\n".join(json.dumps(row) for row in rows if row["elapsed_ms"] <= minimum_elapsed) + "\n")
+        with self.assertRaisesRegex(ValueError, "Incomplete soak resource series"):
+            self.verify()
 
     def test_missing_platform_and_unverified_native_behavior_are_rejected(self):
         self.record["native"].pop()
@@ -121,9 +153,9 @@ class ReleaseEvidenceTests(unittest.TestCase):
         original = list(rows)
         rows[-1]["duration_seconds"] = 120
         self.proof(name, "\n".join(map(json.dumps, rows)) + "\n")
-        with self.assertRaisesRegex(ValueError, "Short soak"):
+        with self.assertRaisesRegex(ValueError, "Short or unsupported soak"):
             self.verify()
-        original[-1]["duration_seconds"] = gate.SOAK_SECONDS
+        original[-1]["duration_seconds"] = gate.MINIMUM_SOAK_SECONDS
         self.proof(name, "\n".join(map(json.dumps, [original[0], original[-1]])) + "\n")
         with self.assertRaisesRegex(ValueError, "unobserved interval"):
             self.verify()

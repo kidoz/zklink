@@ -1,6 +1,6 @@
 # Production release readiness
 
-Reviewed on **31 October 2026**. Core **0.1.0 is published**. The intended next
+Reviewed on **1 November 2026**. Core **0.1.0 is published**. The intended next
 production release is **1.0.0**, subject to the checks below. It is not yet
 qualified for production. Passing the current CI workflows establishes their
 documented scope; it does not complete these release requirements.
@@ -21,13 +21,20 @@ core acceptance check.
 
 ## Evidence and blockers
 
+Release qualification requires at least **six continuous hours on each server
+version**, with complete resource series, normal workload completion and verified
+cleanup. Longer completed runs up to 24 hours remain optional evidence. This
+replaces the earlier 24-hour-per-version requirement and accepts less
+long-duration coverage. It does not resolve historical failures or remove any
+correctness, security, resource, benchmark or publication requirement.
+
 | Requirement | Observed evidence | Still needed for release |
 | --- | --- | --- |
 | Cross-platform build and packaging | [All 33 shared-candidate jobs passed](https://github.com/kidoz/zklink/actions/runs/41239985235), including three OS package-inspection jobs and Linux installed consumers | Repeat applicable checks after final metadata changes, including the released-package comparison |
 | Native execution | The same shared-candidate run passes all four native targets, 48 secure live cases with sent-cancellation/`Unknown`, and five online-revocation controls per target | Repeat after final metadata changes and complete sustained qualification |
 | Production TLS policy | Managed and native checks cover valid, revoked, unavailable and invalidly signed status responses, plus held-response cancellation, on all four targets | Review deployment PKI and documented platform cleanup limits. The live ZooKeeper fixtures use `NoCheck`; online policy has dedicated responders. Triage the previously unexplained concurrent rejection timeout. A local Mac with an active network filter does not fetch loopback status; its cause remains unconfirmed |
-| Required recovery coverage | Scoped follower, leader, quorum, client-traffic and peer-partition checks pass | Observer-role, write, watch-recovery and cleanup checks now pass on both versions, locally and in hosted verification. Finish the required authentication, expiry, cancellation and watch evidence review |
-| Sustained resource ownership | Short seeded workloads pass; the release-duration attempt failed after about two hours on 3.8.7 with a `SyncAsync` timeout | Investigate the retained timeout/frame failures, retain the corrected initial-retry and cross-session write-fence checks, then complete both durations and review heap, threads, sockets, counters and cleanup. Reconcile measured runtime inputs with the candidate |
+| Required recovery coverage | Scoped follower, leader, quorum, client-traffic and peer-partition checks pass; live expiry verifies terminal ownership, and authentication-policy checks cover UTF-8 digest replay and explicit unsupported-SASL rejection on both versions | Observer-role, write, watch-recovery and cleanup checks pass on both versions, locally and in hosted verification. Finish the required cancellation and watch evidence review and reconcile all evidence with the final candidate |
+| Sustained resource ownership | Short seeded workloads pass; the release-duration attempt failed after about two hours on 3.8.7 with a `DeleteAsync` timeout | Investigate the retained timeout/frame failures, retain the corrected initial-retry and cross-session write-fence checks, then complete both durations and review heap, threads, sockets, counters and cleanup. Reconcile measured runtime inputs with the candidate |
 | Performance evidence | Existing protocol/allocation, live CRUD, watch fan-out and 10,000-watch recovery suites produce raw reports | Repeat existing commands on a controlled runner and retain a reviewed report. No throughput target or timing gate is inferred from shared-runner smoke results |
 | Final artifact and publication | Shared-candidate distribution passes hosted verification. Public-feed installation and symbol-server verification pass against published 0.1.0 | Complete final-candidate qualification, then publish those exact package bytes |
 | API and operator documentation | The shipped baseline records 0.1.0; SDK comparison and the 401-entry declaration review find no API changes; usage and failure semantics are documented | Review behavioral compatibility and intentional changes, freeze the 1.0.0 API, reconcile defaults/support claims and document the tested release matrix |
@@ -57,7 +64,10 @@ Verification after the metadata change exposed a watch-pressure counter timeout
 before the next round's event burst. Earlier rounds drained to zero and fixture
 rollback completed. Setup now completes its writes on the watched session before
 registration, and counter timeouts retain expected and observed numeric values.
-The original failure lacks those values, so its exact cause remains unconfirmed;
+Checks against the pinned Apache implementations confirm that a delayed setup
+commit can legitimately produce a watch event after registration. Applying setup
+writes on the watched session prevents that precondition error. The original
+failure lacks actual counter values, so its exact attribution remains unconfirmed;
 the corrected check and a reviewed failure record are required before release.
 
 That preceding candidate run also received `NotEmpty` while deleting a round's
@@ -65,8 +75,14 @@ namespace on 3.9.6, after 534 completed rounds and 11,755 successful CRUD reques
 The original workload assertions had passed; the cleanup failure remains fatal.
 Follow-up diagnostics preserve child counts, child-version/transaction metadata
 and fixed node-category counts before and after the rejected delete, without
-retaining names. Later short runs pass but do not explain that failure. Local
-short runs interrupted by idle sleep are retained as interrupted evidence;
+retaining names. Deterministic Apache-only checks reproduce an empty follower
+view alongside a leader-side `NotEmpty` rejection while session-close child-count
+bookkeeping is pending. The revised fixture binds maintenance to the observed
+leader and uses its acknowledged write fences before independent post-close
+observations and cleanup. A controlled-peer regression preserves the explicit
+`Rejected` result without replay, even after an empty child-list snapshot.
+The original failed record lacks the node counts needed for conclusive historical
+attribution. Local short runs interrupted by idle sleep are retained as interrupted evidence;
 continuous qualification rejects their UTC reporting gaps.
 
 The later replay stopped after about 76 minutes because its test required

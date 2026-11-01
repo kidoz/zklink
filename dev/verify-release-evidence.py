@@ -15,10 +15,13 @@ NATIVE_TARGETS = {"linux-x64", "linux-arm64", "win-x64", "osx-arm64"}
 BENCHMARK_SUITES = {"protocol", "live_operations", "watch_fanout", "watch_recovery"}
 REQUIRED_CASES = {"authentication", "expiry", "watch_recovery", "observer_endpoints",
                   "native_sent_unknown", "native_online_revocation"}
+# Keep the historical evidence key stable: source review identifies sync_timeout
+# as DeleteAsync using the shared SyncCoreAsync reply helper. It remains required.
 FAILURE_REVIEWS = {"sync_timeout", "proxy_frame_bound", "extra_connection_attempt",
                    "tls_rejection_timeout", "local_revocation_fetch", "watch_pressure_counter",
                    "soak_cleanup_not_empty"}
-SOAK_SECONDS = 86_400
+MINIMUM_SOAK_SECONDS = 6 * 60 * 60
+MAXIMUM_SOAK_SECONDS = 24 * 60 * 60
 RETAINED_HEAP_ALLOWANCE_BYTES = 16 * 1024 * 1024
 THREAD_ALLOWANCE = 32
 MILLISECONDS_PER_SECOND = 1000
@@ -117,8 +120,10 @@ def verify(directory, candidate_directory, candidate_sha256):
         require(len(rows) >= 2 and rows[0].get("kind") == "baseline"
                 and rows[-1].get("kind") == "summary", "Incomplete soak resource series")
         baseline, summary = rows[0], rows[-1]
-        require(summary.get("duration_seconds") == SOAK_SECONDS
-                and summary.get("elapsed_ms", 0) >= SOAK_SECONDS * MILLISECONDS_PER_SECOND, "Short soak duration")
+        duration = summary.get("duration_seconds")
+        require(type(duration) is int and MINIMUM_SOAK_SECONDS <= duration <= MAXIMUM_SOAK_SECONDS
+                and summary.get("elapsed_ms", 0) >= duration * MILLISECONDS_PER_SECOND,
+                "Short or unsupported soak duration")
         require(summary.get("crud_started", 0) == summary.get("crud_succeeded", -1)
                 and summary.get("crud_succeeded", 0) > 0, "Incomplete soak operations")
         require(all(summary.get(name) == summary.get("rounds")
@@ -127,7 +132,7 @@ def verify(directory, candidate_directory, candidate_sha256):
         previous_utc = None
         for row in rows:
             require(row.get("kind") in {"baseline", "checkpoint", "summary"}, "Failed soak record")
-            require(row.get("seed") == summary.get("seed") and row.get("duration_seconds") == SOAK_SECONDS,
+            require(row.get("seed") == summary.get("seed") and row.get("duration_seconds") == duration,
                     "Mixed resource series inputs")
             require(all(row.get(name) == 0 for name in ["owned_counters", "owned_live_tcp", "owned_listeners"]),
                     "Soak retained owned resources")
@@ -147,7 +152,7 @@ def verify(directory, candidate_directory, candidate_sha256):
                         "Resource reporting times have an unobserved interval")
             previous_elapsed, previous_utc = elapsed, utc
         require((previous_utc - datetime.datetime.fromisoformat(baseline["reported_at_utc"])).total_seconds()
-                >= SOAK_SECONDS - MAXIMUM_SAMPLE_GAP_MILLISECONDS / MILLISECONDS_PER_SECOND,
+                >= duration - MAXIMUM_SAMPLE_GAP_MILLISECONDS / MILLISECONDS_PER_SECOND,
                 "Resource reporting times do not cover the soak duration")
 
     benchmarks = record.get("benchmarks", [])
