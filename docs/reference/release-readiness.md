@@ -32,9 +32,9 @@ correctness, security, resource, benchmark or publication requirement.
 | --- | --- | --- |
 | Cross-platform build and packaging | [All 33 shared-candidate jobs passed](https://github.com/kidoz/zklink/actions/runs/41239985235), including three OS package-inspection jobs and Linux installed consumers | Repeat applicable checks after final metadata changes, including the released-package comparison |
 | Native execution | The same shared-candidate run passes all four native targets, 48 secure live cases with sent-cancellation/`Unknown`, and five online-revocation controls per target | Repeat after final metadata changes and complete sustained qualification |
-| Production TLS policy | Managed and native checks cover valid, revoked, unavailable and invalidly signed status responses, plus held-response cancellation, on all four targets | Review deployment PKI and documented platform cleanup limits. The live ZooKeeper fixtures use `NoCheck`; online policy has dedicated responders. Triage the previously unexplained concurrent rejection timeout. A local Mac with an active network filter does not fetch loopback status; its cause remains unconfirmed |
+| Production TLS policy | Managed and native checks cover valid, revoked, unavailable and invalidly signed status responses, plus held-response cancellation, on all four targets | Review deployment PKI and documented platform cleanup limits. The live ZooKeeper fixtures use `NoCheck`; online policy has dedicated responders. Review the disposition of the unexplained concurrent rejection timeout; bounded investigations pass without identifying its cause. A local Mac with an active network filter does not fetch loopback status; its cause remains unconfirmed |
 | Required recovery coverage | Scoped follower, leader, quorum, client-traffic and peer-partition checks pass; live expiry/authentication checks cover both versions. Reviewed cancellation/watch evidence includes 194 controlled cases per managed target and 48 matching-candidate secure native cases | Reconcile the completed recovery reviews with final release evidence. Historical failure disposition, sustained qualification and controlled measurements remain required |
-| Sustained resource ownership | Short seeded workloads pass; the release-duration attempt failed after about two hours on 3.8.7 with a `DeleteAsync` timeout | Investigate the retained timeout/frame failures, retain the corrected initial-retry and cross-session write-fence checks, then complete both durations and review heap, threads, sockets, counters and cleanup. Reconcile measured runtime inputs with the candidate |
+| Sustained resource ownership | The latest 3.8.7 workload completed six hours; 3.9.6 failed after about 90 minutes waiting for watch restoration, with a proxy framing error. The older two-hour `DeleteAsync` timeout remains unresolved | Investigate the retained timeout/frame failures, retain the corrected initial-retry and cross-session write-fence checks, then complete both durations and review heap, threads, sockets, counters and cleanup. Reconcile measured runtime inputs with the candidate |
 | Performance evidence | Existing protocol/allocation, live CRUD, watch fan-out and 10,000-watch recovery suites produce raw reports | Repeat existing commands on a controlled runner and retain a reviewed report. No throughput target or timing gate is inferred from shared-runner smoke results |
 | Final artifact and publication | Shared-candidate distribution passes hosted verification. Public-feed installation and symbol-server verification pass against published 0.1.0 | Complete final-candidate qualification, then publish those exact package bytes |
 | API and operator documentation | The shipped baseline records 0.1.0; SDK comparison and the 401-entry declaration review find no API changes; usage and failure semantics are documented | Review behavioral compatibility and intentional changes, freeze the 1.0.0 API, reconcile defaults/support claims and document the tested release matrix |
@@ -58,6 +58,53 @@ explicit uncertain outcomes and ordered late-reply recovery without replay.
 [Hosted verification passed](https://github.com/kidoz/zklink/actions/runs/41293302220)
 on all four managed targets and both pinned server versions. These bounded
 experiments do not establish the cause of either historical failure.
+
+The concurrent TLS check now retains bounded per-connection handshake timing,
+individual certificate-import progress and safe failure classifications. Each
+rejection burst also opens a fresh valid connection and verifies that its client
+connections drain back to the existing control. Functional and concurrent
+matrices pass on macOS and Linux; transport/trace checks pass on all four managed
+targets in [hosted verification](https://github.com/kidoz/zklink/actions/runs/41309147708).
+Current-environment controls with the original class overlap, connection budgets
+and an earlier TLS connector also pass. The original temporary logs are
+unavailable, so the historical timeout remains unexplained and requires explicit
+release review.
+
+The latest sustained attempt is now **failed**. Its 3.9.6 recovery proxy rejected
+its first client frame before the source connection reached readiness; the
+retained prefix is consistent with a TLS handshake record arriving at the
+plaintext listener. This is an inference from four bytes, not a complete decoded
+handshake or sender attribution. The restore wait then expired, and disposal
+surfaced the framing error. All 468,251 CRUD operations had succeeded. Three-node
+authenticated rollback and owned teardown completed. Preserve the six-hour 3.8.7
+summary and both failure records; the whole attempt does not qualify the release.
+Investigate the unexpected peer traffic before another full run. No automatic
+restart or host-network-policy change has been made.
+
+Follow-up diagnostics now retain the listener, peer and upstream ports and can
+query the live peer's PID and process name on macOS/Linux when `lsof` is available.
+Other platforms and unavailable lookups report their status explicitly. The lookup
+does not collect arguments, environments or packet bodies, and malformed frames
+remain fatal. Controlled TLS contamination and failure-evidence checks pass on
+all four managed targets in [hosted verification](https://github.com/kidoz/zklink/actions/runs/41323430531).
+The original sender has not been identified. A bounded loopback probe did not
+reproduce unsolicited traffic. The maintained `just zk-soak-isolated` command now
+keeps proxy ports inside an owned follower network namespace, with a pinned Linux
+runtime, source/binary integrity checks, continuous resource observations and
+bounded owned cleanup. Native and isolated short workloads and all four probes for driver termination
+or supervisor interruption pass on both server versions locally and in
+[Linux CI](https://github.com/kidoz/zklink/actions/runs/41332643283).
+The isolated process evidence covers Linux x64/arm64; it does not explain the old
+sender or qualify native macOS/Windows resource behavior. A fresh supervised
+six-hour run on each patch, candidate reconciliation and explicit historical
+failure review remain required. No full-duration restart or benchmark run was
+performed during this runner verification.
+
+On 1 November, a fresh supervised isolated attempt started after short checks
+passed on both patches. It requests six continuous hours per patch using frozen
+inputs that match the verified runner and candidate core sources. Full completion,
+cleanup, resource trends and applicability to the candidate still require review;
+the launch does not waive the retained failures or qualify the release.
 
 The release-candidate workflow now distributes one package/symbol bundle to
 managed and native consumers. Publication downloads those qualified bytes,
