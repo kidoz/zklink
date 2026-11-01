@@ -128,6 +128,12 @@ A late success, including `Exists/NoNode`, suppresses orphan delivery and schedu
 cleanup unless another handle needs the registration. Failed reads install no
 successful local subscription. Application operations are never replayed.
 
+A cancelled registration sharing a server watch must leave the older handle
+usable. Controlled checks cover late success, missing-node existence watches
+and late rejection, including data/existence sharing and both persistent modes
+under each compatibility profile. The surviving handle receives its event once;
+final removal uses the profile's required category and releases reserved capacity.
+
 Same-session recovery authenticates first, restores acknowledged watches, and
 waits for all reset acknowledgments before publishing readiness. Restoration
 uses one captured ordinary-reply zxid across bounded data/existence/children
@@ -186,8 +192,8 @@ explicit reconnect gaps after missed create/delete intervals. Run `just zk-opera
 every node. Additional live checks drop a server-applied reset acknowledgment,
 verify admission stays closed, resume the same session with one gap, and exercise
 local loss after a paused reconnect. Controlled peers cover multi-batch failure,
-reset rejection, stale generations and terminal expiry/authentication. Broader
-quorum faults and release/AOT qualification remain open. The separate
+reset rejection, stale generations and terminal expiry/authentication. Sustained
+release qualification remains open. The separate
 [security matrix](../how-to/verify-secure-connections.md) checks selected one-shot
 and persistent restoration over end-to-end client TLS/mTLS on both versions.
 
@@ -195,5 +201,12 @@ and persistent restoration over end-to-end client TLS/mTLS on both versions.
 consumers, explicit shared-buffer overflow, buffered event order and repeated
 capacity/counter cleanup on both pinned versions. The bounded workload includes
 actual heartbeat acknowledgments and unread-handle disposal.
+
+The [reviewed cancellation/watch run](https://github.com/kidoz/zklink/actions/runs/41288720068)
+passes 194 controlled cases on each of four managed targets, including 32 cases
+for cancelled shared registrations. Retained matching-candidate native evidence
+also covers 48 secure watch/cancellation cases across both server versions and
+all four native targets. These results do not resolve historical failures or
+replace completed soak and controlled benchmark evidence.
 
 [Reference](README.md) · [Documentation home](../README.md)
