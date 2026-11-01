@@ -69,6 +69,53 @@ fixture verifies client TLS, without qualifying quorum TLS, revocation services,
 certificate rotation, SASL, Native AOT or production security. Remote CI and
 other client operating systems require their own observed results.
 
+## Required authentication policies
+
+Run the separate authentication checks with:
+
+```sh
+just zk-authentication
+```
+
+This command needs the pinned .NET SDK, Docker with Compose and Python 3. It
+starts separate digest-required and SASL-required three-node fixtures for both
+ZooKeeper versions. Every member must pass authenticated Java create/read/delete
+readiness, and its version and leader/follower role are recorded.
+
+Digest checks use two generated UTF-8 credentials, verify both identities in
+creator ACLs, and read the protected node with each identity separately.
+Reconnect must replay both credentials before protected watch restoration and
+readiness. A wrong password produces per-operation `NoAuth`; the session remains
+usable. A client without the required authentication becomes terminal `AuthFailed`.
+
+SASL remains unsupported by ZkLink. ZooKeeper accepts the connection handshake
+and digest authentication packets before enforcing its required scheme on an
+application operation. The checks require that operation to fail with
+`Rejected` and `SessionClosedRequiresSaslAuth`, followed by terminal `AuthFailed`,
+closed admission and no automatic replacement. The same server error code also
+applies to an unauthenticated client on a digest-required server; its legacy
+name does not identify the configured scheme.
+
+The Java positive control uses a private SASL DIGEST-MD5 login. This disposable
+SASL fixture explicitly disables ZooKeeper's FIPS compatibility mode on its
+servers and Java clients because that mode disables the legacy mechanism.
+Digest fixtures retain each server version's default. See the
+[ZooKeeper authentication and FIPS settings](https://zookeeper.apache.org/doc/r3.9.6/zookeeperAdmin.html).
+These fixtures verify managed digest behavior and rejection of unsupported
+authentication; they do not establish SASL or FIPS support in ZkLink.
+
+JAAS credentials and test passwords live in a private directory outside retained
+evidence. Fresh authenticated probes run before teardown, including after test
+failure. A final scan fails and redacts evidence if private values appear, then
+removes the private directory. Configuration, roles, test results and server logs
+remain available for review. Missing fixture configuration fails selected cases
+before opening a client.
+
+All 24 live policy cases pass locally on macOS arm64 and in
+[Linux verification](https://github.com/kidoz/zklink/actions/runs/41286490991).
+That run also passes the existing 50 operations cases per server version and
+the 10 controlled authentication cases on each of four managed targets.
+
 ## Online revocation and connection cleanup
 
 Run the platform revocation checks without Docker or a ZooKeeper installation:

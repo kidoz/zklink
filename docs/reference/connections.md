@@ -83,6 +83,14 @@ are acknowledged sequentially and replayed before readiness after reconnect.
 Authentication failure is terminal; an operation's `NoAuth` does not by itself
 end the session. SASL and read-only mode are unavailable.
 
+Digest credentials establish an identity; a wrong password can establish a
+different identity and produce `NoAuth` when accessing a protected node.
+Servers enforcing an authentication scheme can reject the first application
+operation with `SessionClosedRequiresSaslAuth` and terminal `AuthFailed`, even
+after accepting the connection handshake. ZooKeeper also uses that legacy error
+code for a missing required digest identity. See the
+[required-authentication checks](../how-to/verify-secure-connections.md#required-authentication-policies).
+
 ## State, recovery and request outcomes
 
 Snapshots expose `State`, diagnostic `SessionId`, requested/negotiated timeout,

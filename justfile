@@ -103,6 +103,10 @@ zk-driver-matrix:
 zk-operations-matrix:
     bash dev/test-zookeeper-matrix.sh --operations
 
+# Verify required digest authentication and explicit unsupported-SASL failure on both versions.
+zk-authentication:
+    bash dev/test-zookeeper-matrix.sh --authentication
+
 # Verify explicit TTL creation with enabled and disabled servers on both pinned versions.
 zk-ttl-matrix:
     bash dev/test-zookeeper-matrix.sh --ttl

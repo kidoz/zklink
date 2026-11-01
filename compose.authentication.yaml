@@ -1,0 +1,30 @@
+# Authentication-policy fixtures use private, temporary JAAS configuration.
+# Legacy SASL reference controls explicitly require FIPS mode off in this fixture.
+x-authentication-environment: &authentication-environment
+  JVMFLAGS: >-
+    -Dzookeeper.extendedTypesEnabled=false
+    -Dzookeeper.fips-mode=${ZKLINK_AUTH_FIPS_MODE:?Authentication runner required}
+    -Dzookeeper.enforce.auth.enabled=true
+    -Dzookeeper.enforce.auth.schemes=${ZKLINK_TEST_AUTH_SCHEME:?Authentication runner required}
+    -Dzookeeper.authProvider.1=org.apache.zookeeper.server.auth.SASLAuthenticationProvider
+    -Djava.security.auth.login.config=/opt/zklink/authentication/jaas.conf
+  CLIENT_JVMFLAGS: >-
+    -Dzookeeper.fips-mode=${ZKLINK_AUTH_FIPS_MODE:?Authentication runner required}
+    -Djava.security.auth.login.config=/opt/zklink/authentication/jaas.conf
+    -Dzookeeper.sasl.client=${ZKLINK_HEALTH_SASL:?Authentication runner required}
+x-jaas: &jaas
+  type: bind
+  source: ${ZKLINK_AUTH_PRIVATE_DIRECTORY:?Authentication runner required}/jaas.conf
+  target: /opt/zklink/authentication/jaas.conf
+  read_only: true
+
+services:
+  zoo1:
+    environment: *authentication-environment
+    volumes: [*jaas]
+  zoo2:
+    environment: *authentication-environment
+    volumes: [*jaas]
+  zoo3:
+    environment: *authentication-environment
+    volumes: [*jaas]

@@ -70,9 +70,13 @@ public sealed class AuthenticationSessionTests : IAsyncLifetime
         Assert.True(_first.IsDisposed);
     }
 
-    [Fact(Timeout = 10000)]
+    [Theory(Timeout = 10000)]
+    [InlineData(ZooKeeperErrorCode.AuthFailed)]
+    [InlineData(ZooKeeperErrorCode.SessionClosedRequiresSaslAuth)]
     [Trait("Acceptance", "T21")]
-    public async Task AuthenticationFailureStopsTheSessionAndRedactsCredentialText()
+    public async Task AuthenticationFailureStopsTheSessionAndRedactsCredentialText(
+        ZooKeeperErrorCode code
+    )
     {
         using var auth = ZooKeeperAuthentication.Digest("sensitive-user", "sensitive-password");
         var options = SessionFixture.Options(authentication: [auth]);
@@ -83,12 +87,12 @@ public sealed class AuthenticationSessionTests : IAsyncLifetime
         );
         await SessionTestSupport.NextAsync(_first).ConfigureAwait(true);
         var request = await SessionTestSupport.NextAsync(_first).ConfigureAwait(true);
-        _first.Reply(request, -115);
+        _first.Reply(request, (int)code);
         var error = await Assert
             .ThrowsAsync<ZooKeeperConnectionException>(() => SessionTestSupport.Bounded(connecting))
             .ConfigureAwait(true);
         Assert.Equal(ZooKeeperConnectionFailure.Authentication, error.Failure);
-        Assert.Equal(-115, error.ErrorCode);
+        Assert.Equal((int)code, error.ErrorCode);
         Assert.DoesNotContain("sensitive-", error.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain("sensitive-", auth.ToString(), StringComparison.Ordinal);
         Assert.True(_first.IsDisposed);
