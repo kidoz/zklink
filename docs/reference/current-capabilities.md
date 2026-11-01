@@ -1,6 +1,6 @@
 # Current capabilities
 
-This describes the checkout as of **2026-10-31**. The published core package is
+This describes the checkout as of **2026-11-01**. The published core package is
 **0.1.0**; **1.0.0** is an unpublished candidate.
 See [Production release readiness](release-readiness.md) for the current core
 release scope, blocking evidence and delivery order.
@@ -36,6 +36,14 @@ ephemeral preservation, watch restoration before readiness, explicit request
 outcomes and no replay, with verified rollback. A separate
 [leader recovery check](../how-to/verify-leader-recovery.md) also verifies replacement
 election and old-leader return as a follower.
+[Required authentication checks](../how-to/verify-secure-connections.md#required-authentication-policies)
+cover two UTF-8 digest identities, protected watch restoration after auth replay,
+per-operation `NoAuth` and terminal rejection of unauthenticated or unsupported
+SASL clients on both pinned versions. SASL remains unsupported.
+[Server-expiry checks](../how-to/verify-session-expiry.md) verify terminal
+`Expired`, watch/readiness termination, ephemeral removal and no replacement
+session or committed-create replay on both pinned versions. These managed
+checks use an exact server management operation in separate owned fixtures.
 [Quorum recovery checks](../how-to/verify-quorum-recovery.md) cover a brief
 two-voter outage with session/watch recovery and a longer interruption ending
 in local `Lost`, without automatic replacement or uncertain-create replay.
@@ -62,8 +70,8 @@ CRUD, repeated client lifecycles, cancellation outcomes and same-session watch
 recovery. Resource checkpoints check owned counters/connections and compare
 retained managed heap and threads against a recorded baseline. The harness
 supports configurable durations; a passing short run does not establish the
-24-hour release requirement or cross-platform qualification. The release-duration
-attempt on 29 October stopped after about two hours on 3.8.7 with a `SyncAsync`
+six-hour-per-version release minimum or cross-platform qualification. The release-duration
+attempt on 29 October stopped after about two hours on 3.8.7 with a `DeleteAsync`
 timeout; fixture rollback completed, and the cause remains under investigation.
 Bounded follow-up workloads and concurrent scratch-file deletion did not
 reproduce it. Controlled late-sync checks now verify `Unknown`, ordered reply
@@ -72,7 +80,10 @@ drain, the same session and no replay on both patches. The longer diagnostic rep
 cleanup. Both errors were retained; fixture rollback completed. Journals now
 label guarded waits and preserve safe rejected-frame metadata at its original
 observation time, with server-free regression checks and fresh five-minute
-workloads passing on both versions. Both historical causes remain open.
+workloads passing on both versions. Controlled-peer delete checks preserve
+operation metadata, late-reply draining and no replay after a deadline. Proxy
+checks cover truncated prefixes and bodies in both directions, followed by a
+clean reconnect. Both historical causes remain open.
 
 ## Frameworks and platforms
 
