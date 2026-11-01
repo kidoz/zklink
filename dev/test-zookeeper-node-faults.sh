@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-if [[ $# -ne 1 || ( "$1" != follower && "$1" != leader && "$1" != quorum && "$1" != partition && "$1" != peer && "$1" != pressure && "$1" != soak ) ]]; then
-  echo "Usage: $0 follower|leader|quorum|partition|peer|pressure|soak" >&2; exit 2
+if [[ $# -ne 1 || ( "$1" != follower && "$1" != leader && "$1" != quorum && "$1" != partition && "$1" != peer && "$1" != pressure && "$1" != soak && "$1" != expiry ) ]]; then
+  echo "Usage: $0 follower|leader|quorum|partition|peer|pressure|soak|expiry" >&2; exit 2
 fi
 role="$1"
 export ZKLINK_FAULT_ROLE="${role}"
@@ -44,6 +44,13 @@ docker compose version >"${artifacts}/compose-version.txt"
 dotnet --info >"${artifacts}/dotnet-info.txt"
 git rev-parse HEAD >"${artifacts}/revision.txt"
 git status --short >"${artifacts}/working-tree.txt"
+if [[ "${role}" == expiry ]]; then
+  command -v java >/dev/null
+  java -version >"${artifacts}/java-version.txt" 2>&1
+  bash tests/ZkLink.JavaOracle/gradlew -p tests/ZkLink.JavaEnsemble \
+    --project-cache-dir "$PWD/artifacts/java-ensemble-cache" --no-daemon \
+    --warning-mode fail --dependency-verification strict classes >"${artifacts}/gradle.txt" 2>&1
+fi
 unset ZOOKEEPER_IMAGE
 export ZOOKEEPER_PORT_1=0 ZOOKEEPER_PORT_2=0 ZOOKEEPER_PORT_3=0
 export ZKLINK_FAULT_REPO_ROOT="$PWD"
@@ -54,6 +61,7 @@ allocation_network=""
 compose_files=(-f compose.yaml -f compose.fault.yaml)
 if [[ "${role}" == quorum ]]; then compose_files+=(-f compose.quorum-fault.yaml); fi
 if [[ "${role}" == peer ]]; then compose_files+=(-f compose.peer-fault.yaml); fi
+if [[ "${role}" == expiry ]]; then compose_files+=(-f compose.expiry-fault.yaml); fi
 compose() {
   docker compose "${compose_files[@]}" --env-file "dev/zookeeper-${version}.env" --project-name "${project}" "$@"
 }
@@ -79,7 +87,7 @@ cleanup() {
         ZKLINK_FAULT_PROJECT="${project}" ZKLINK_FAULT_SERVICE="${target}" \
           python3 dev/zookeeper-peer-network.py verify >>"${artifacts}/${evidence_key}-rollback.log" 2>&1 || cleanup_exit=1
       fi
-      if [[ "${role}" == pressure || "${role}" == soak ]]; then
+      if [[ "${role}" == pressure || "${role}" == soak || "${role}" == expiry ]]; then
         for service in zoo1 zoo2 zoo3; do
           if compose exec -T "${service}" bash /opt/zklink/zookeeper-healthcheck.sh >>"${artifacts}/${evidence_key}-rollback.log" 2>&1; then
             printf '%s-cleanup-authenticated-ready: %s\n' "${role}" "${service}" >>"${artifacts}/${evidence_key}-rollback.log"
@@ -102,6 +110,7 @@ test_fixture=MemberFault
 if [[ "${role}" == partition ]]; then test_fixture=PartitionFault; fi
 if [[ "${role}" == pressure ]]; then test_fixture=WatchPressure; fi
 if [[ "${role}" == soak ]]; then test_fixture=Soak; fi
+if [[ "${role}" == expiry ]]; then test_fixture=SessionExpiry; fi
 if [[ "${role}" == quorum || "${role}" == partition ]]; then outages=(brief lost); fi
 peer_roles=(none)
 if [[ "${role}" == peer ]]; then peer_roles=(leader follower); fi
@@ -174,7 +183,9 @@ PORTS
     case_label="${outage}"
     if [[ "${role}" == peer ]]; then case_label="${peer_role}"; fi
     if [[ "${role}" == partition ]]; then case_label="${direction}/${outage}"; fi
-    if [[ "${role}" == soak ]]; then
+    if [[ "${role}" == expiry ]]; then
+      echo "Checking server-confirmed expiry on ZooKeeper ${version}"
+    elif [[ "${role}" == soak ]]; then
       echo "Checking seeded soak on ZooKeeper ${version}: seconds=${ZKLINK_SOAK_DURATION_SECONDS} seed=${ZKLINK_SOAK_SEED}"
     elif [[ "${role}" == pressure ]]; then
       echo "Checking watch pressure on ZooKeeper ${version}"
@@ -185,6 +196,7 @@ PORTS
     compose up -d --wait --wait-timeout "${startup_guard_seconds}" >"${artifacts}/${evidence_key}-startup.log" 2>&1
     leaders=0
     followers=0
+    observed_leader=""
     for service in zoo1 zoo2 zoo3; do
       compose exec -T "${service}" zkServer.sh version >"${artifacts}/${evidence_key}-${service}-version.txt" 2>&1
       grep -Fq "Apache ZooKeeper, version ${version} " "${artifacts}/${evidence_key}-${service}-version.txt"
@@ -193,9 +205,10 @@ PORTS
       if grep -Fxq 'Mode: follower' "${artifacts}/${evidence_key}-${service}-role-before.txt"; then
         followers=$((followers + 1))
         if [[ "${role}" == quorum && -z "${second_target}" ]]; then second_target="${service}"; fi
-        if [[ ( "${role}" == follower || "${role}" == pressure || "${role}" == soak || ( "${role}" == peer && "${peer_role}" == follower ) ) && -z "${target}" ]]; then target="${service}"; fi
+        if [[ ( "${role}" == follower || "${role}" == pressure || "${role}" == soak || "${role}" == expiry || ( "${role}" == peer && "${peer_role}" == follower ) ) && -z "${target}" ]]; then target="${service}"; fi
       elif grep -Fxq 'Mode: leader' "${artifacts}/${evidence_key}-${service}-role-before.txt"; then
         leaders=$((leaders + 1))
+        observed_leader="${service}"
         if [[ ( "${role}" == leader || "${role}" == quorum || "${role}" == partition || ( "${role}" == peer && "${peer_role}" == leader ) ) && -z "${target}" ]]; then target="${service}"; fi
       else
         echo "Unrecognized initial role; aborting ${version}" >&2; exit 1
@@ -204,14 +217,22 @@ PORTS
     if [[ "${leaders}" -ne 1 || "${followers}" -ne 2 ]]; then echo "No healthy voting ensemble" >&2; exit 1; fi
     selection="first observed ${role}"
     if [[ "${role}" == peer ]]; then selection="observed ${peer_role} for peer isolation"; fi
-    if [[ "${role}" == pressure || "${role}" == soak ]]; then selection="first observed follower as transparent forwarding target"; fi
+    if [[ "${role}" == pressure || "${role}" == soak || "${role}" == expiry ]]; then selection="first observed follower as transparent forwarding target"; fi
     if [[ "${role}" == partition ]]; then selection="observed leader as the client proxy target"; fi
     if [[ "${role}" == quorum ]]; then selection="observed leader and first observed follower"; fi
     printf 'Selection: %s in zoo1/zoo2/zoo3 order\nTarget: %s\n' "${selection}" "${target}" >"${artifacts}/${evidence_key}-selection.txt"
     if [[ "${role}" == partition ]]; then printf 'Direction: %s\nOutage: %s\n' "${direction}" "${outage}" >>"${artifacts}/${evidence_key}-selection.txt"; fi
     if [[ "${role}" == quorum ]]; then printf 'Second stopped member: %s\nOutage: %s\n' "${second_target}" "${outage}" >>"${artifacts}/${evidence_key}-selection.txt"; fi
     endpoints="$(compose port zoo1 2181),$(compose port zoo2 2181),$(compose port zoo3 2181)"
-    ZKLINK_TEST_CONNECTION_STRING="${endpoints}" ZKLINK_TEST_SERVER_VERSION="${version}" \
+    control_endpoints="${endpoints}"
+    if [[ "${role}" == soak || "${role}" == expiry ]]; then
+      # A follower can apply closeSession before the leader has drained its
+      # predicted parent child count. Maintenance writes must be acknowledged
+      # by the leader before recursive deletion snapshots are taken.
+      control_endpoints="$(compose port "${observed_leader}" 2181)"
+      printf 'Maintenance: observed leader %s\n' "${observed_leader}" >>"${artifacts}/${evidence_key}-selection.txt"
+    fi
+    ZKLINK_TEST_CONNECTION_STRING="${control_endpoints}" ZKLINK_TEST_SERVER_VERSION="${version}" \
       ZKLINK_FAULT_SECOND_SERVICE="${second_target}" ZKLINK_FAULT_PROJECT="${project}" ZKLINK_FAULT_SERVICE="${target}" ZKLINK_FAULT_ENDPOINT="$(compose port "${target}" 2181)" \
       dotnet test --project tests/ZkLink.FaultTests -c Release --no-build --no-restore \
       --filter-trait "Fixture=${test_fixture}" --output Detailed --show-stdout All --show-live-output on --timeout "${runner_guard}" \
@@ -223,12 +244,18 @@ PORTS
       compose exec -T "${service}" bash /opt/zklink/zookeeper-healthcheck.sh
       compose exec -T "${service}" zkServer.sh status >"${artifacts}/${evidence_key}-${service}-role-after.txt" 2>&1
     done
+    if [[ "${role}" == soak || "${role}" == expiry ]] && ! grep -Fxq 'Mode: leader' "${artifacts}/${evidence_key}-${observed_leader}-role-after.txt"; then
+      echo "The soak maintenance leader changed; aborting qualification" >&2
+      exit 1
+    fi
     compose ps --format json >"${artifacts}/${evidence_key}-status.json"
     compose logs --no-color >"${artifacts}/${evidence_key}-server.log" 2>&1
     compose down --volumes >"${artifacts}/${evidence_key}-cleanup.log" 2>&1
     project=""
     target=""
-    if [[ "${role}" == soak ]]; then
+    if [[ "${role}" == expiry ]]; then
+      echo "ZooKeeper ${version}: PASS (server Expired, terminal watches/readiness, ephemeral removal, no replacement/replay and cleanup)"
+    elif [[ "${role}" == soak ]]; then
       echo "ZooKeeper ${version}: PASS (seeded churn, CRUD, cancellation, watch/session recovery, resource checkpoints and cleanup)"
     elif [[ "${role}" == pressure ]]; then
       echo "ZooKeeper ${version}: PASS (slow consumers, heartbeat progress, shared event overflow, FIFO, counter and fixture cleanup)"

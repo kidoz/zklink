@@ -24,12 +24,16 @@ Complete a specific task in an existing checkout.
   or outgoing client traffic and check recovery, terminal loss and no replay.
 - [Verify quorum recovery](verify-quorum-recovery.md) — stop two voters and check
   valid-session recovery or terminal local loss, with verified cleanup.
+- [Verify server expiry](verify-session-expiry.md) — terminate an exact owned
+  session and verify terminal watches, ephemeral removal and no replacement or replay.
 - [Verify leader recovery](verify-leader-recovery.md) — stop the observed leader,
   check replacement election and session/watch recovery, and restore it as a follower.
 - [Verify follower recovery](verify-follower-recovery.md) — stop one observed
   follower, check session/watch recovery and request outcomes, and restore it.
 - [Verify secure connections](verify-secure-connections.md) — run isolated TLS
   and mTLS fixtures, certificate rejection and secure recovery checks.
+- [Verify required authentication](verify-secure-connections.md#required-authentication-policies)
+  — check required digest credentials and explicit failure against SASL-required servers.
 - [Register ZkLink with dependency injection](use-dependency-injection.md) — let
   a Microsoft host connect, share and close one ZooKeeper client.
 

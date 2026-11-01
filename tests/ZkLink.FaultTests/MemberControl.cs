@@ -15,6 +15,7 @@ internal sealed class MemberControl
     internal const string Quorum = "quorum";
     internal const string Partition = "partition";
     internal const string Peer = "peer";
+    internal const string Expiry = "expiry";
     internal const string Brief = "brief";
     internal const string UntilLost = "lost";
     internal const string Incoming = "incoming";
@@ -45,7 +46,7 @@ internal sealed class MemberControl
         string? peerState = Environment.GetEnvironmentVariable("ZKLINK_PEER_STATE_FILE");
         const int RunIdLength = 32;
         if (
-            Role is not (Leader or Follower or Quorum or Partition or Peer)
+            Role is not (Leader or Follower or Quorum or Partition or Peer or Expiry)
             || _version is not ("3.8.7" or "3.9.6")
             || _runId.Length != RunIdLength
             || !_runId.All(char.IsAsciiHexDigit)
@@ -57,6 +58,7 @@ internal sealed class MemberControl
             || (Role == Partition && Direction is not (Incoming or Outgoing))
             || !Path.IsPathFullyQualified(_root)
             || !File.Exists(Path.Combine(_root, "compose.fault.yaml"))
+            || (Role == Expiry && !File.Exists(Path.Combine(_root, "compose.expiry-fault.yaml")))
             || (
                 Role == Peer
                 && (
@@ -80,7 +82,7 @@ internal sealed class MemberControl
     internal static string Required(string name) =>
         Environment.GetEnvironmentVariable(name)
         ?? throw new InvalidOperationException(
-            "Run the matching just zk-follower-faults, zk-leader-faults, zk-quorum-faults, zk-partition-faults or zk-peer-partition-faults command with its required disposable fixture."
+            "Run the matching just zk-follower-faults, zk-leader-faults, zk-quorum-faults, zk-partition-faults zk-peer-partition-faults or zk-session-expiry command with its required disposable fixture."
         );
 
     private string[] Compose(params string[] arguments) =>
@@ -96,6 +98,11 @@ internal sealed class MemberControl
                     : []
             ),
             .. (Role == Peer ? new[] { "-f", Path.Combine(_root, "compose.peer-fault.yaml") } : []),
+            .. (
+                Role == Expiry
+                    ? new[] { "-f", Path.Combine(_root, "compose.expiry-fault.yaml") }
+                    : []
+            ),
             "--env-file",
             Path.Combine(_root, $"dev/zookeeper-{_version}.env"),
             "--project-name",
@@ -131,11 +138,46 @@ internal sealed class MemberControl
         }
     }
 
+    internal async Task ExpireSessionAsync(long sessionId, CancellationToken token)
+    {
+        if (Role != Expiry || sessionId == 0)
+        {
+            throw new InvalidOperationException(
+                "The owned expiry fixture and a live session are required."
+            );
+        }
+        await VerifyOwnershipAsync(Service, token).ConfigureAwait(false);
+        if (await ReadRoleAsync(Service, token).ConfigureAwait(false) != Follower)
+        {
+            throw new InvalidOperationException(
+                "The expiry target is no longer the selected follower."
+            );
+        }
+        var (code, output) = await RunAsync(
+                Compose(
+                    "exec",
+                    "-T",
+                    Service,
+                    "java",
+                    "-cp",
+                    "/opt/zklink/session-control",
+                    "SessionControl",
+                    sessionId.ToString("x", System.Globalization.CultureInfo.InvariantCulture)
+                ),
+                token
+            )
+            .ConfigureAwait(false);
+        if (code != 0 || output.Trim() != "Exact owned session termination requested: PASS")
+        {
+            throw new InvalidOperationException("The exact owned session could not be terminated.");
+        }
+    }
+
     internal async Task StopAsync(CancellationToken token)
     {
-        if (Role is Partition or Peer)
+        if (Role is Partition or Peer or Expiry)
         {
-            throw new InvalidOperationException("Partition experiments must not stop any server.");
+            throw new InvalidOperationException("This fault role must not stop any server.");
         }
         foreach (string target in _targets)
         {

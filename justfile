@@ -142,6 +142,10 @@ zk-peer-partition-faults:
 zk-watch-pressure-faults:
     bash dev/test-zookeeper-watch-pressure-faults.sh
 
+# Verify server-confirmed expiry, terminal watches and no session replacement or replay.
+zk-session-expiry:
+    bash dev/test-zookeeper-node-faults.sh expiry
+
 # Run a seeded bounded workload on both versions (30..86400 seconds per version).
 zk-soak seconds="120" seed="1729":
     bash dev/test-zookeeper-soak.sh "$1" "$2"

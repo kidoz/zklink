@@ -1,0 +1,26 @@
+# JMX is reachable only inside each disposable container; no management port is published.
+x-expiry-environment: &expiry-environment
+  JMXPORT: "1099"
+  JMXHOSTNAME: "127.0.0.1"
+  JMXAUTH: "false"
+  JMXSSL: "false"
+  JVMFLAGS: >-
+    -Dzookeeper.extendedTypesEnabled=false
+    -Dcom.sun.management.jmxremote.host=127.0.0.1
+    -Dcom.sun.management.jmxremote.rmi.port=1098
+x-session-control: &session-control
+  type: bind
+  source: ./artifacts/java-ensemble-build/classes/java/main
+  target: /opt/zklink/session-control
+  read_only: true
+
+services:
+  zoo1:
+    environment: *expiry-environment
+    volumes: [*session-control]
+  zoo2:
+    environment: *expiry-environment
+    volumes: [*session-control]
+  zoo3:
+    environment: *expiry-environment
+    volumes: [*session-control]

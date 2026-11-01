@@ -22,7 +22,7 @@ public sealed class MemberOutageTests : IAsyncLifetime
     public ValueTask InitializeAsync()
     {
         var fault = new MemberControl(); // Reject missing/foreign fixture metadata before opening any client.
-        if (fault.Role == MemberControl.Partition)
+        if (fault.Role is MemberControl.Partition or MemberControl.Expiry)
         {
             throw new InvalidOperationException(
                 "The member fault selection must exclude partition cases."
