@@ -34,13 +34,26 @@ endpoint, and missing, untrusted or expired client certificate. Each round waits
 for every actor's valid setup before releasing the rejection attempts together.
 Probes retain a four-second initial connection budget and a two-second attempt
 budget. A separate valid authenticated connection repeatedly sends `Sync` while
-rejections run; every actor also checks its valid connection afterward. Setup
-and execution have sixteen-second guards, with a ninety-second test guard.
-Fixed progress labels and elapsed times identify certificate loading, option
-capture, connection completion and disposal without printing secrets.
+rejections run; every actor also checks its valid connection afterward. Each round
+also opens a fresh valid connection and requires its acknowledged close. After
+the actors finish, only the existing control connection may remain on the
+fixture's client ports. Setup and execution have sixteen-second guards, with a
+ninety-second test guard.
+
+Fixed progress labels and UTC/elapsed times distinguish individual certificate
+imports, option capture, connection completion and disposal. A bounded TLS trace
+records client handshake starts, failures and completions by actor. It excludes
+hostnames, certificate contents and exception messages; trace overflow or missing
+completion fails the check.
 
 These short runs do not establish sustained-load or soak behavior. The earlier
 intermittent concurrent rejection timeouts have not been reproduced or explained.
+The current functional and concurrent matrices pass on macOS and Linux, and the
+transport/trace checks pass on all four managed targets in
+[hosted verification](https://github.com/kidoz/zklink/actions/runs/41309147708).
+Recreating the documented class overlap and original connection budgets also
+passes on this Mac. The original temporary failure logs are unavailable, and
+these results do not identify its trigger.
 
 The checks exercise trusted connections on every node, digest-only ACLs, node
 operations, transactions, one-shot and persistent watch restoration, and

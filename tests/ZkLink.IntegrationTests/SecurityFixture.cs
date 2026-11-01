@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
@@ -5,6 +6,9 @@ namespace ZkLink.IntegrationTests;
 
 internal sealed class SecurityFixture(Action<string>? progress = null) : IAsyncLifetime
 {
+    private static int _nextDiagnosticId;
+    private readonly int _diagnosticId = Interlocked.Increment(ref _nextDiagnosticId);
+    private readonly Stopwatch _clock = Stopwatch.StartNew();
     private static readonly TimeSpan ConnectGuard = TimeSpan.FromSeconds(4);
 
     // A cold server TLS pipeline can exceed one second on a shared runner.
@@ -43,7 +47,11 @@ internal sealed class SecurityFixture(Action<string>? progress = null) : IAsyncL
         if (progress is not null)
             progress(step);
         else
-            TestContext.Current.TestOutputHelper?.WriteLine(step);
+            TestContext.Current.TestOutputHelper?.WriteLine(
+                FormattableString.Invariant(
+                    $"security-fixture id={_diagnosticId} event={step} elapsed_ms={_clock.Elapsed.TotalMilliseconds:F4} observed_at_utc={DateTimeOffset.UtcNow:O}"
+                )
+            );
     }
 
     private static string Required(string key) =>
@@ -116,14 +124,19 @@ internal sealed class SecurityFixture(Action<string>? progress = null) : IAsyncL
         }
         // Schannel needs a disk-backed key on Windows; macOS uses platform storage.
         // Without PersistKeySet, disposal releases the temporary imported key.
-        X509Certificate2 Load(string name) =>
-            X509CertificateLoader.LoadPkcs12FromFile(
+        X509Certificate2 Load(string name)
+        {
+            Report("certificate." + name + ".begin");
+            var certificate = X509CertificateLoader.LoadPkcs12FromFile(
                 Path.Combine(directory, name + ".p12"),
                 storePassword,
                 OperatingSystem.IsLinux()
                     ? X509KeyStorageFlags.EphemeralKeySet
                     : X509KeyStorageFlags.DefaultKeySet
             );
+            Report("certificate." + name + ".end");
+            return certificate;
+        }
     }
 
     internal ZooKeeperTlsOptions Tls(
@@ -211,6 +224,11 @@ internal sealed class SecurityFixture(Action<string>? progress = null) : IAsyncL
                     await _client.DisposeAsync().ConfigureAwait(false);
                 }
             }
+        }
+        catch (Exception failure)
+        {
+            Report("fixture.cleanup." + failure.GetType().Name);
+            throw;
         }
         finally
         {
