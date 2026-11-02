@@ -33,11 +33,9 @@ public sealed class SoakDeadlineTests : IAsyncLifetime
         string endpoint =
             Environment.GetEnvironmentVariable("ZKLINK_FAULT_ENDPOINT")
             ?? throw new InvalidOperationException("The owned soak forwarding target is required.");
-        var proxy = new FaultProxy(endpoint, holdRestore: false, token);
+        var sockets = new SoakSocketScope();
+        var proxy = new FaultProxy(endpoint, holdRestore: false, token, sockets);
         using var metrics = new SoakMetrics();
-        int listenerPort = new Uri("tcp://" + proxy.Endpoint).Port;
-        int targetPort = new Uri("tcp://" + endpoint).Port;
-        int upstreamPort;
         await using (proxy.ConfigureAwait(true))
         {
             var owner = await _fixture
@@ -45,7 +43,6 @@ public sealed class SoakDeadlineTests : IAsyncLifetime
                 .ConfigureAwait(true);
             await using (owner.ConfigureAwait(true))
             {
-                upstreamPort = proxy.UpstreamLocalPort;
                 await owner.SyncAsync(_fixture.Root, token).ConfigureAwait(true);
                 long session = owner.Session.SessionId;
                 long generation = owner.Session.ConnectionGeneration;
@@ -165,8 +162,6 @@ public sealed class SoakDeadlineTests : IAsyncLifetime
             }
         }
         await metrics.QuiescentAsync(token).ConfigureAwait(true);
-        await SoakMetrics
-            .PortsClosedAsync([listenerPort], [upstreamPort], targetPort, token)
-            .ConfigureAwait(true);
+        await SoakMetrics.PortsClosedAsync(sockets, token).ConfigureAwait(true);
     }
 }

@@ -342,6 +342,11 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: '1'
         run: python3 dev/test-isolated-soak.py
+      - name: Verify socket ownership in a Docker DNS namespace
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+          ZKLINK_MATRIX_ARTIFACT_ROOT: ${{ github.workspace }}/artifacts/isolated-soak
+        run: python3 dev/test-zookeeper-socket-namespace.py
       - name: Verify isolated workload on both pinned versions
         env:
           PYTHONDONTWRITEBYTECODE: '1'

@@ -1,6 +1,6 @@
 # Production release readiness
 
-Reviewed on **1 November 2026**. Core **0.1.0 is published**. The intended next
+Reviewed on **2 November 2026**. Core **0.1.0 is published**. The intended next
 production release is **1.0.0**, subject to the checks below. It is not yet
 qualified for production. Passing the current CI workflows establishes their
 documented scope; it does not complete these release requirements.
@@ -105,6 +105,23 @@ passed on both patches. It requests six continuous hours per patch using frozen
 inputs that match the verified runner and candidate core sources. Full completion,
 cleanup, resource trends and applicability to the candidate still require review;
 the launch does not waive the retained failures or qualify the release.
+
+That attempt stopped on 3.8.7 after about three and a half minutes at the
+socket-cleanup check. An instrumented reproduction found a foreign listener
+being counted by port number. A separate Docker DNS control recreates the
+same-port collision on another loopback address. The observer now tracks original
+socket handles and exact endpoint pairs; retained-listener and retained-peer
+controls remain failures under the unchanged guard. All 67 proxy/socket/evidence
+checks pass on each of four managed targets in
+[hosted verification](https://github.com/kidoz/zklink/actions/runs/41351171320),
+along with Docker namespace and owned failure-cleanup checks. The original failed
+run lacks its socket row, so its exact socket cannot be identified retrospectively.
+Fresh full-duration evidence and the remaining failure reviews are still required.
+
+Subsequent five-minute workloads passed on both patches with the corrected
+observer, clean resource checkpoints and verified teardown. A fresh supervised
+six-hour-per-patch attempt has been launched from frozen inputs; its completion
+and review remain pending. Benchmarks stay deferred until sustained qualification.
 
 The release-candidate workflow now distributes one package/symbol bundle to
 managed and native consumers. Publication downloads those qualified bytes,

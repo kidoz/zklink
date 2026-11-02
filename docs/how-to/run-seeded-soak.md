@@ -126,11 +126,27 @@ Every round must return active watches, event backlog, application requests,
 owned request bytes, tombstones and disconnected-session counters to zero.
 A passive listener retains only the six latest counter values.
 
-The harness captures its proxy listener and upstream local ports while they are
-live. After disposal, scoped loopback TCP snapshots must show no remaining owned
-listeners or live connections. Upstream matches also require the known server
-port. Kernel `TIME_WAIT` is excluded; host-wide connection totals are not used
-as a per-process leak measure. See the [.NET TCP snapshot documentation](https://learn.microsoft.com/en-us/dotnet/api/system.net.networkinformation.ipglobalproperties.getactivetcpconnections?view=net-10.0).
+The harness registers each original listener and every accepted or connected
+upstream socket while it is live. After disposal, all registered socket handles
+must be closed, and scoped TCP snapshots must show no active connection matching
+an owned address/port pair in either direction. Pending handshakes to the exact
+listener endpoints are also checked. The inventory has finite bounds and cannot
+silently drop registrations.
+
+A port number alone does not establish ownership: another loopback address or a
+later socket can use it. In a shared Linux namespace, Docker's DNS listener can
+have the same port number as a proxy on a different loopback address. The checks
+retain the original listener handle and compare exact connection endpoints,
+including equivalent IPv4-mapped addresses. Retained listeners and `CLOSE_WAIT`
+peers still fail the unchanged ten-second guard. Kernel `TIME_WAIT` is excluded;
+namespace-wide totals are not treated as a per-process leak measure.
+
+A socket-cleanup timeout retains a bounded snapshot of matching TCP/listener
+states, numeric address families and ports, and open owned-handle counts. On
+Linux, best-effort kernel inode/UID and test-process descriptor membership add
+ownership evidence. Missing or unsupported ownership lookup is explicit and
+never replaces the original failure. Addresses, payloads, arguments and
+environments are excluded from this snapshot.
 
 After five initial rounds, the harness records a resource baseline. Subsequent
 quiescent samples record:

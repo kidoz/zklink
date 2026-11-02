@@ -405,17 +405,15 @@ public sealed class SoakEvidenceTests
         listener.Start();
         unrelated.Start();
         int target = ((IPEndPoint)listener.LocalEndpoint).Port;
-        int otherTarget = ((IPEndPoint)unrelated.LocalEndpoint).Port;
         await client.ConnectAsync(IPAddress.Loopback, target, token).ConfigureAwait(true);
         using var accepted = await listener.AcceptTcpClientAsync(token).ConfigureAwait(true);
-        int local = ((IPEndPoint)client.Client.LocalEndPoint!).Port;
-        var closed = SoakMetrics.PortsClosedAsync([], [local], target, token);
+        var sockets = new SoakSocketScope();
+        sockets.TrackConnection(client.Client);
+        var closed = SoakMetrics.PortsClosedAsync(sockets, token);
         try
         {
             Assert.False(closed.IsCompleted);
-            await SoakMetrics
-                .PortsClosedAsync([], [local], otherTarget, token)
-                .ConfigureAwait(true);
+            await SoakMetrics.PortsClosedAsync(new SoakSocketScope(), token).ConfigureAwait(true);
         }
         finally
         {

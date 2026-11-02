@@ -29,6 +29,9 @@ internal sealed class FaultProxy : IAsyncDisposable
     private readonly Uri _target;
     private readonly bool _holdRestore;
     private readonly Task _run;
+    private readonly SoakSocketScope? _socketScope;
+    private Task? _dispose;
+    private bool _disposeCompleted;
     private readonly TaskCompletionSource _restoreRelease = NewSignal();
     private readonly TaskCompletionSource _syncHeld = NewSignal();
     private readonly TaskCompletionSource _syncRelease = NewSignal();
@@ -107,7 +110,12 @@ internal sealed class FaultProxy : IAsyncDisposable
 
     internal void HealOutgoing() => Volatile.Write(ref _outgoingPartition, 0);
 
-    internal FaultProxy(string endpoint, bool holdRestore, CancellationToken token)
+    internal FaultProxy(
+        string endpoint,
+        bool holdRestore,
+        CancellationToken token,
+        SoakSocketScope? socketScope = null
+    )
     {
         _target = new Uri("tcp://" + endpoint);
         if (
@@ -122,6 +130,17 @@ internal sealed class FaultProxy : IAsyncDisposable
         _stop = CancellationTokenSource.CreateLinkedTokenSource(token);
         _stop.CancelAfter(LifetimeGuard);
         _listener.Start(1);
+        _socketScope = socketScope;
+        try
+        {
+            _socketScope?.TrackListener(_listener.Server);
+        }
+        catch
+        {
+            _listener.Dispose();
+            _stop.Dispose();
+            throw;
+        }
         _listenerPort = ((IPEndPoint)_listener.LocalEndpoint).Port;
         Endpoint = $"127.0.0.1:{_listenerPort}";
         _run = RunAsync();
@@ -241,6 +260,7 @@ internal sealed class FaultProxy : IAsyncDisposable
                     .AcceptTcpClientAsync(_stop.Token)
                     .ConfigureAwait(false);
                 using var upstream = new TcpClient();
+                _socketScope?.TrackConnection(client.Client);
                 Interlocked.Increment(ref _connectionAttempts);
                 var identity = new ProxyConnectionIdentity(
                     _listenerPort,
@@ -260,6 +280,7 @@ internal sealed class FaultProxy : IAsyncDisposable
                     await upstream
                         .ConnectAsync(_target.Host, _target.Port, _stop.Token)
                         .ConfigureAwait(false);
+                    _socketScope?.TrackConnection(upstream.Client);
                     client.NoDelay = true;
                     upstream.NoDelay = true;
                     // Capture both streams before forwarding can observe EOF or
@@ -583,7 +604,35 @@ internal sealed class FaultProxy : IAsyncDisposable
         }
     }
 
-    public async ValueTask DisposeAsync()
+    // Deliberate forwarding cut; final disposal observes the same bounded stop.
+    internal ValueTask StopForwardingAsync() => DisposeAsync();
+
+    public ValueTask DisposeAsync()
+    {
+        lock (_gate)
+        {
+            return _disposeCompleted
+                ? ValueTask.CompletedTask
+                : new(_dispose ??= DisposeOnceAsync());
+        }
+    }
+
+    private async Task DisposeOnceAsync()
+    {
+        try
+        {
+            await DisposeCoreAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                _disposeCompleted = true;
+            }
+        }
+    }
+
+    private async Task DisposeCoreAsync()
     {
         RecordConnection(ProxyConnectionEventKind.StopRequested);
         await _stop.CancelAsync().ConfigureAwait(false);

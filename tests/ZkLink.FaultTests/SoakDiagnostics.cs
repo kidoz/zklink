@@ -104,7 +104,11 @@ internal enum SoakWaitSite
 
 internal static class SoakDiagnostics
 {
-    internal static async Task ObserveAsync(Task wait, SoakWaitSite site)
+    internal static async Task ObserveAsync(
+        Task wait,
+        SoakWaitSite site,
+        SoakConnectionDiagnostics? connections = null
+    )
     {
         try
         {
@@ -113,6 +117,10 @@ internal static class SoakDiagnostics
         catch (Exception failure) when (failure is TimeoutException or InvalidDataException)
         {
             failure.Data[typeof(SoakWaitSite)] = site;
+            if (connections is not null)
+            {
+                failure.Data[typeof(SoakConnectionDiagnostics)] = connections;
+            }
             throw;
         }
     }

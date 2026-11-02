@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Globalization;
-using System.Net;
 using System.Net.NetworkInformation;
 
 namespace ZkLink.FaultTests;
@@ -120,55 +119,35 @@ internal sealed class SoakMetrics : IDisposable
         }
     }
 
-    internal static Task PortsClosedAsync(
-        int[] listenerPorts,
-        int[] upstreamPorts,
-        int targetPort,
-        CancellationToken token
-    )
+    internal static async Task PortsClosedAsync(SoakSocketScope scope, CancellationToken token)
     {
-        Assert.All(
-            listenerPorts.Concat(upstreamPorts),
-            static port => Assert.InRange(port, IPEndPoint.MinPort + 1, IPEndPoint.MaxPort)
-        );
-        return UntilAsync(
-            () =>
+        var inventory = scope.Seal();
+        try
+        {
+            await UntilAsync(
+                    () =>
+                        inventory.OpenHandles == 0
+                        && !IPGlobalProperties
+                            .GetIPGlobalProperties()
+                            .GetActiveTcpConnections()
+                            .Any(inventory.Matches),
+                    "Owned proxy connections/listeners remain after disposal.",
+                    token
+                )
+                .ConfigureAwait(true);
+        }
+        catch (TimeoutException failure)
+        {
+            try
             {
-                var network = IPGlobalProperties.GetIPGlobalProperties();
-                bool connections = network
-                    .GetActiveTcpConnections()
-                    .Any(connection =>
-                        IPAddress.IsLoopback(connection.LocalEndPoint.Address)
-                        && IPAddress.IsLoopback(connection.RemoteEndPoint.Address)
-                        && (
-                            listenerPorts.Contains(connection.LocalEndPoint.Port)
-                            || listenerPorts.Contains(connection.RemoteEndPoint.Port)
-                            || (
-                                upstreamPorts.Contains(connection.LocalEndPoint.Port)
-                                && connection.RemoteEndPoint.Port == targetPort
-                            )
-                            || (
-                                upstreamPorts.Contains(connection.RemoteEndPoint.Port)
-                                && connection.LocalEndPoint.Port == targetPort
-                            )
-                        )
-                        && connection.State
-                            is TcpState.Established
-                                or TcpState.CloseWait
-                                or TcpState.SynSent
-                                or TcpState.SynReceived
-                    );
-                bool listeners = network
-                    .GetActiveTcpListeners()
-                    .Any(endpoint =>
-                        IPAddress.IsLoopback(endpoint.Address)
-                        && listenerPorts.Contains(endpoint.Port)
-                    );
-                return !connections && !listeners;
-            },
-            "Owned proxy connections/listeners remain after disposal.",
-            token
-        );
+                failure.Data[typeof(SoakSocketSnapshot)] = SoakSocketSnapshot.Capture(inventory);
+            }
+            catch (Exception diagnostic) when (diagnostic is not OutOfMemoryException)
+            {
+                failure.Data["SocketSnapshotErrorType"] = diagnostic.GetType().Name;
+            }
+            throw;
+        }
     }
 
     public void Dispose() => _listener.Dispose();
@@ -279,10 +258,15 @@ internal sealed class SoakEvidence : IAsyncDisposable
         string connections =
             (failure.Data[typeof(SoakConnectionDiagnostics)] as SoakConnectionDiagnostics)?.ToJson()
             ?? "null";
+        string socketError = failure.Data["SocketSnapshotErrorType"] is string socketErrorType
+            ? System.Text.Json.JsonSerializer.Serialize(socketErrorType)
+            : "null";
+        string sockets =
+            (failure.Data[typeof(SoakSocketSnapshot)] as SoakSocketSnapshot)?.ToJson() ?? "null";
         string cleanup =
             (failure.Data[typeof(SoakCleanupFailure)] as SoakCleanupFailure)?.ToJson() ?? "null";
         string line = FormattableString.Invariant(
-            $"{{\"kind\":\"failure\",\"reported_at_utc\":\"{DateTimeOffset.UtcNow:O}\",\"elapsed_ms\":{elapsed.TotalMilliseconds:F0},\"seed\":{_settings.Seed},\"round\":{totals.Rounds},\"error_type\":\"{failure.GetType().Name}\",\"wait_site\":{waitSite},\"frame_failure\":{frameFailure},\"connection_diagnostics\":{connections},\"cleanup_failure\":{cleanup},\"error_code\":{errorCode},\"request_operation\":{operation},\"request_outcome\":{outcome},\"crud_started\":{totals.CrudStarted},\"crud_succeeded\":{totals.CrudSucceeded}}}"
+            $"{{\"kind\":\"failure\",\"reported_at_utc\":\"{DateTimeOffset.UtcNow:O}\",\"elapsed_ms\":{elapsed.TotalMilliseconds:F0},\"seed\":{_settings.Seed},\"round\":{totals.Rounds},\"error_type\":\"{failure.GetType().Name}\",\"wait_site\":{waitSite},\"frame_failure\":{frameFailure},\"connection_diagnostics\":{connections},\"cleanup_failure\":{cleanup},\"socket_snapshot\":{sockets},\"socket_snapshot_error_type\":{socketError},\"error_code\":{errorCode},\"request_operation\":{operation},\"request_outcome\":{outcome},\"crud_started\":{totals.CrudStarted},\"crud_succeeded\":{totals.CrudSucceeded}}}"
         );
         await _writer.WriteLineAsync(line).ConfigureAwait(true);
         await _writer.FlushAsync().ConfigureAwait(true);

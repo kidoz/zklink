@@ -20,6 +20,11 @@ qualification is in progress. The public API declarations are unchanged from
 
 ### Added
 
+- Soak socket ownership checks now retain original handles and exact connection
+  endpoints, excluding unrelated namespace listeners that share a port number.
+  Bounded failure snapshots and regression controls preserve detection of
+  retained listeners and TCP peers under the existing deadlines.
+
 - `just zk-soak-isolated [seconds] [seed]` runs the soak in a pinned Linux
   runtime with private proxy listeners, source/binary integrity checks, bounded
   supervision and retained resource/cleanup evidence. CI checks short workloads,

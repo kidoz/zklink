@@ -142,21 +142,17 @@ public sealed class SoakTests : IAsyncLifetime
     )
     {
         string root = _fixture.Root + "/r-" + totals.Rounds.ToString(CultureInfo.InvariantCulture);
-        FaultProxy? source = null;
-        FaultProxy? recovery = null;
         ZooKeeperClient? owner = null;
-        bool sourceDisposed = false;
         int sourceReadyAttempts = 0;
         int recoveryRestoreAttempts = 0;
         Task<CreateResult>? uncertain = null;
-        var listenerPorts = new List<int>();
-        var upstreamPorts = new List<int>();
+        var sockets = new SoakSocketScope();
+        var source = new FaultProxy(Endpoint, holdRestore: false, token, sockets);
+        await using var sourceLifetime = source.ConfigureAwait(true);
+        var recovery = new FaultProxy(Endpoint, holdRestore: true, token, sockets);
+        await using var recoveryLifetime = recovery.ConfigureAwait(true);
         try
         {
-            source = new FaultProxy(Endpoint, holdRestore: false, token);
-            listenerPorts.Add(Port(source));
-            recovery = new FaultProxy(Endpoint, holdRestore: true, token);
-            listenerPorts.Add(Port(recovery));
             await _fixture
                 .Client.CreateAsync(root, null, LiveZooKeeperFixture.OwnerCreate, token)
                 .ConfigureAwait(true);
@@ -164,7 +160,6 @@ public sealed class SoakTests : IAsyncLifetime
                 .ConnectAsync(connectionString: source.Endpoint, cancellationToken: token)
                 .ConfigureAwait(true);
             sourceReadyAttempts = source.Checkpoint(ProxyConnectionEventKind.ReadyCheckpoint);
-            upstreamPorts.Add(source.UpstreamLocalPort);
             long session = owner.Session.SessionId;
             long generation = owner.Session.ConnectionGeneration;
             for (int index = 0; index < jobs.Length; index += MaximumConcurrency)
@@ -288,8 +283,7 @@ public sealed class SoakTests : IAsyncLifetime
                 Assert.Equal(RequestOutcome.Unknown, unknown.Outcome);
                 totals.Unknown++;
             }
-            sourceDisposed = true;
-            await source.DisposeAsync().ConfigureAwait(true);
+            await source.StopForwardingAsync().ConfigureAwait(true);
             Assert.Equal(creates + 1, source.CreateTransmissions);
             await SoakDiagnostics
                 .ObserveAsync(
@@ -300,7 +294,6 @@ public sealed class SoakTests : IAsyncLifetime
             recoveryRestoreAttempts = recovery.Checkpoint(
                 ProxyConnectionEventKind.RestoreCheckpoint
             );
-            upstreamPorts.Add(recovery.UpstreamLocalPort);
             Assert.Equal(ZooKeeperSessionState.Restoring, owner.Session.State);
             var ready = owner.WaitForConnectionAsync(token);
             Assert.False(ready.IsCompleted);
@@ -401,7 +394,7 @@ public sealed class SoakTests : IAsyncLifetime
                 {
                     try
                     {
-                        if (source is not null && !sourceDisposed)
+                        if (source is not null)
                         {
                             await source.DisposeAsync().ConfigureAwait(true);
                         }
@@ -431,13 +424,14 @@ public sealed class SoakTests : IAsyncLifetime
                             await DeleteTreeAsync(root, cleanup.Token).ConfigureAwait(true);
                             await SoakDiagnostics
                                 .ObserveAsync(
-                                    SoakMetrics.PortsClosedAsync(
-                                        listenerPorts.ToArray(),
-                                        upstreamPorts.ToArray(),
-                                        new Uri("tcp://" + Endpoint).Port,
-                                        cleanup.Token
-                                    ),
-                                    SoakWaitSite.ProxyConnectionsClosed
+                                    SoakMetrics.PortsClosedAsync(sockets, cleanup.Token),
+                                    SoakWaitSite.ProxyConnectionsClosed,
+                                    new SoakConnectionDiagnostics(
+                                        sourceReadyAttempts,
+                                        recoveryRestoreAttempts,
+                                        source?.ConnectionSnapshot(),
+                                        recovery?.ConnectionSnapshot()
+                                    )
                                 )
                                 .ConfigureAwait(true);
                         }
