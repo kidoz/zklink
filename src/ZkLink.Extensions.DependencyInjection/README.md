@@ -48,3 +48,7 @@ ZooKeeper 3.8.7 and 3.9.6 with TLS and mTLS. See the
 [native verification guide](../../docs/how-to/verify-native-aot.md) for commands
 and evidence scope. This verifies the documented host integration; it does not
 establish compatibility for arbitrary application registrations or dependencies.
+
+The public **1.0.2** packages pass this matrix in
+[verification run 42410311495](https://github.com/kidoz/zklink/actions/runs/42410311495):
+all eight jobs pass, with 48 native DI lifecycle cases and no trim/AOT warnings.

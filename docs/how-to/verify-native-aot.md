@@ -177,4 +177,25 @@ compiler-input checks and native host lifecycle success marker described above.
 Deployment-specific PKI, certificate rotation and full production qualification
 remain separate from these native checks.
 
+## DI verification for 1.0.2
+
+[Run 42410311495](https://github.com/kidoz/zklink/actions/runs/42410311495) passes
+all eight publication/live jobs against the public `ZkLink` and
+`ZkLink.Extensions.DependencyInjection` **1.0.2** packages, using SDK **10.0.403**
+and Microsoft.Extensions **10.0.14**. Their recorded package source is
+`45bd4a0`; the verification harness is `c5f9ff5`.
+
+Linux x64/arm64, Windows x64 and macOS arm64 each pass rooted and unrooted native
+publication without trim/AOT warnings, direct executable identity checks and
+managed-execution rejection. Each target passes twelve native DI lifecycle cases
+across ZooKeeper **3.8.7 and 3.9.6**, TLS/mTLS and all three voters: **48 cases**
+in total. Retained artifacts verify identical public core/DI package hashes and DI
+compiler-input hashes across all targets, plus sixteen native executable hashes
+and architecture headers.
+
+The verified DI scope is the host lifecycle described above. These secure live
+fixtures use private test PKI with `NoCheck`; the core has separate native online
+revocation controls. Arbitrary application registrations/dependencies and full
+production qualification remain outside this evidence.
+
 [How-to guides](README.md) · [Documentation home](../README.md)
