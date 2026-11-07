@@ -105,6 +105,8 @@ def execute(manifest_argument, run):
                     (run / (key + "-exit.json")).write_text(json.dumps({"exitCode": code}) + "\n", encoding="utf-8")
                     if code != 0 or "Native smoke: PASS" not in output.read_text(encoding="utf-8"):
                         raise FixtureError("A direct native portable case failed.")
+                    if "Native DI startup, constructor injection, shared scopes, borrowed-client disposal, live operations and acknowledged shutdown: verified." not in output.read_text(encoding="utf-8"):
+                        raise FixtureError("The native DI host lifecycle was not verified.")
                     if mode == "mtls" and index == 0:
                         with server_log.open("rb") as source:
                             source.seek(log_start)

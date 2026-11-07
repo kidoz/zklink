@@ -2,6 +2,8 @@
   <PropertyGroup>
     <Description>Microsoft.Extensions.DependencyInjection registration and host-owned lifetime for ZkLink.</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     <IsPackable>true</IsPackable>
     <VersionPrefix>1.0.2</VersionPrefix>
     <PackageId>ZkLink.Extensions.DependencyInjection</PackageId>

@@ -45,4 +45,13 @@ def read_manifest(path):
     package = manifest.parent / "feed" / f"ZkLink.{data['version']}.nupkg"
     if sha256(package) != data["packageSha256"]:
         raise ValueError("Native candidate package identity mismatch.")
+    di = data["dependencyInjection"]
+    for suffix, field in [(".nupkg", "packageSha256"), (".snupkg", "symbolsSha256")]:
+        if field == "symbolsSha256" and di[field] is None:
+            if data.get("packageOrigin") != "https://api.nuget.org/v3-flatcontainer":
+                raise ValueError("Only public-feed verification may omit symbol packages.")
+            continue
+        package = manifest.parent / "feed" / f"ZkLink.Extensions.DependencyInjection.{data['version']}{suffix}"
+        if sha256(package) != di[field]:
+            raise ValueError("Native DI candidate package identity mismatch.")
     return manifest, data

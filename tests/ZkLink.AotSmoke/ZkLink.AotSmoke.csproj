@@ -20,5 +20,13 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="ZkLink" Version="[$(ZkLinkPackageVersion)]" />
+    <PackageReference
+      Include="ZkLink.Extensions.DependencyInjection"
+      Version="[$(ZkLinkPackageVersion)]"
+    />
+    <PackageReference
+      Include="Microsoft.Extensions.Hosting"
+      Version="[$(MicrosoftExtensionsVersion)]"
+    />
   </ItemGroup>
 </Project>

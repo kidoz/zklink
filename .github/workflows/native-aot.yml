@@ -3,8 +3,18 @@ name: Native AOT verification
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      published_version:
+        description: Published NuGet version to verify (empty builds source candidates)
+        required: false
+        type: string
+        default: '1.0.2'
   workflow_call:
     inputs:
+      published_version:
+        type: string
+        default: ''
       candidate_artifact:
         type: string
         default: ''
@@ -21,6 +31,7 @@ env:
   ZKLINK_CANDIDATE_DIRECTORY: ${{ inputs.candidate_artifact != '' && format('{0}/artifacts/candidate', github.workspace) || '' }}
   ZKLINK_CANDIDATE_MANIFEST_SHA256: ${{ inputs.candidate_manifest_sha256 }}
   PYTHONDONTWRITEBYTECODE: '1'
+  ZKLINK_AOT_PUBLISHED_VERSION: ${{ inputs.published_version || '' }}
 
 jobs:
   publish:

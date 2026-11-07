@@ -12,7 +12,8 @@ import sys
 import tempfile
 import xml.etree.ElementTree as ET
 from aot_artifacts import ROOT, RIDS, native_header, sha256
-from release_version import local_candidate_version
+from aot_packages import DI_ID, PUBLIC_FEED, inspect_di, public_packages
+from release_version import local_candidate_version, validate_version
 from release_candidate import from_environment, write_candidate
 
 def input_hashes():
@@ -23,6 +24,9 @@ def input_hashes():
     inputs += [ROOT / "tests/ZkLink.IntegrationTests/WatchReconnectProxy.cs", ROOT / "dev/aot_artifacts.py", pathlib.Path(__file__)]
     inputs += [ROOT / "dev/release_version.py", ROOT / "dev/release_candidate.py",
                ROOT / "tests/ZkLink.Protocol.Tests/Sessions/RevocationAuthority.cs"]
+    inputs += [path for path in (ROOT / "src/ZkLink.Extensions.DependencyInjection").iterdir()
+               if path.is_file() and path.suffix in {".cs", ".csproj", ".json", ".md", ".txt"}]
+    inputs += [ROOT / "dev/release-packages.py", ROOT / "dev/aot_packages.py"]
     return {str(path.relative_to(ROOT)): sha256(path) for path in inputs if not {"obj", "bin"}.intersection(path.relative_to(ROOT).parts)}
 
 
@@ -47,8 +51,11 @@ def main():
             raise SystemExit(f"{name} failed ({result.returncode}); inspect {run / (name + '.txt')}")
 
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    candidate = from_environment(revision)
-    version = candidate[1]["version"] if candidate else local_candidate_version(revision)
+    published = os.environ.get("ZKLINK_AOT_PUBLISHED_VERSION")
+    if published and any(os.environ.get(name) for name in ["ZKLINK_CANDIDATE_DIRECTORY", "ZKLINK_CANDIDATE_MANIFEST_SHA256"]):
+        raise SystemExit("Select published packages or a shared source candidate, not both.")
+    candidate = None if published else from_environment(revision)
+    version = validate_version(published) if published else candidate[1]["version"] if candidate else local_candidate_version(revision)
     command("sdk", ["dotnet", "--info"])
     command("working-tree", ["git", "status", "--short"])
     (run / "host.json").write_text(json.dumps({"rid": rid, "os": platform.platform(), "machine": platform.machine(), "libc": platform.libc_ver(), "python": sys.version, "revision": revision}, indent=2) + "\n", encoding="utf-8")
@@ -56,20 +63,31 @@ def main():
     if compiler:
         with (run / "native-toolchain.txt").open("w", encoding="utf-8") as output:
             subprocess.run([compiler, "--version"] if pathlib.Path(compiler).stem != "cl" else [compiler], stdout=output, stderr=subprocess.STDOUT, check=False)
-    command("core-restore", ["dotnet", "restore", "src/ZkLink", "--locked-mode"])
-    if candidate:
-        for name in [*candidate[1]["files"], "candidate.json"]:
-            shutil.copy2(candidate[0] / name, feed / name)
+    if published:
+        package_report, di_report = public_packages(feed, version)
+        (run / "package.json").write_text(json.dumps(package_report, indent=2) + "\n", encoding="utf-8")
     else:
-        command("pack", ["dotnet", "pack", "src/ZkLink", "-c", "Release", "--no-restore", f"-p:Version={version}", "-p:ContinuousIntegrationBuild=true", "-o", str(feed)])
-    command("inspector-restore", ["dotnet", "restore", "tests/ZkLink.PackageValidation", "--locked-mode"])
-    command("inspector-build", ["dotnet", "build", "tests/ZkLink.PackageValidation", "-c", "Release", "--no-restore"])
-    inspector = ROOT / "tests/ZkLink.PackageValidation/bin/Release/net10.0/ZkLink.PackageValidation.dll"
-    package = feed / f"ZkLink.{version}.nupkg"
-    command("package-validation", ["dotnet", str(inspector), "package", str(package), str(package.with_suffix(".snupkg")), version, revision, str(run / "package.json")])
-    package_report = json.loads((run / "package.json").read_text(encoding="utf-8"))
-    if not candidate:
-        write_candidate(feed, version, revision)
+        command("core-restore", ["dotnet", "restore", "src/ZkLink", "--locked-mode"])
+        if candidate:
+            for name in [*candidate[1]["files"], "candidate.json"]:
+                shutil.copy2(candidate[0] / name, feed / name)
+        else:
+            command("pack", ["dotnet", "pack", "src/ZkLink", "-c", "Release", "--no-restore", f"-p:Version={version}", "-p:ContinuousIntegrationBuild=true", "-o", str(feed)])
+        command("inspector-restore", ["dotnet", "restore", "tests/ZkLink.PackageValidation", "--locked-mode"])
+        command("inspector-build", ["dotnet", "build", "tests/ZkLink.PackageValidation", "-c", "Release", "--no-restore"])
+        inspector = ROOT / "tests/ZkLink.PackageValidation/bin/Release/net10.0/ZkLink.PackageValidation.dll"
+        package = feed / f"ZkLink.{version}.nupkg"
+        command("package-validation", ["dotnet", str(inspector), "package", str(package), str(package.with_suffix(".snupkg")), version, revision, str(run / "package.json")])
+        package_report = json.loads((run / "package.json").read_text(encoding="utf-8"))
+        if not candidate:
+            write_candidate(feed, version, revision)
+        # Freeze the separately qualified DI package from the same source/version.
+        command("di-restore", ["dotnet", "restore", "src/ZkLink.Extensions.DependencyInjection", "--locked-mode"])
+        command("di-pack", ["dotnet", "pack", "src/ZkLink.Extensions.DependencyInjection", "-c", "Release",
+                           "--no-restore", f"-p:Version={version}", "-p:ContinuousIntegrationBuild=true", "-o", str(feed)])
+        di_report = inspect_di(feed, version, revision)
+    di_id = DI_ID
+    di_assembly_hash = di_report["assemblySha256"]
 
     config = ET.Element("configuration")
     sources = ET.SubElement(config, "packageSources")
@@ -79,6 +97,7 @@ def main():
     mapping = ET.SubElement(config, "packageSourceMapping")
     candidate = ET.SubElement(mapping, "packageSource", key="candidate")
     ET.SubElement(candidate, "package", pattern="ZkLink")
+    ET.SubElement(candidate, "package", pattern=di_id)
     sdk = ET.SubElement(mapping, "packageSource", key="nuget.org")
     for pattern in ["Microsoft.*", "runtime.*", "System.*"]:
         ET.SubElement(sdk, "package", pattern=pattern)
@@ -86,7 +105,13 @@ def main():
     ET.ElementTree(config).write(config_path, encoding="utf-8", xml_declaration=True)
     (run / "Directory.Build.props").write_text("<Project />\n", encoding="utf-8")
     environment["NUGET_PACKAGES"] = str(run / "package-cache")
-    receipt = {"rid": rid, "revision": revision, "version": version, "packageSha256": package_report["packageSha256"], "candidateManifestSha256": sha256(feed / "candidate.json"), "consumers": {}}
+    receipt = {"rid": rid, "revision": package_report.get("revision", revision), "harnessRevision": revision,
+               "version": version, "packageSha256": package_report["packageSha256"],
+               "packageOrigin": PUBLIC_FEED if published else "source",
+               "candidateManifestSha256": None if published else sha256(feed / "candidate.json"), "consumers": {}}
+    receipt["dependencyInjection"] = di_report
+    extensions_version = ET.parse(ROOT / "Directory.Packages.props").find(
+        ".//PackageVersion[@Include='Microsoft.Extensions.Hosting']").get("Version")
     for name in ["ZkLink.AotAnalysis", "ZkLink.AotSmoke"]:
         project = run / name
         project.mkdir()
@@ -104,7 +129,8 @@ def main():
             tree = ET.parse(project / f"{name}.csproj")
             if tree.findall(".//TrimmerRootAssembly") or tree.findall(".//TrimmerRootDescriptor") or tree.findall(".//ProjectReference"):
                 raise SystemExit("The representative consumer must not root the core or reference its source project.")
-        properties = [f"-p:ZkLinkPackageVersion={version}", f"-p:RuntimeIdentifier={rid}"]
+        properties = [f"-p:ZkLinkPackageVersion={version}", f"-p:RuntimeIdentifier={rid}",
+                      f"-p:MicrosoftExtensionsVersion={extensions_version}"]
         command(name + "-restore", ["dotnet", "restore", str(project), "--configfile", str(config_path), "--force-evaluate", *properties], cwd=project)
         command(name + "-locked-restore", ["dotnet", "restore", str(project), "--configfile", str(config_path), "--locked-mode", *properties], cwd=project)
         assets = json.loads((project / "obj/project.assets.json").read_text(encoding="utf-8"))
@@ -114,13 +140,17 @@ def main():
         installed = run / "package-cache" / library["path"] / "lib/net10.0/ZkLink.dll"
         if sha256(installed) != package_report["assemblySha256"]:
             raise SystemExit("Native compiler input differs from the candidate.")
+        di_library = assets["libraries"][f"{di_id}/{version}"]
+        di_installed = run / "package-cache" / di_library["path"] / f"lib/net10.0/{di_id}.dll"
+        if di_library["type"] != "package" or sha256(di_installed) != di_assembly_hash:
+            raise SystemExit("Native DI compiler input differs from the packed candidate.")
         output = run / (name + "-publish")
         command(name + "-publish", ["dotnet", "publish", str(project), "-c", "Release", "--no-restore", *properties, "-o", str(output)], cwd=project)
         log = (run / (name + "-publish.txt")).read_text(encoding="utf-8")
         if re.search(r"\bwarning\s+IL\d+", log, re.IGNORECASE):
             raise SystemExit("Unreviewed trim/AOT publish warning.")
         binary = output / (name + (".exe" if rid == "win-x64" else ""))
-        if not native_header(binary, rid) or (output / "ZkLink.dll").exists():
+        if not native_header(binary, rid) or any((output / (library + ".dll")).exists() for library in ["ZkLink", di_id]):
             raise SystemExit("Expected a native executable with the correct architecture.")
         dependency_tool = shutil.which("otool" if rid == "osx-arm64" else "ldd" if rid.startswith("linux-") else "dumpbin")
         if dependency_tool:
@@ -136,7 +166,7 @@ def main():
         for notice_name in ["LICENSE.TXT", "THIRD-PARTY-NOTICES.TXT"]:
             shutil.copy2(runtime_packages[0] / notice_name, notices / ("dotnet-" + notice_name))
         (notices / "dotnet-runtime-pack.txt").write_text(runtime_packages[0].parent.name + "/" + runtime_packages[0].name + "\n", encoding="utf-8")
-        receipt["consumers"][name] = {"executable": str(binary.relative_to(run)), "sha256": sha256(binary), "nativeHeaderVerified": True, "candidateCompilerInputVerified": True}
+        receipt["consumers"][name] = {"executable": str(binary.relative_to(run)), "sha256": sha256(binary), "nativeHeaderVerified": True, "candidateCompilerInputVerified": True, "diCompilerInputVerified": True}
         if name == "ZkLink.AotAnalysis":
             command("analysis-direct-execution", [str(binary)], cwd=output)
         else:

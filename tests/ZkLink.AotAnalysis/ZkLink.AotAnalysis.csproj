@@ -19,6 +19,11 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="ZkLink" Version="[$(ZkLinkPackageVersion)]" />
+    <PackageReference
+      Include="ZkLink.Extensions.DependencyInjection"
+      Version="[$(ZkLinkPackageVersion)]"
+    />
     <TrimmerRootAssembly Include="ZkLink" />
+    <TrimmerRootAssembly Include="ZkLink.Extensions.DependencyInjection" />
   </ItemGroup>
 </Project>

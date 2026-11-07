@@ -14,15 +14,34 @@ argument selects the expected host RID: `linux-x64`, `linux-arm64`, `win-x64` or
 `osx-arm64`. A mismatched host fails before publication. The command prints its
 `artifacts/aot/run.*/native.json` path.
 
-The command packs and inspects a unique local core candidate, then publishes two
-independent executables against it. `ZkLink.AotAnalysis` roots the core for full
+The command packs and inspects local core and dependency-injection candidates at
+the same source revision and version, then publishes two independent executables.
+When a shared core candidate is supplied, its original bytes are reused and DI
+is packed separately from that source. `ZkLink.AotAnalysis` roots both libraries for
 implementation analysis. `ZkLink.AotSmoke` calls representative public APIs without
 broad roots or source-project references. Both use fresh package caches and source
-mapping: ZkLink resolves only from the candidate feed, while SDK compiler/runtime
+mapping: both ZkLink packages resolve only from the candidate feed, while Microsoft
 packages resolve from nuget.org. Generated dependency locks are restored again in
-locked mode. Core trim/AOT analyzers and publish warnings remain enabled.
+locked mode. Core and DI trim/AOT analyzers and publish warnings remain enabled.
 These projects sit outside normal solution restore because publication requires
 the fresh candidate feed and a target RID.
+
+To verify an already published version, set `ZKLINK_AOT_PUBLISHED_VERSION`, for
+example `ZKLINK_AOT_PUBLISHED_VERSION=1.0.2 just aot-check` on macOS/Linux. The
+publisher downloads the core and DI packages from NuGet's public feed, checks their
+shared source revision/version and records their package and compiler-input hashes.
+`just aot-portable-check` supports the same setting. The Native AOT workflow also
+accepts a `published_version` when dispatched manually. Published-package checks
+record the package source revision separately from the test-harness revision.
+
+Each secure native smoke case also starts a real DI host using `AddZkLink` and a
+constructor-injected `IZooKeeperClientAccessor`. It checks access before startup
+and after shutdown, 10,000 shared resolutions, synchronous/asynchronous scopes,
+borrowed-client disposal, live node operations, and acknowledged shutdown with
+independently observed ephemeral cleanup. Both the rooted analysis and unrooted
+host consume the packed DI assembly whose compiler-input hash is recorded in
+`native.json`. The scope is this documented host lifecycle, not arbitrary
+application registrations or dependencies.
 
 Evidence includes candidate/compiler-input hashes, native file format and
 architecture, executable hashes, source inputs, SDK/host information, dependency
@@ -152,9 +171,10 @@ Local macOS arm64 execution also includes both fixture backends. The
 [shared-candidate verification](https://github.com/kidoz/zklink/actions/runs/41239985235)
 adds sent-request cancellation with an independently observed committed write,
 an `Unknown` outcome and no replay to all 48 secure live cases. Five dedicated
-online-revocation controls also pass on each native target. Deployment-specific
-PKI, certificate rotation, optional DI and full release qualification remain
-open. Core `IsAotCompatible` is enabled in the unpublished 1.0.0 candidate;
-these checks do not declare release support.
+online-revocation controls also pass on each native target. Those earlier runs
+covered the core client. DI verification additionally requires the packed DI
+compiler-input checks and native host lifecycle success marker described above.
+Deployment-specific PKI, certificate rotation and full production qualification
+remain separate from these native checks.
 
 [How-to guides](README.md) · [Documentation home](../README.md)

@@ -37,6 +37,14 @@ Calling `AddZkLink` twice in one service collection throws. Options, credentials
 
 Install `ZkLink.Extensions.DependencyInjection` version `1.0.1`; it depends on the
 matching core package. The release includes portable symbols and verifies a fresh
-package consumer, assembly identity and shared accessor registration. Full
-cross-platform and Native AOT qualification remain separate; no DI-specific Native
-AOT support is claimed.
+package consumer, assembly identity and shared accessor registration.
+
+Native AOT verification uses packed core and DI packages, a rooted analysis
+consumer and an unrooted native host. The host checks constructor injection,
+shared access across synchronous and asynchronous scopes, borrowed-client disposal,
+live operations, acknowledged shutdown and ephemeral cleanup. The native workflow
+runs these checks on Linux x64/arm64, Windows x64 and macOS arm64, against
+ZooKeeper 3.8.7 and 3.9.6 with TLS and mTLS. See the
+[native verification guide](../../docs/how-to/verify-native-aot.md) for commands
+and evidence scope. This verifies the documented host integration; it does not
+establish compatibility for arbitrary application registrations or dependencies.

@@ -102,6 +102,9 @@ internal static class Program
             await NativeRecovery
                 .VerifyAsync(settings, client, deadline.Token)
                 .ConfigureAwait(false);
+            await NativeDependencyInjection
+                .VerifyAsync(settings, client, deadline.Token)
+                .ConfigureAwait(false);
             if (args.Length != 0)
             {
                 await NativeSecurity

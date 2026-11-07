@@ -86,24 +86,31 @@ internal sealed class NativeSettings : IDisposable
         ZooKeeperTlsOptions? tls = null
     )
     {
-        using var auth = ZooKeeperAuthentication.Digest(_user, _password);
+        using var auth = Authentication();
         return await ZooKeeperClient
-            .ConnectAsync(
-                new ZooKeeperClientOptions
-                {
-                    ConnectionString = endpoint,
-                    Tls = tls ?? Tls(Mutual ? Certificate : null),
-                    Authentication = digest ? [auth] : [],
-                    CompatibilityProfile = Profile,
-                    InitialConnectTimeout = ConnectGuard,
-                    ConnectAttemptTimeout = ConnectGuard,
-                    OperationTimeout = OperationGuard,
-                    CloseTimeout = CloseGuard,
-                },
-                token
-            )
+            .ConnectAsync(Options(endpoint, digest ? [auth] : [], tls), token)
             .ConfigureAwait(false);
     }
+
+    internal ZooKeeperAuthentication Authentication() =>
+        ZooKeeperAuthentication.Digest(_user, _password);
+
+    internal ZooKeeperClientOptions Options(
+        string endpoint,
+        IReadOnlyList<ZooKeeperAuthentication> authentication,
+        ZooKeeperTlsOptions? tls = null
+    ) =>
+        new()
+        {
+            ConnectionString = endpoint,
+            Tls = tls ?? Tls(Mutual ? Certificate : null),
+            Authentication = authentication,
+            CompatibilityProfile = Profile,
+            InitialConnectTimeout = ConnectGuard,
+            ConnectAttemptTimeout = ConnectGuard,
+            OperationTimeout = OperationGuard,
+            CloseTimeout = CloseGuard,
+        };
 
     internal static async Task CloseAsync(ZooKeeperClient client, CancellationToken token)
     {
