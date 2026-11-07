@@ -175,6 +175,11 @@ internal static class NativeRevocation
                 }
                 catch (ZooKeeperConnectionException failure)
                 {
+                    await Console
+                        .Out.WriteLineAsync(
+                            $"Native revocation rejection: failure={failure.Failure}, requests={authority.Requests}, application-frames={applicationFrames}"
+                        )
+                        .ConfigureAwait(false);
                     NativeSettings.Require(failure.Failure == ZooKeeperConnectionFailure.Tls);
                 }
             }
@@ -186,7 +191,10 @@ internal static class NativeRevocation
         finally
         {
             await deadline.CancelAsync().ConfigureAwait(false);
-            listener.Stop();
+            // A rejected handshake can loop into another accept during cancellation.
+            // Keep the listener active until the peer exits; accepting after Stop
+            // throws InvalidOperationException instead of observing the cancelled token.
+            // The using declaration stops/disposes it after this await.
             try
             {
                 await peer.ConfigureAwait(false);
