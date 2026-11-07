@@ -376,7 +376,10 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                 }
                 catch (SocketException)
                 {
-                    lastFailure = new(ZooKeeperConnectionFailure.Unreachable, endpoint);
+                    if (lastFailure.Failure != ZooKeeperConnectionFailure.Tls)
+                    {
+                        lastFailure = new(ZooKeeperConnectionFailure.Unreachable, endpoint);
+                    }
                 }
                 finally
                 {

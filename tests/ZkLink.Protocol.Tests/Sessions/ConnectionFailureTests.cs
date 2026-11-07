@@ -280,6 +280,70 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
         Assert.Equal(TimeSpan.FromMilliseconds(50), client.Manager.InboundSilence);
     }
 
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T08")]
+    [Trait("Acceptance", "T20")]
+    public async Task LaterSocketFailureDoesNotReplaceAnEarlierTlsClassification()
+    {
+        var time = new ManualTimeProvider();
+        var connector = new TlsThenSocketConnector();
+        var options = new ZooKeeperClientOptions
+        {
+            ConnectionString = "first:2181,second:2181",
+            Tls = ZooKeeperTlsOptions.Disabled(),
+            InitialConnectTimeout = TimeSpan.FromMilliseconds(100),
+            ConnectAttemptTimeout = TimeSpan.FromMilliseconds(100),
+            OperationTimeout = TimeSpan.FromMilliseconds(100),
+            CloseTimeout = TimeSpan.FromMilliseconds(100),
+        };
+        var pending = ZooKeeperClient.ConnectCoreAsync(
+            ZkLink.Configuration.ClientOptionsSnapshot.Capture(options),
+            time,
+            connector,
+            new ZkLink.Sessions.SessionRandom(new Random(1)),
+            TestContext.Current.CancellationToken
+        );
+        await SessionTestSupport.Bounded(connector.SecondAttempt).ConfigureAwait(true);
+        time.Advance(TimeSpan.FromMilliseconds(100));
+
+        var error = await Assert
+            .ThrowsAsync<ZooKeeperConnectionException>(() => SessionTestSupport.Bounded(pending))
+            .ConfigureAwait(true);
+
+        Assert.Equal(ZooKeeperConnectionFailure.Tls, error.Failure);
+    }
+
+    private sealed class TlsThenSocketConnector : ZkLink.Transport.ITransportConnector
+    {
+        private int _attempts;
+        private readonly TaskCompletionSource _secondAttempt = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        internal Task SecondAttempt => _secondAttempt.Task;
+
+        public async Task<ZkLink.Transport.TransportConnection> ConnectAsync(
+            ZooKeeperEndpoint endpoint,
+            ZkLink.Configuration.ClientOptionsSnapshot options,
+            CancellationToken cancellationToken
+        )
+        {
+            var attempt = Interlocked.Increment(ref _attempts);
+            if (attempt == 1)
+            {
+                throw new ZooKeeperConnectionException(ZooKeeperConnectionFailure.Tls, endpoint);
+            }
+            if (attempt == 2)
+            {
+                _secondAttempt.TrySetResult();
+                throw new System.Net.Sockets.SocketException(
+                    (int)System.Net.Sockets.SocketError.HostNotFound
+                );
+            }
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
+            throw new OperationCanceledException(cancellationToken);
+        }
+    }
+
     private static byte[] SessionNotification()
     {
         var data = new byte[64];
