@@ -9,6 +9,20 @@ not establish broader security, Native AOT or production qualification. See
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-11-07
+
+### Added
+
+- Verify packed `ZkLink` and `ZkLink.Extensions.DependencyInjection` hosts under
+  Native AOT on Linux x64/arm64, Windows x64 and macOS arm64. Rooted analysis and
+  an unrooted DI host run 48 secure lifecycle cases across ZooKeeper 3.8.7 and 3.9.6.
+
+### Changed
+
+- Enable trim and Native AOT analyzers for the dependency-injection package.
+- Require a scheduler owner when constructing pending requests, simplifying
+  cancellation and timeout callback state.
+
 ## [1.0.2] - 2026-11-07
 
 ### Fixed
