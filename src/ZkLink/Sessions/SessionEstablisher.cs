@@ -276,7 +276,7 @@ internal sealed class SessionEstablisher(
                     translated,
                     options.Limits
                 );
-                owner.EstablishmentInbound();
+                owner.EstablishmentInbound(reply.Header);
                 if (reply.Header.Error != WatchProtocol.Success)
                     throw new ZooKeeperConnectionException(
                         reply.Header.Error switch

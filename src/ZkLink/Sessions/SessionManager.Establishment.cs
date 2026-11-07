@@ -27,7 +27,17 @@ internal sealed partial class SessionManager
         }
     }
 
-    internal void EstablishmentInbound() => _lastInbound = _time.GetTimestamp();
+    internal void EstablishmentInbound(ReplyHeader? reply = null)
+    {
+        lock (_gate)
+        {
+            _lastInbound = _time.GetTimestamp();
+            if (reply is { Zxid: > 0 } header)
+            {
+                _lastZxid = header.Zxid;
+            }
+        }
+    }
 
     internal void BeginWatchRestoration()
     {

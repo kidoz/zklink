@@ -113,7 +113,7 @@ public sealed class WatchRecoveryTests : IAsyncLifetime
         Assert.Equal(RequestOutcome.Unknown, failure.Outcome);
         var firstBatch = await NextDuringRecoveryAsync(second).ConfigureAwait(true);
         Assert.Equal(2, RestorePaths(firstBatch).Length);
-        second.Reply(firstBatch, zxid: StaleZxid);
+        second.Reply(firstBatch);
         var lastBatch = await NextDuringRecoveryAsync(second).ConfigureAwait(true);
         Assert.Single(RestorePaths(lastBatch));
         long failedGeneration = Client.Session.ConnectionGeneration;
@@ -449,6 +449,53 @@ public sealed class WatchRecoveryTests : IAsyncLifetime
         Assert.Equal(ZooKeeperWatchEventKind.NodeCreated, events.Current.Kind);
         Assert.Equal(2, events.Current.ConnectionGeneration);
         Assert.False(await events.MoveNextAsync().ConfigureAwait(true));
+    }
+
+    [Fact(Timeout = TestTimeoutMilliseconds)]
+    [Trait("Acceptance", "T07")]
+    [Trait("Acceptance", "T26")]
+    public async Task RestoreReplyAdvancesTheNextResumeWatermarkButNotificationDoesNot()
+    {
+        const long restoredZxid = 40;
+        const long nextZxid = 41;
+        await RegisterAsync("/node").ConfigureAwait(true);
+        var second = Peer();
+        _fixture.Connector.Add(second);
+        First.Drop();
+        AssertResume(await NextDuringRecoveryAsync(second).ConfigureAwait(true));
+        var reset = await NextDuringRecoveryAsync(second).ConfigureAwait(true);
+        Assert.Equal("/node", Assert.Single(RestorePaths(reset)));
+        var bytes = new byte[PacketBytes];
+        var output = new JuteWriter(bytes, ProtocolFixtures.Limits);
+        output.WriteReplyHeader(
+            new ReplyHeader(WatchProtocol.NotificationXid, StaleZxid, WatchProtocol.Success)
+        );
+        output.WriteInt32((int)ZooKeeperWatchEventKind.NodeDataChanged);
+        output.WriteInt32(WatchProtocol.ServerConnected);
+        output.WriteString("/node");
+        second.Inject(bytes[..output.WrittenCount]);
+        second.Reply(reset, zxid: restoredZxid);
+        await Client
+            .WaitForConnectionAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        Assert.Equal(restoredZxid, Client.Session.LastReplyZxid);
+
+        var third = Peer();
+        _fixture.Connector.Add(third);
+        second.Drop();
+        var handshake = await NextDuringRecoveryAsync(third).ConfigureAwait(true);
+        var resume = new JuteReader(handshake.Bytes, ProtocolFixtures.Limits);
+        resume.ReadInt32();
+        Assert.Equal(restoredZxid, resume.ReadInt64());
+        reset = await NextDuringRecoveryAsync(third).ConfigureAwait(true);
+        var restoration = new JuteReader(reset.Bytes, ProtocolFixtures.Limits);
+        restoration.ReadRequestHeader();
+        Assert.Equal(restoredZxid, restoration.ReadInt64());
+        third.Reply(reset, zxid: nextZxid);
+        await Client
+            .WaitForConnectionAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        Assert.Equal(nextZxid, Client.Session.LastReplyZxid);
     }
 
     private async Task<ZooKeeperWatch> RegisterAsync(string path)
