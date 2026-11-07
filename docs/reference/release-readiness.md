@@ -11,6 +11,16 @@ Core **1.0.0** is now published, and [release run42382051552](https://github.com
 passes package verification, trusted publication, fresh public-only installation
 and indexed-symbol comparison.
 
+The coordinated **1.0.1** release now publishes `ZkLink`,
+`ZkLink.Extensions.DependencyInjection` and `ZkLink.Analyzers`. Its exact-source
+[candidate run](https://github.com/kidoz/zklink/actions/runs/42385866600) passes all
+36 jobs. The release separately checks the complete package set, installed DI
+registration, analyzer compilation diagnostics and core/DI portable symbols.
+All four [release jobs](https://github.com/kidoz/zklink/actions/runs/42387367966)
+pass, including fresh public-only installation of all three packages and indexed
+core/DI PDB comparison.
+This does not add DI-specific Native AOT or full sustained qualification claims.
+
 Reviewed on **2 November 2026**. Core **0.1.0 is published**. The intended next
 production release is **1.0.0**, subject to the checks below. It is not yet
 qualified for production. Passing the current CI workflows establishes their
