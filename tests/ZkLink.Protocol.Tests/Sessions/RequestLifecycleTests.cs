@@ -92,6 +92,59 @@ public sealed class RequestLifecycleTests : IDisposable
         Assert.Null(_scheduler.Take(1).Request);
     }
 
+    [Theory(Timeout = 10000)]
+    [InlineData(false, 100)]
+    [InlineData(false, 150)]
+    [InlineData(true, 100)]
+    [InlineData(true, 150)]
+    [Trait("Acceptance", "T11")]
+    public async Task ExpiredQueuedRequestCannotBeSentBeforeItsTimerCallbackRuns(
+        bool maintenance,
+        int elapsedMilliseconds
+    )
+    {
+        var expired = maintenance
+            ? _scheduler.Submit(
+                new WatchRequest(ZooKeeperOperation.RemoveWatches, "/a", 3),
+                new ZooKeeperRequestInfo(ZooKeeperOperation.RemoveWatches, path: "/a"),
+                TestContext.Current.CancellationToken,
+                watchOperation: true,
+                maintenance: true
+            )
+            : Submit(token: TestContext.Current.CancellationToken);
+        _time.Advance(TimeSpan.FromMilliseconds(elapsedMilliseconds), invokeCallbacks: false);
+        var next = Submit("/next", TestContext.Current.CancellationToken);
+        var writes = 0;
+
+        var handoff = _scheduler.WriteNext(
+            1,
+            _ =>
+            {
+                writes++;
+                return Task.CompletedTask;
+            },
+            TestContext.Current.CancellationToken
+        );
+
+        var error = await Assert
+            .ThrowsAsync<ZooKeeperTimeoutException>(() => expired)
+            .ConfigureAwait(true);
+        Assert.Equal(RequestOutcome.NotSent, error.Outcome);
+        Assert.Null(error.Request.RequestId);
+        Assert.True(_scheduler.MaintenanceAvailable);
+        Assert.Equal(1, writes);
+        var pending = Assert.IsType<PendingRequest>(handoff.Request);
+        Assert.Equal("/next", pending.Info.Path);
+        Assert.Equal(1, pending.Info.RequestId);
+        await handoff.Write!.ConfigureAwait(true);
+        _scheduler.WriteFinished(pending);
+        Reply(pending);
+        await next.ConfigureAwait(true);
+        _time.Advance(TimeSpan.Zero);
+        Assert.Equal(0, _scheduler.PendingCount);
+        Assert.Equal(0, _scheduler.OwnedBytes);
+    }
+
     [Fact(Timeout = 10000)]
     [Trait("Acceptance", "T12")]
     public async Task SentCancellationRetainsATombstoneAndDrainsTheLateReplyInOrder()
@@ -430,6 +483,80 @@ public sealed class RequestLifecycleTests : IDisposable
         Assert.Equal(1, _scheduler.PendingCount);
         _scheduler.WriteFinished(pending);
         Reply(pending);
+        Assert.Equal(0, _scheduler.OwnedBytes);
+    }
+
+    [Theory(Timeout = 10000)]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    [Trait("Acceptance", "T11")]
+    public async Task SignaledCancellationCannotBeSentBeforeItsCallbackRuns(
+        bool maintenance,
+        bool successor
+    )
+    {
+        using var stop = new CancellationTokenSource();
+        var task = maintenance
+            ? _scheduler.Submit(
+                new WatchRequest(
+                    ZooKeeperOperation.RemoveWatches,
+                    "/a",
+                    ZkLink.Watches.WatchProtocol.Any
+                ),
+                new ZooKeeperRequestInfo(ZooKeeperOperation.RemoveWatches, path: "/a"),
+                stop.Token,
+                watchOperation: true,
+                maintenance: true
+            )
+            : Submit(token: stop.Token);
+        var next = successor ? Submit("/next", TestContext.Current.CancellationToken) : null;
+        var writerToken = TestContext.Current.CancellationToken;
+        (PendingRequest? Request, Task? Write) handoff = default;
+        var writes = 0;
+        // Cancellation callbacks run in reverse registration order. This callback
+        // hands work to the writer before the scheduler's callback can remove it.
+        using var callback = stop.Token.Register(() =>
+        {
+            handoff = _scheduler.WriteNext(
+                1,
+                _ =>
+                {
+                    writes++;
+                    return Task.CompletedTask;
+                },
+                writerToken
+            );
+        });
+
+        await stop.CancelAsync().ConfigureAwait(true);
+
+        var error = await Assert
+            .ThrowsAsync<ZooKeeperOperationCanceledException>(() => task)
+            .ConfigureAwait(true);
+        Assert.Equal(RequestOutcome.NotSent, error.Outcome);
+        Assert.Null(error.Request.RequestId);
+        Assert.True(task.IsCanceled);
+        Assert.True(_scheduler.MaintenanceAvailable);
+        Assert.Equal(successor ? 1 : 0, writes);
+        Assert.Equal(successor ? 1 : 0, _scheduler.PendingCount);
+        if (next is not null)
+        {
+            var pending = Assert.IsType<PendingRequest>(handoff.Request);
+            Assert.Equal("/next", pending.Info.Path);
+            Assert.Equal(1, pending.Info.RequestId);
+            await handoff.Write!.ConfigureAwait(true);
+            _scheduler.WriteFinished(pending);
+            Reply(pending);
+            await next.ConfigureAwait(true);
+        }
+        else
+        {
+            Assert.Null(handoff.Request);
+            Assert.Null(handoff.Write);
+        }
+        Assert.Equal(0, _scheduler.PendingCount);
         Assert.Equal(0, _scheduler.OwnedBytes);
     }
 

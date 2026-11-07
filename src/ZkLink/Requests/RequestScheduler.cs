@@ -509,49 +509,72 @@ internal sealed class RequestScheduler(
             {
                 return (null, false);
             }
-            var pending = _close is { Sent: false, Completed: false } ? _close : null;
-            if (pending is null && _pingQueued)
+            while (true)
             {
-                _pingQueued = false;
-                _pingSent = true;
-                _pingStarted = timeProvider.GetTimestamp();
-                return (null, true);
-            }
-            if (
-                pending is null
-                && _maintenance is { Sent: false, Prepared: true, Completed: false }
-            )
-                pending = _maintenance;
-            if (pending is null)
-            {
+                var pending = _close is { Sent: false, Completed: false } ? _close : null;
+                if (pending is null && _pingQueued)
+                {
+                    _pingQueued = false;
+                    _pingSent = true;
+                    _pingStarted = timeProvider.GetTimestamp();
+                    return (null, true);
+                }
                 if (
-                    !_accepting
-                    || _inFlight >= options.Settings.MaxInFlightRequests
-                    || _queued.First is not { Value.Prepared: true } head
+                    pending is null
+                    && _maintenance is { Sent: false, Prepared: true, Completed: false }
                 )
                 {
-                    return (null, false);
+                    pending = _maintenance;
                 }
-                pending = head.Value;
+                if (pending is null)
+                {
+                    if (
+                        !_accepting
+                        || _inFlight >= options.Settings.MaxInFlightRequests
+                        || _queued.First is not { Value.Prepared: true } head
+                    )
+                    {
+                        return (null, false);
+                    }
+                    pending = head.Value;
+                }
+                // A cancellation callback can be delayed after its token is signaled.
+                // Withdraw the request before assigning an xid or starting transmission.
+                if (pending.Token.IsCancellationRequested)
+                {
+                    Cancel(pending, false);
+                    continue;
+                }
+                // Timer callbacks can also be delayed; an elapsed deadline must
+                // withdraw queued work before transmission. Close has its own deadline.
+                if (
+                    pending.Info.Operation != ZooKeeperOperation.CloseSession
+                    && timeProvider.GetElapsedTime(pending.Started)
+                        >= options.Settings.OperationTimeout
+                )
+                {
+                    Cancel(pending, true);
+                    continue;
+                }
+                // Keep ownership in the queued/control slot if allocation fails.
+                var xid = AllocateXid();
+                pending.Info = new ZooKeeperRequestInfo(
+                    pending.Info.Operation,
+                    xid,
+                    _endpoint,
+                    pending.Info.Path
+                );
+                if (!pending.Control)
+                {
+                    RemoveQueued(pending);
+                    _inFlight++;
+                }
+                pending.Sent = true;
+                pending.Writing = true;
+                _sent.Enqueue(pending);
+                BinaryPrimitives.WriteInt32BigEndian(pending.Packet!, xid);
+                return (pending, false);
             }
-            // Keep ownership in the queued/control slot if allocation fails.
-            var xid = AllocateXid();
-            pending.Info = new ZooKeeperRequestInfo(
-                pending.Info.Operation,
-                xid,
-                _endpoint,
-                pending.Info.Path
-            );
-            if (!pending.Control)
-            {
-                RemoveQueued(pending);
-                _inFlight++;
-            }
-            pending.Sent = true;
-            pending.Writing = true;
-            _sent.Enqueue(pending);
-            BinaryPrimitives.WriteInt32BigEndian(pending.Packet!, xid);
-            return (pending, false);
         }
     }
 
