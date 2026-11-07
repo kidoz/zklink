@@ -20,8 +20,9 @@ just zk-down 3.9.6
 
 Expect `Node create/read/update/delete completed.` and `Close: Acknowledged`.
 The password is disposable and is not printed. `--plaintext` explicitly selects
-the local development fixture and its unsafe plaintext-digest override. Use TLS
-for protected credentials outside this fixture.
+the local development fixture and its unsafe plaintext-digest override. Every
+endpoint must be a loopback address or `localhost`; mixed local/remote lists are
+rejected. Use TLS for protected credentials outside this fixture.
 
 ## Understand the calls
 

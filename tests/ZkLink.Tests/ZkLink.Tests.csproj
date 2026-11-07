@@ -9,6 +9,14 @@
       Include="../../benchmarks/ZkLink.Benchmarks/LatencyHistogram.cs"
       Link="LatencyHistogram.cs"
     />
+    <Compile
+      Include="../../samples/ZkLink.Samples.Basic/SampleArguments.cs"
+      Link="SampleArguments.cs"
+    />
+    <Compile
+      Include="../../samples/ZkLink.Samples.Basic/SampleClientOptionsFactory.cs"
+      Link="SampleClientOptionsFactory.cs"
+    />
     <PackageReference Include="xunit.v3.mtp-v2" />
     <PackageReference Include="NSubstitute" />
     <ProjectReference Include="../../src/ZkLink/ZkLink.csproj" />

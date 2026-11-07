@@ -43,6 +43,13 @@ internal static class SampleArgumentParser
         {
             return SampleParseResult.Failure(AuthenticationError);
         }
+        if (
+            arguments.Plaintext
+            && !SampleClientOptionsFactory.IsLoopbackConnectionString(arguments.ConnectionString)
+        )
+        {
+            return SampleParseResult.Failure(SampleClientOptionsFactory.PlaintextError);
+        }
 
         return SampleParseResult.Success(arguments);
     }
