@@ -12,11 +12,12 @@ not establish broader security, Native AOT or production qualification. See
 
 ## [Unreleased]
 
-## [1.0.0] - Unreleased
+## [1.0.0] - 2026-11-07
 
-This candidate remains unpublished while sustained resource and performance
-qualification is in progress. The existing 0.1.0 shipped API baseline is preserved;
-new array overloads are recorded separately and the unpublished DI API is revised.
+This release preserves the existing 0.1.0 shipped API baseline; new array
+overloads are recorded separately and the dependency-injection API is revised.
+Sustained resource and performance qualification remains in progress; see
+[release readiness](docs/reference/release-readiness.md) for the open evidence.
 
 ### Added
 
@@ -27,6 +28,9 @@ new array overloads are recorded separately and the unpublished DI API is revise
   per-resolution disposal tracking and child-scope disposal failures.
 - NuGet package metadata and portable symbols for the DI project. Publication and
   DI-specific Native AOT qualification remain separate checks.
+- A leader election tutorial and runnable sample using three separate sessions,
+  ephemeral sequential candidates and predecessor watches, verified in the
+  operations matrix on both pinned server versions.
 
 - Soak socket ownership checks now retain original handles and exact connection
   endpoints, excluding unrelated namespace listeners that share a port number.
