@@ -12,10 +12,13 @@ using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 using var authentication = credentials.CreateAuthentication();
 var options = SampleClientOptionsFactory.Create(arguments, authentication);
 return await new SampleSession(Console.Out, Console.Error)
-    .RunAsync(options, SelectSteps(arguments), deadline.Token)
+    .RunAsync(options, SelectSteps(arguments, options), deadline.Token)
     .ConfigureAwait(false);
 
-static List<ISampleStep> SelectSteps(SampleArguments arguments)
+static List<ISampleStep> SelectSteps(
+    SampleArguments arguments,
+    ZkLink.ZooKeeperClientOptions options
+)
 {
     var steps = new List<ISampleStep>(4);
     if (arguments.Nodes)
@@ -36,6 +39,11 @@ static List<ISampleStep> SelectSteps(SampleArguments arguments)
     if (arguments.Watches)
     {
         steps.Add(new WatchSample());
+    }
+
+    if (arguments.Election)
+    {
+        steps.Add(new ElectionSample(options));
     }
 
     return steps;

@@ -106,6 +106,10 @@ The intended server targets are **ZooKeeper 3.8.7 and 3.9.6**. These versions we
 
 ## Local ZooKeeper testing
 
+For a coordination example, see [leader election](docs/tutorials/leader-election.md).
+Run the basic sample with `--election` to verify three participants taking turns
+through ephemeral sequential nodes and predecessor watches.
+
 [compose.yaml](compose.yaml) starts a three-node ensemble. The `just` lifecycle commands accept `3.8.7` or `3.9.6`, defaulting to **3.9.6**. Both official images are pinned by multi-platform digest in the version-specific settings above; each version uses a separate Compose project and host ports.
 
 ```sh

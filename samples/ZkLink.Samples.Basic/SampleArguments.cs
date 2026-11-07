@@ -7,8 +7,10 @@ internal sealed record SampleArguments(
     bool Nodes,
     bool Transactions,
     bool Auxiliary,
-    bool Watches
+    bool Watches,
+    bool Election = false
 )
 {
-    internal bool RequiresAuthentication => Nodes || Transactions || Auxiliary || Watches;
+    internal bool RequiresAuthentication =>
+        Nodes || Transactions || Auxiliary || Watches || Election;
 }

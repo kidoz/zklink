@@ -99,7 +99,7 @@ zk-matrix:
 zk-driver-matrix:
     bash dev/test-zookeeper-matrix.sh --driver
 
-# Verify node, ACL, transaction, auxiliary and watch operations on both pinned versions.
+# Verify node, ACL, transaction, auxiliary, watch and election examples on both versions.
 zk-operations-matrix:
     bash dev/test-zookeeper-matrix.sh --operations
 

@@ -42,6 +42,7 @@ internal sealed class SampleSession(TextWriter output, TextWriter error)
                     is ZooKeeperConnectionException
                         or ZooKeeperSessionException
                         or ZooKeeperException
+                        or InvalidOperationException
                         or OperationCanceledException
             )
         {

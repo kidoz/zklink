@@ -19,6 +19,9 @@ Learn through a guided exercise with a concrete result.
 - [Watch repeated changes](watch-repeated-changes.md) — keep a persistent or
   recursive subscription and reread state after reconnect gaps.
 
+- [Elect a leader](leader-election.md) — use separate sessions, ephemeral
+  sequential candidates and predecessor watches to demonstrate ordered handoff.
+
 See [current capabilities](../reference/current-capabilities.md) for the available scope.
 
 [Documentation home](../README.md)

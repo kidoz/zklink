@@ -3,10 +3,10 @@ namespace ZkLink.Samples.Basic;
 internal static class SampleArgumentParser
 {
     internal const string Usage =
-        "Usage: ZkLink.Samples.Basic host:port[,host:port] [--plaintext] [--nodes] [--transactions] [--auxiliary] [--watches]";
+        "Usage: ZkLink.Samples.Basic host:port[,host:port] [--plaintext] [--nodes] [--transactions] [--auxiliary] [--watches] [--election]";
 
     internal const string AuthenticationError =
-        "Set both ZKLINK_USER and ZKLINK_PASSWORD; --nodes, --transactions, --auxiliary and --watches require an authenticated creator ACL.";
+        "Set both ZKLINK_USER and ZKLINK_PASSWORD; --nodes, --transactions, --auxiliary, --watches and --election require an authenticated creator ACL.";
 
     private static readonly string[] OptionalFlags =
     [
@@ -15,6 +15,7 @@ internal static class SampleArgumentParser
         "--transactions",
         "--auxiliary",
         "--watches",
+        "--election",
     ];
 
     internal static SampleParseResult Parse(string[] args, SampleCredentials credentials)
@@ -35,7 +36,8 @@ internal static class SampleArgumentParser
             args.Contains("--nodes", StringComparer.Ordinal),
             args.Contains("--transactions", StringComparer.Ordinal),
             args.Contains("--auxiliary", StringComparer.Ordinal),
-            args.Contains("--watches", StringComparer.Ordinal)
+            args.Contains("--watches", StringComparer.Ordinal),
+            args.Contains("--election", StringComparer.Ordinal)
         );
         if (credentials.IsMismatched || (arguments.RequiresAuthentication && !credentials.HasUser))
         {
