@@ -3,6 +3,10 @@ namespace ZkLink;
 /// <summary>An owned data snapshot and the corresponding stat.</summary>
 public sealed class ZNodeData
 {
+    /// <summary>Copies array data, preserving null arrays separately from empty arrays.</summary>
+    public ZNodeData(byte[]? data, ZNodeStat stat)
+        : this(Snapshot.AsNullableMemory(data), stat) { }
+
     /// <summary>Copies data while preserving the distinction between null and empty.</summary>
     public ZNodeData(ReadOnlyMemory<byte>? data, ZNodeStat stat)
     {

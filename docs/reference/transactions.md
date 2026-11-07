@@ -94,3 +94,5 @@ for live checks and the sample on all six nodes. These are plaintext tests;
 broader fault, secure-server, Native AOT and release qualification remain open.
 
 [Reference](README.md) · [Documentation home](../README.md)
+
+The write `Create` and `SetData` factories accept `byte[]?` as well as `ReadOnlyMemory<byte>?`, preserving null array variables separately from empty arrays. These descriptors borrow data until `MultiAsync` returns its Task; the array overloads do not copy before batch admission.

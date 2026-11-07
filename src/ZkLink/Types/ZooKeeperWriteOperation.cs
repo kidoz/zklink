@@ -29,12 +29,26 @@ public abstract class ZooKeeperWriteOperation
         CreateOptions options
     ) => new Descriptor(path, ZooKeeperClient.CreateNodeRequest(path, data, options));
 
+    /// <summary>Describes a create, preserving null arrays without copying data before batch admission.</summary>
+    public static ZooKeeperWriteOperation Create(
+        string path,
+        byte[]? data,
+        CreateOptions options
+    ) => Create(path, Snapshot.AsNullableMemory(data), options);
+
     /// <summary>Describes a data-version-conditional update without copying the supplied memory.</summary>
     public static ZooKeeperWriteOperation SetData(
         string path,
         ReadOnlyMemory<byte>? data,
         ZNodeVersion version
     ) => new Descriptor(path, new SetDataRequest(path, data, version.Value));
+
+    /// <summary>Describes an update, preserving null arrays without copying data before batch admission.</summary>
+    public static ZooKeeperWriteOperation SetData(
+        string path,
+        byte[]? data,
+        ZNodeVersion version
+    ) => SetData(path, Snapshot.AsNullableMemory(data), version);
 
     /// <summary>Describes a data-version-conditional delete.</summary>
     public static ZooKeeperWriteOperation Delete(string path, ZNodeVersion version) =>

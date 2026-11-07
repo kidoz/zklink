@@ -68,6 +68,35 @@ public sealed class MultiApiTests : IAsyncLifetime
     }
 
     [Theory(Timeout = 10000)]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    [Trait("Acceptance", "T18")]
+    public async Task ArrayDescriptorsPreserveNullAndEmptyOnTheWire(bool create, bool empty)
+    {
+        byte[]? data = empty ? [] : null;
+        var operation = create
+            ? ZooKeeperWriteOperation.Create("/array", data, Create)
+            : ZooKeeperWriteOperation.SetData("/array", data, ZNodeVersion.Any);
+        var pending = Client.MultiAsync([operation], TestContext.Current.CancellationToken);
+        var packet = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        var input = new JuteReader(packet.Bytes, ProtocolFixtures.Limits);
+        input.ReadRequestHeader();
+        Assert.Equal((int)operation.Operation, input.ReadInt32());
+        Assert.False(input.ReadBoolean());
+        Assert.Equal(-1, input.ReadInt32());
+        Assert.Equal("/app/array", input.ReadString());
+        Assert.Equal(data, input.ReadBuffer());
+        WireResult result = create
+            ? new PathResult("/app/array", ProtocolFixtures.Stat)
+            : new StatResult(ProtocolFixtures.Stat);
+        Inject(packet, [new((int)operation.Operation, 0, result)]);
+        await pending.ConfigureAwait(true);
+        Assert.Equal(0, Client.Manager.Scheduler.OwnedBytes);
+    }
+
+    [Theory(Timeout = 10000)]
     [InlineData(-103)]
     [InlineData(-999)]
     [Trait("Acceptance", "T18")]

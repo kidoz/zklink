@@ -63,6 +63,19 @@ public sealed partial class ZooKeeperClient
         );
     }
 
+    /// <summary>Creates one node, preserving null arrays separately from empty arrays.</summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "ApiDesign",
+        "RS0026",
+        Justification = "Retain the shipped optional cancellation token. Array-to-memory conversion makes the array overload strictly preferred for null/array inputs; consumer tests cover both token call forms."
+    )]
+    public Task<CreateResult> CreateAsync(
+        string path,
+        byte[]? data,
+        CreateOptions options,
+        CancellationToken cancellationToken = default
+    ) => CreateAsync(path, Snapshot.AsNullableMemory(data), options, cancellationToken);
+
     internal static CreateRequest CreateNodeRequest(
         string path,
         ReadOnlyMemory<byte>? data,
@@ -113,6 +126,19 @@ public sealed partial class ZooKeeperClient
                 cancellationToken
             )
         );
+
+    /// <summary>Writes an owned array snapshot, preserving null arrays separately from empty arrays.</summary>
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "ApiDesign",
+        "RS0026",
+        Justification = "Retain the shipped optional cancellation token. Array-to-memory conversion makes the array overload strictly preferred for null/array inputs; consumer tests cover both token call forms."
+    )]
+    public Task<ZNodeStat> SetDataAsync(
+        string path,
+        byte[]? data,
+        ZNodeVersion version,
+        CancellationToken cancellationToken = default
+    ) => SetDataAsync(path, Snapshot.AsNullableMemory(data), version, cancellationToken);
 
     /// <summary>Deletes one node under a data-version condition; nonempty nodes are rejected by the server.</summary>
     public Task DeleteAsync(

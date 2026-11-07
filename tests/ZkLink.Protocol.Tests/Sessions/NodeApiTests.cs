@@ -80,6 +80,53 @@ public sealed class NodeApiTests : IAsyncLifetime
         Assert.Equal(ZooKeeperSessionState.Connected, Client.Session.State);
     }
 
+    [Theory(Timeout = 10000)]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    [Trait("Acceptance", "T15")]
+    [Trait("Acceptance", "T16")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Usage",
+        "xUnit1051",
+        Justification = "Tests overload selection with the optional token omitted; the test timeout and owned fixture bound cleanup."
+    )]
+    public async Task ArrayWritesPreserveNullAndEmptyOnTheWire(bool empty, bool passToken)
+    {
+        byte[]? data = empty ? [] : null;
+        var options = new CreateOptions([ZooKeeperAcl.OpenUnsafe]);
+        var create = passToken
+            ? Client.CreateAsync("/array", data, options, TestContext.Current.CancellationToken)
+            : Client.CreateAsync("/array", data, options);
+        var packet = await NextPathAsync((int)ZooKeeperOperation.CreateWithStat, "/app/array")
+            .ConfigureAwait(true);
+        var input = new JuteReader(packet.Bytes, ProtocolFixtures.Limits);
+        input.ReadRequestHeader();
+        input.ReadString();
+        Assert.Equal(data, input.ReadBuffer());
+        Reply(packet, new PathResult("/app/array", Stat));
+        await create.ConfigureAwait(true);
+
+        var set = passToken
+            ? Client.SetDataAsync(
+                "/array",
+                data,
+                ZNodeVersion.Any,
+                TestContext.Current.CancellationToken
+            )
+            : Client.SetDataAsync("/array", data, ZNodeVersion.Any);
+        packet = await NextPathAsync((int)ZooKeeperOperation.SetData, "/app/array")
+            .ConfigureAwait(true);
+        input = new JuteReader(packet.Bytes, ProtocolFixtures.Limits);
+        input.ReadRequestHeader();
+        input.ReadString();
+        Assert.Equal(data, input.ReadBuffer());
+        Reply(packet, new StatResult(Stat));
+        await set.ConfigureAwait(true);
+        Assert.Equal(0, Client.Manager.Scheduler.OwnedBytes);
+    }
+
     [Fact(Timeout = TestTimeoutMilliseconds)]
     [Trait("Acceptance", "T15")]
     [Trait("Acceptance", "T16")]

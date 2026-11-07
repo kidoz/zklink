@@ -13,6 +13,12 @@ public sealed class ModelContractTests
         bytes[0] = 255;
         Assert.Equal(new byte[] { 1, 2, 3 }, snapshot.Data!.Value.ToArray());
         Assert.Null(new ZNodeData(null, default).Data);
+        byte[]? nullArray = null;
+        Assert.Null(new ZNodeData(nullArray, default).Data);
+        byte[] emptyArray = [];
+        Assert.True(new ZNodeData(emptyArray, default).Data!.Value.IsEmpty);
+        ReadOnlyMemory<byte>? nullMemory = null;
+        Assert.Null(new ZNodeData(nullMemory, default).Data);
         var empty = new ZNodeData(ReadOnlyMemory<byte>.Empty, default).Data;
         Assert.True(empty.HasValue);
         Assert.True(empty.Value.IsEmpty);
