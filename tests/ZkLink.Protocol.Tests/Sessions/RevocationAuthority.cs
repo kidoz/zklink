@@ -30,7 +30,15 @@ internal sealed class RevocationAuthority : IAsyncDisposable
     private const string Sha1IdentifierOid = "1.3.14.3.2.26";
     private const string Sha256RsaSignatureOid = "1.2.840.113549.1.1.11";
     private static readonly TimeSpan Lifetime = TimeSpan.FromSeconds(30);
-    private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
+
+    // Apple's trustd permits HTTP status fetches on 80/8080, but rejects
+    // ephemeral ports under its SSRF policy. Keep the responder on loopback;
+    // unique issuer/host/path values below still isolate each test's cache.
+    private const int AppleResponderPort = 8080;
+    private readonly TcpListener _listener = new(
+        IPAddress.Loopback,
+        OperatingSystem.IsMacOS() ? AppleResponderPort : 0
+    );
     private readonly CancellationTokenSource _stop;
     private readonly Task _server;
     private readonly byte[] _crl;

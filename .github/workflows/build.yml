@@ -90,6 +90,8 @@ jobs:
         run: python dev/test-release-candidate.py
       - name: Verify candidate and release version rules
         run: python dev/test-release-version.py
+      - name: Verify release asset preflight
+        run: python dev/test-qualified-release.py
       - name: Download the shared candidate
         if: inputs.candidate_artifact != ''
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7

@@ -77,6 +77,20 @@ Publishing the GitHub release invokes [Release](../../.github/workflows/release.
 A manual run can inspect an existing draft through its `release_tag` input and
 does not push to NuGet.
 
+Check that every required asset is attached before publishing the draft:
+
+```sh
+PACKAGE_VERSION=VERSION QUALIFIED_RELEASE_TAG=vVERSION \
+  GITHUB_REPOSITORY=kidoz/zklink \
+  python3 -B dev/download-qualified-release.py --check-assets
+```
+
+The preflight lists missing or empty assets before the publication job starts.
+It checks presence only; the full qualification below still verifies their contents.
+An older candidate cannot qualify a later release commit, even when the runtime
+source is unchanged. Run candidate verification on the exact intended release
+commit before assembling its assets.
+
 The publication job downloads these assets and the original candidate workflow
 artifact. It requires the completed verification run to match the release source,
 compares the package and symbols byte for byte, verifies their attestations and

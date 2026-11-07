@@ -145,6 +145,10 @@ application bytes are sent. Explicit `NoCheck` controls establish that chain,
 name and protocol setup are otherwise valid. Each case has a separate issuer,
 TLS identity and responder URL; macOS also uses separate loopback responder
 hostnames to isolate platform caches. No root is installed in a system store.
+On macOS the responder binds loopback port 8080, which must be available while
+these checks run. Apple's `trustd` SSRF protection rejects the ephemeral ports
+used by the other platforms. Issuers, hostnames and URL paths remain unique
+for every case; certificate checks and host security settings are unchanged.
 
 Held-response tests cancel the caller or advance the driver deadline after a
 status lookup starts, then require failure and owned cleanup without a ready
@@ -173,10 +177,11 @@ The [shared-candidate run](https://github.com/kidoz/zklink/actions/runs/41239985
 passes all five native cases on Linux x64/arm64, Windows x64 and macOS arm64.
 The separate two-version ZooKeeper fixtures still use `NoCheck`; production
 revocation services, multi-issuer deployments and certificate rotation require
-their own evidence. The local macOS 27 host currently reports unknown status
-without contacting the loopback responder while a VPN, proxy or network filter
-is active. Its cause is unconfirmed; network settings and client policy remain
-unchanged.
+their own evidence. An earlier local macOS 27 failure contacted no responder.
+A controlled reproduction now records `trustd` rejecting the ephemeral port
+under its SSRF policy; the same fixture on port 8080 fetches successfully, and
+all eight managed cases pass. This does not attribute every historical failure
+to that policy or to the host's VPN, proxy or network filter.
 
 See Microsoft's [certificate URL timeout API](https://learn.microsoft.com/dotnet/api/system.security.cryptography.x509certificates.x509chainpolicy.urlretrievaltimeout)
 and [platform cryptography limits](https://learn.microsoft.com/dotnet/standard/security/cross-platform-cryptography#x509chain),

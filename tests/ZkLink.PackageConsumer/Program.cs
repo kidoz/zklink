@@ -43,7 +43,13 @@ var options = SampleClientOptionsFactory.Create(arguments, authentication);
 return await new SampleSession(Console.Out, Console.Error)
     .RunAsync(
         options,
-        [new NodeSample(), new TransactionSample(), new AuxiliarySample(), new WatchSample()],
+        [
+            new NodeSample(),
+            new TransactionSample(),
+            new AuxiliarySample(),
+            new WatchSample(),
+            new ElectionSample(options),
+        ],
         deadline.Token
     )
     .ConfigureAwait(false);

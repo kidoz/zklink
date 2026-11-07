@@ -40,6 +40,8 @@ jobs:
         run: python3 dev/test-release-candidate.py
       - name: Test production evidence rejection
         run: python3 dev/test-release-evidence.py
+      - name: Test release asset preflight
+        run: python3 dev/test-qualified-release.py
       - name: Resolve package version
         id: version
         env:
@@ -53,6 +55,12 @@ jobs:
             version=$(python3 dev/release_version.py --tag "${QUALIFIED_RELEASE_TAG}")
           fi
           printf 'version=%s\n' "${version}" >>"${GITHUB_OUTPUT}"
+      - name: Check required immutable release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_VERSION: ${{ steps.version.outputs.version }}
+          QUALIFIED_RELEASE_TAG: ${{ github.event_name == 'release' && github.ref_name || inputs.release_tag }}
+        run: python3 dev/download-qualified-release.py --check-assets
 
   nuget:
     name: Verify and publish core package

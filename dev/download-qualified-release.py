@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Download verified release assets; publication never repacks the candidate."""
 
+import argparse
 import importlib.util
 import json
 import os
@@ -26,19 +27,45 @@ def gh(*arguments, capture=False):
     return result.stdout if capture else None
 
 
+def required_assets(version):
+    return [MANIFEST_NAME, "ZkLink." + version + ".nupkg", "ZkLink." + version + ".snupkg",
+            "release-evidence.json", "release-evidence.zip"]
+
+
+def check_assets(repository, tag, version):
+    release = json.loads(gh("release", "view", tag, "--repo", repository,
+                            "--json", "tagName,assets", capture=True))
+    if release["tagName"] != tag:
+        raise ValueError("Qualified release tag mismatch")
+    assets = {asset["name"]: asset["size"] for asset in release["assets"]}
+    missing = [name for name in required_assets(version) if assets.get(name, 0) <= 0]
+    if missing:
+        raise ValueError(f"Release {tag} is missing qualified assets: {', '.join(missing)}. "
+                         "Attach the original packages and manifest from a successful candidate run "
+                         "for this exact commit, plus its validated production evidence. "
+                         "Prepare and verify these assets on a draft release before publishing it.")
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check-assets", action="store_true",
+                        help="Check required asset names and sizes without downloading or publishing")
+    args = parser.parse_args()
     version = validate_version(os.environ["PACKAGE_VERSION"])
     repository = os.environ["GITHUB_REPOSITORY"]
     tag = os.environ.get("QUALIFIED_RELEASE_TAG") or "v" + version
     if not re.fullmatch(r"v?" + re.escape(version), tag):
         raise ValueError("Qualified release tag does not match its package version")
+    check_assets(repository, tag, version)
+    if args.check_assets:
+        print("Required release assets are present (content qualification still required).")
+        return
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     root = ROOT / "artifacts/qualified-release"
     root.mkdir(parents=True, exist_ok=False)
     feed = root / "feed"
     feed.mkdir()
-    for name in [MANIFEST_NAME, "ZkLink." + version + ".nupkg", "ZkLink." + version + ".snupkg",
-                 "release-evidence.json", "release-evidence.zip"]:
+    for name in required_assets(version):
         gh("release", "download", tag, "--repo", repository, "--pattern", name, "--dir", str(feed))
     if (feed / "release-evidence.json").stat().st_size > MAXIMUM_INDEX_BYTES:
         raise ValueError("Release evidence index exceeds its bound")
