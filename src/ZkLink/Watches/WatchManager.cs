@@ -483,24 +483,27 @@ internal sealed class WatchManager(
             {
                 if (!watch.Active || watch.Suppressed)
                     continue;
-                bool matches = watch.Persistent
-                    ? kind
+                bool matches = watch.Mode switch
+                {
+                    ZooKeeperWatchMode.OneShotExists when watch.Absent => kind
+                        is ZooKeeperWatchEventKind.NodeCreated
+                            or ZooKeeperWatchEventKind.DataWatchRemoved,
+                    ZooKeeperWatchMode.OneShotExists or ZooKeeperWatchMode.OneShotData => kind
+                        is ZooKeeperWatchEventKind.NodeDataChanged
+                            or ZooKeeperWatchEventKind.NodeDeleted
+                            or ZooKeeperWatchEventKind.DataWatchRemoved,
+                    ZooKeeperWatchMode.OneShotChildren => kind
+                        is ZooKeeperWatchEventKind.NodeChildrenChanged
+                            or ZooKeeperWatchEventKind.NodeDeleted
+                            or ZooKeeperWatchEventKind.ChildWatchRemoved,
+                    ZooKeeperWatchMode.Persistent or ZooKeeperWatchMode.PersistentRecursive => kind
                         is ZooKeeperWatchEventKind.NodeCreated
                             or ZooKeeperWatchEventKind.NodeDeleted
                             or ZooKeeperWatchEventKind.NodeDataChanged
                             or ZooKeeperWatchEventKind.NodeChildrenChanged
-                            or ZooKeeperWatchEventKind.PersistentWatchRemoved
-                    : kind == ZooKeeperWatchEventKind.NodeDeleted
-                        || (
-                            watch.Mode == ZooKeeperWatchMode.OneShotChildren
-                                ? kind
-                                    is ZooKeeperWatchEventKind.NodeChildrenChanged
-                                        or ZooKeeperWatchEventKind.ChildWatchRemoved
-                                : kind
-                                    is ZooKeeperWatchEventKind.NodeCreated
-                                        or ZooKeeperWatchEventKind.NodeDataChanged
-                                        or ZooKeeperWatchEventKind.DataWatchRemoved
-                        );
+                            or ZooKeeperWatchEventKind.PersistentWatchRemoved,
+                    _ => false,
+                };
                 if (matches)
                     targets.Add(watch);
             }

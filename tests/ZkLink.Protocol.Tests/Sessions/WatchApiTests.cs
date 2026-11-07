@@ -46,6 +46,8 @@ public sealed class WatchApiTests : IAsyncLifetime
     )]
     [InlineData(ZooKeeperWatchMode.OneShotChildren, ZooKeeperWatchEventKind.NodeDeleted, false)]
     [InlineData(ZooKeeperWatchMode.OneShotData, ZooKeeperWatchEventKind.DataWatchRemoved, false)]
+    [InlineData(ZooKeeperWatchMode.OneShotExists, ZooKeeperWatchEventKind.DataWatchRemoved, true)]
+    [InlineData(ZooKeeperWatchMode.OneShotExists, ZooKeeperWatchEventKind.DataWatchRemoved, false)]
     [InlineData(
         ZooKeeperWatchMode.OneShotChildren,
         ZooKeeperWatchEventKind.ChildWatchRemoved,
@@ -81,6 +83,95 @@ public sealed class WatchApiTests : IAsyncLifetime
         Assert.Equal(watch.RegistrationId, events.Current.RegistrationId);
         Assert.Equal(NotificationZxid, events.Current.Zxid);
         Assert.DoesNotContain("/node", events.Current.ToString(), StringComparison.Ordinal);
+        Assert.False(await events.MoveNextAsync().ConfigureAwait(true));
+        Assert.Equal(0, Client.Manager.WatchCount);
+    }
+
+    [Theory(Timeout = TestTimeoutMilliseconds)]
+    [InlineData(
+        ZooKeeperWatchMode.OneShotExists,
+        true,
+        ZooKeeperWatchEventKind.NodeDataChanged,
+        ZooKeeperWatchEventKind.NodeCreated
+    )]
+    [InlineData(
+        ZooKeeperWatchMode.OneShotExists,
+        true,
+        ZooKeeperWatchEventKind.NodeDeleted,
+        ZooKeeperWatchEventKind.NodeCreated
+    )]
+    [InlineData(
+        ZooKeeperWatchMode.OneShotExists,
+        true,
+        ZooKeeperWatchEventKind.ChildWatchRemoved,
+        ZooKeeperWatchEventKind.NodeCreated
+    )]
+    [InlineData(
+        ZooKeeperWatchMode.OneShotExists,
+        false,
+        ZooKeeperWatchEventKind.NodeCreated,
+        ZooKeeperWatchEventKind.NodeDataChanged
+    )]
+    [InlineData(
+        ZooKeeperWatchMode.OneShotData,
+        false,
+        ZooKeeperWatchEventKind.NodeCreated,
+        ZooKeeperWatchEventKind.NodeDeleted
+    )]
+    [InlineData(
+        ZooKeeperWatchMode.OneShotData,
+        false,
+        ZooKeeperWatchEventKind.ChildWatchRemoved,
+        ZooKeeperWatchEventKind.NodeDataChanged
+    )]
+    [InlineData(
+        ZooKeeperWatchMode.OneShotChildren,
+        false,
+        ZooKeeperWatchEventKind.NodeCreated,
+        ZooKeeperWatchEventKind.NodeChildrenChanged
+    )]
+    [InlineData(
+        ZooKeeperWatchMode.OneShotChildren,
+        false,
+        ZooKeeperWatchEventKind.NodeDataChanged,
+        ZooKeeperWatchEventKind.NodeDeleted
+    )]
+    [InlineData(
+        ZooKeeperWatchMode.OneShotChildren,
+        false,
+        ZooKeeperWatchEventKind.DataWatchRemoved,
+        ZooKeeperWatchEventKind.NodeChildrenChanged
+    )]
+    [InlineData(
+        ZooKeeperWatchMode.OneShotExists,
+        true,
+        ZooKeeperWatchEventKind.PersistentWatchRemoved,
+        ZooKeeperWatchEventKind.NodeCreated
+    )]
+    [Trait("Acceptance", "T23")]
+    [Trait("Acceptance", "T24")]
+    public async Task UnrelatedEventsLeaveOneShotWatchActiveUntilItsMatchingEvent(
+        ZooKeeperWatchMode mode,
+        bool missing,
+        ZooKeeperWatchEventKind unrelated,
+        ZooKeeperWatchEventKind expected
+    )
+    {
+        var watch = await RegisterAsync(mode, missing: missing).ConfigureAwait(true);
+        Notify(_peer, unrelated, "/app/node");
+        await BarrierAsync().ConfigureAwait(true);
+
+        Assert.True(watch.Active);
+        Assert.False(watch.Queue.Reader.TryPeek(out _));
+
+        Notify(_peer, expected, "/app/node");
+        Notify(_peer, expected, "/app/node");
+        await BarrierAsync().ConfigureAwait(true);
+        await using var events = watch
+            .ReadEventsAsync(TestContext.Current.CancellationToken)
+            .GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        Assert.True(await events.MoveNextAsync().ConfigureAwait(true));
+        Assert.Equal(expected, events.Current.Kind);
         Assert.False(await events.MoveNextAsync().ConfigureAwait(true));
         Assert.Equal(0, Client.Manager.WatchCount);
     }
