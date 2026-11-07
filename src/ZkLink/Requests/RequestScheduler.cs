@@ -19,9 +19,11 @@ internal sealed class PendingRequest
         long generation,
         long started,
         CancellationToken token,
-        bool control = false
+        bool control = false,
+        RequestScheduler? owner = null
     )
     {
+        Owner = owner;
         Info = info;
         ReservedBytes = bytes;
         Generation = generation;
@@ -35,6 +37,7 @@ internal sealed class PendingRequest
         await task.ConfigureAwait(false);
 
     internal Task<WireReply> Task { get; }
+    internal readonly RequestScheduler? Owner;
     internal ZooKeeperRequestInfo Info;
     internal readonly int ReservedBytes;
     internal readonly long Generation;
@@ -247,15 +250,20 @@ internal sealed class RequestScheduler(
                 _generation,
                 started,
                 cancellationToken,
-                maintenance
+                maintenance,
+                this
             )
             {
                 Observer = observer,
             };
             if (maintenance)
+            {
                 _maintenance = pending;
+            }
             else
+            {
                 pending.Node = _queued.AddLast(pending);
+            }
             _bytes += pending.ReservedBytes;
             if (_preparing++ == 0)
             {
@@ -300,11 +308,10 @@ internal sealed class RequestScheduler(
                         pending.Cancellation = cancellationToken.UnsafeRegister(
                             static state =>
                             {
-                                var pair = ((RequestScheduler Scheduler, PendingRequest Pending))
-                                    state!;
-                                pair.Scheduler.Cancel(pair.Pending, false);
+                                var pending = (PendingRequest)state!;
+                                pending.Owner!.Cancel(pending, false);
                             },
-                            (this, pending)
+                            pending
                         );
                         var remaining =
                             options.Settings.OperationTimeout
@@ -318,14 +325,10 @@ internal sealed class RequestScheduler(
                             pending.Timer = timeProvider.CreateTimer(
                                 static state =>
                                 {
-                                    var pair = ((
-                                        RequestScheduler Scheduler,
-                                        PendingRequest Pending
-                                    ))
-                                        state!;
-                                    pair.Scheduler.Cancel(pair.Pending, true);
+                                    var pending = (PendingRequest)state!;
+                                    pending.Owner!.Cancel(pending, true);
                                 },
-                                (this, pending),
+                                pending,
                                 remaining,
                                 Timeout.InfiniteTimeSpan
                             );
@@ -487,7 +490,8 @@ internal sealed class RequestScheduler(
                 _generation,
                 timeProvider.GetTimestamp(),
                 default,
-                true
+                true,
+                this
             )
             {
                 Preparing = false,
