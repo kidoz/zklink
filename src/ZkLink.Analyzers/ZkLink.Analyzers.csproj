@@ -3,7 +3,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <IsPackable>true</IsPackable>
-    <VersionPrefix>1.0.1</VersionPrefix>
+    <VersionPrefix>1.0.2</VersionPrefix>
     <PackageId>ZkLink.Analyzers</PackageId>
     <Title>ZkLink.Analyzers</Title>
     <Description>Roslyn analyzers for secure and asynchronous ZkLink usage.</Description>

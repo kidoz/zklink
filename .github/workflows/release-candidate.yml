@@ -7,7 +7,7 @@ on:
         description: Exact candidate package version
         required: true
         type: string
-        default: '1.0.1'
+        default: '1.0.2'
 
 permissions:
   contents: read

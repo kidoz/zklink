@@ -5,7 +5,7 @@
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     <IsAotCompatible>true</IsAotCompatible>
     <IsPackable>true</IsPackable>
-    <VersionPrefix>1.0.1</VersionPrefix>
+    <VersionPrefix>1.0.2</VersionPrefix>
     <PackageId>ZkLink</PackageId>
     <Description>A managed asynchronous .NET 10 client for Apache ZooKeeper with explicit session ownership, bounded requests and watch recovery.</Description>
     <PackageTags>zookeeper;async;dotnet</PackageTags>

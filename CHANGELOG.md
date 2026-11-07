@@ -9,6 +9,28 @@ not establish broader security, Native AOT or production qualification. See
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-11-07
+
+### Fixed
+
+- Preserve the watch-restoration watermark across interrupted attempts, committing
+  reply progress only after every reset batch succeeds. One-shot data and child
+  invalidations remain eligible for delivery when later batches must be retried.
+- Include authentication and accepted-session retries in the initial connection
+  deadline, and preserve TLS failure classification across later socket failures.
+- Withdraw canceled and expired queued requests before transmission, and measure
+  recovery deadlines from the oldest unanswered application or maintenance request.
+- Finalize session failures before stopping the transport and recheck inbound
+  activity before committing a heartbeat timeout.
+- Match one-shot watch notifications by registration mode and whether the watched
+  node existed. Removal notifications remain specific to the watch category.
+- Restrict the basic sample's plaintext credential override to loopback endpoints.
+
+### Changed
+
+- Reuse the heartbeat timer and dispatch watch events without intermediate target
+  lists to reduce per-activity allocations.
+
 ## [1.0.1] - 2026-11-07
 
 ### Added

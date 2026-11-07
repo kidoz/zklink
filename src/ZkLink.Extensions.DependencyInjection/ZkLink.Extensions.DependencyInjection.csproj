@@ -3,7 +3,7 @@
     <Description>Microsoft.Extensions.DependencyInjection registration and host-owned lifetime for ZkLink.</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IsPackable>true</IsPackable>
-    <VersionPrefix>1.0.1</VersionPrefix>
+    <VersionPrefix>1.0.2</VersionPrefix>
     <PackageId>ZkLink.Extensions.DependencyInjection</PackageId>
     <PackageTags>zookeeper;dependency-injection;hosting;dotnet</PackageTags>
     <PackageProjectUrl>https://github.com/kidoz/zklink</PackageProjectUrl>
