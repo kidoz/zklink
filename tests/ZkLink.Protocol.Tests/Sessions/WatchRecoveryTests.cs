@@ -401,6 +401,42 @@ public sealed class WatchRecoveryTests : IAsyncLifetime
         Assert.Equal(ZooKeeperCloseStatus.SessionExpired, Client.Session.CloseStatus);
     }
 
+    [Theory(Timeout = TestTimeoutMilliseconds)]
+    [InlineData(WatchProtocol.ServerDisconnected, ZooKeeperSessionState.Disconnected)]
+    [InlineData((int)ZooKeeperErrorCode.SessionExpired, ZooKeeperSessionState.Expired)]
+    [InlineData(WatchProtocol.ServerAuthFailed, ZooKeeperSessionState.AuthFailed)]
+    [InlineData(ServerReadOnly, ZooKeeperSessionState.Faulted)]
+    [Trait("Acceptance", "T10")]
+    [Trait("Acceptance", "T14")]
+    public async Task SessionNotificationCommitsAdmissionAndPendingOutcomesBeforeReturning(
+        int state,
+        ZooKeeperSessionState expected
+    )
+    {
+        First.HoldApplicationWrite = true;
+        var sent = Client.SyncAsync("/sent", TestContext.Current.CancellationToken);
+        await SessionTestSupport.NextAsync(First).ConfigureAwait(true);
+        await SessionTestSupport.Bounded(First.ApplicationWriteHeld).ConfigureAwait(true);
+        var queued = Client.SyncAsync("/queued", TestContext.Current.CancellationToken);
+
+        var failure = Client.Manager.Notification(
+            Client.Session.ConnectionGeneration,
+            new WireNotification(WatchProtocol.SessionEvent, state, null, null)
+        );
+
+        Assert.NotNull(failure);
+        Assert.Equal(expected, Client.Session.State);
+        Assert.Equal(0, Client.Manager.Scheduler.PendingCount);
+        var uncertain = await Assert
+            .ThrowsAsync<ZooKeeperException>(() => sent)
+            .ConfigureAwait(true);
+        var notSent = await Assert
+            .ThrowsAsync<ZooKeeperException>(() => queued)
+            .ConfigureAwait(true);
+        Assert.Equal(RequestOutcome.Unknown, uncertain.Outcome);
+        Assert.Equal(RequestOutcome.NotSent, notSent.Outcome);
+    }
+
     [Fact(Timeout = TestTimeoutMilliseconds)]
     [Trait("Acceptance", "T26")]
     public async Task OneShotConsumedDuringAnAbortedRestoreIsNotRestoredAgain()

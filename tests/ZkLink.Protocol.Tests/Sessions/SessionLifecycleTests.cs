@@ -154,6 +154,12 @@ public sealed class SessionLifecycleTests : IAsyncLifetime
         var ping = await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
         Assert.Equal(-2, ping.Xid);
         Assert.Equal(11, ping.Opcode);
+        await _fixture
+            .Time.WaitForTimerAsync(
+                TimeSpan.FromMilliseconds(400),
+                TestContext.Current.CancellationToken
+            )
+            .ConfigureAwait(true);
         _fixture.Time.Advance(TimeSpan.FromMilliseconds(200));
         await observer.WaitAsync(ZooKeeperSessionState.Disconnected).ConfigureAwait(true);
         // Observe the reconnect attempt before advancing its remaining session deadline.
@@ -169,6 +175,35 @@ public sealed class SessionLifecycleTests : IAsyncLifetime
                 client.WaitForConnectionAsync(TestContext.Current.CancellationToken)
             )
             .ConfigureAwait(true);
+    }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T09")]
+    public async Task LateInboundInvalidatesASampledHeartbeatFailure()
+    {
+        var peer = Peer();
+        var client = await SessionTestSupport
+            .Bounded(
+                _fixture.ConnectAsync(
+                    peer,
+                    cancellationToken: TestContext.Current.CancellationToken
+                )
+            )
+            .ConfigureAwait(true);
+        await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
+        var sampled = client.Manager.InboundTimestamp;
+        _fixture.Time.Advance(TimeSpan.FromMilliseconds(50));
+        client.Manager.Inbound(client.Session.ConnectionGeneration, null);
+
+        var stopped = client.Manager.StopIfInboundUnchanged(
+            client.Session.ConnectionGeneration,
+            sampled,
+            new(ZkLink.Sessions.RuntimeStop.Lost)
+        );
+
+        Assert.False(stopped);
+        Assert.Equal(ZooKeeperSessionState.Connected, client.Session.State);
+        Assert.Equal(TimeSpan.Zero, client.Manager.InboundSilence);
     }
 
     [Fact(Timeout = 10000)]

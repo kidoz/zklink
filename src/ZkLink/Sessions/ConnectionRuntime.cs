@@ -93,37 +93,20 @@ internal sealed class ConnectionRuntime(
                         new PingRequest(),
                         options.Limits
                     );
-                    if (!scheduler.ConsumePing(Generation))
+                    var stop = owner.PingReply(Generation, acknowledgment.Header);
+                    if (stop is { } value)
                     {
-                        return new(RuntimeStop.Stopped);
-                    }
-                    owner.Inbound(Generation, null);
-                    if (acknowledgment.Header.Error != 0)
-                    {
-                        return Stop(
-                            new(
-                                acknowledgment.Header.Error switch
-                                {
-                                    -112 => RuntimeStop.Expired,
-                                    -115 or -124 => RuntimeStop.AuthFailed,
-                                    -4 or -7 or -12 or -118 or -122 => RuntimeStop.Disconnected,
-                                    _ => RuntimeStop.Protocol,
-                                },
-                                acknowledgment.Header.Error
-                            )
-                        );
+                        return Stop(value);
                     }
                 }
                 else
                 {
-                    var pending = scheduler.Expected(Generation, header.Xid, out var expectedShape);
+                    var pending = owner.Expected(Generation, header.Xid, out var expectedShape);
                     if (pending is null)
                     {
                         return new(RuntimeStop.Stopped);
                     }
-                    var shape =
-                        expectedShape
-                        ?? throw new InvalidDataException("Missing expected reply shape.");
+                    var shape = expectedShape!;
                     var reply = ReplyCodec.Decode(packet, header.Xid, shape, options.Limits);
                     if (reply.Header.Error == 0)
                     {
@@ -233,15 +216,26 @@ internal sealed class ConnectionRuntime(
         {
             while (true)
             {
-                var silence = owner.InboundSilence;
+                var inbound = owner.InboundTimestamp;
+                var silence = time.GetElapsedTime(inbound);
                 if (silence >= timeout)
                 {
-                    return Stop(new(RuntimeStop.Lost));
+                    var failure = new RuntimeFailure(RuntimeStop.Lost);
+                    if (owner.StopIfInboundUnchanged(Generation, inbound, failure))
+                    {
+                        return failure;
+                    }
+                    continue;
                 }
                 var readRemaining = TimeSpan.FromTicks(timeout.Ticks * 2 / 3) - silence;
                 if (readRemaining <= TimeSpan.Zero)
                 {
-                    return Stop(new(RuntimeStop.Disconnected));
+                    var failure = new RuntimeFailure(RuntimeStop.Disconnected);
+                    if (owner.StopIfInboundUnchanged(Generation, inbound, failure))
+                    {
+                        return failure;
+                    }
+                    continue;
                 }
                 var unanswered = scheduler.OldestRemaining(timeout);
                 if (unanswered is { } overdue && overdue <= TimeSpan.Zero)

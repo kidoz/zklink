@@ -66,6 +66,20 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
     internal RequestScheduler Scheduler { get; }
     internal ZooKeeperSessionSnapshot Session => _states.Current;
     internal TimeSpan InboundSilence => _time.GetElapsedTime(Interlocked.Read(ref _lastInbound));
+    internal long InboundTimestamp => Interlocked.Read(ref _lastInbound);
+
+    internal bool StopIfInboundUnchanged(long value, long sampled, RuntimeFailure failure)
+    {
+        lock (_gate)
+        {
+            if (Interlocked.Read(ref _lastInbound) != sampled)
+            {
+                return false;
+            }
+            TransportStopped(value, failure);
+            return true;
+        }
+    }
 
     internal Task Start()
     {
@@ -491,77 +505,149 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
         }
     }
 
+    internal PendingRequest? Expected(long value, int xid, out WireRequest? shape)
+    {
+        lock (_gate)
+        {
+            try
+            {
+                var pending = Scheduler.Expected(value, xid, out shape);
+                if (pending is not null && shape is null)
+                {
+                    throw new InvalidDataException("Missing expected reply shape.");
+                }
+                return pending;
+            }
+            catch (InvalidDataException)
+            {
+                TransportStopped(value, new(RuntimeStop.Protocol));
+                throw;
+            }
+        }
+    }
+
+    internal RuntimeFailure? PingReply(long value, ReplyHeader acknowledgment)
+    {
+        lock (_gate)
+        {
+            try
+            {
+                if (!Scheduler.ConsumePing(value))
+                {
+                    return new(RuntimeStop.Stopped);
+                }
+                Inbound(value, null);
+                if (acknowledgment.Error == 0)
+                {
+                    return null;
+                }
+                var failure = new RuntimeFailure(
+                    acknowledgment.Error switch
+                    {
+                        -112 => RuntimeStop.Expired,
+                        -115 or -124 => RuntimeStop.AuthFailed,
+                        -4 or -7 or -12 or -118 or -122 => RuntimeStop.Disconnected,
+                        _ => RuntimeStop.Protocol,
+                    },
+                    acknowledgment.Error
+                );
+                TransportStopped(value, failure);
+                return failure;
+            }
+            catch (InvalidDataException)
+            {
+                TransportStopped(value, new(RuntimeStop.Protocol));
+                throw;
+            }
+        }
+    }
+
     internal RuntimeFailure? Reply(long value, PendingRequest pending, WireReply reply)
     {
         lock (_gate)
         {
-            if (_active?.Generation != value || Scheduler.Expected(value, reply.Header.Xid) is null)
+            try
             {
-                return new(RuntimeStop.Stopped);
-            }
-            Inbound(value, reply.Header);
-            int errorCode = reply.Header.Error;
-            if (errorCode == 0 && reply.Result is MultiResult multi)
-            {
-                errorCode =
-                    multi
-                        .Members.FirstOrDefault(static member =>
-                            member.Error is -112 or -115 or -124 or -118 or -12
-                        )
-                        ?.Error
-                    ?? 0;
-            }
-            RuntimeFailure? result = null;
-            if (errorCode is -112 or -115 or -124)
-            {
-                result = new RuntimeFailure(
-                    errorCode == -112 ? RuntimeStop.Expired : RuntimeStop.AuthFailed,
-                    errorCode
-                );
-                _terminalCode = errorCode;
-                _serverExpired = result.Value.Kind == RuntimeStop.Expired;
-                _terminalCause = new ZooKeeperSessionException(
-                    _serverExpired
-                        ? ZooKeeperSessionState.Expired
-                        : ZooKeeperSessionState.AuthFailed,
-                    _terminalCode
-                );
-                PublishTerminal(
-                    _serverExpired
-                        ? ZooKeeperSessionState.Expired
-                        : ZooKeeperSessionState.AuthFailed,
-                    detach: false
-                );
-            }
-            if (errorCode is -118 or -12)
-            {
-                Scheduler.StopAdmission();
-                if (!_closing)
+                if (
+                    _active?.Generation != value
+                    || Scheduler.Expected(value, reply.Header.Xid) is null
+                )
                 {
-                    PublishState(ZooKeeperSessionState.Disconnected);
-                    if (_connectionReady.Task.IsCompleted)
-                    {
-                        _connectionReady = NewSignal();
-                    }
+                    return new(RuntimeStop.Stopped);
                 }
-                result = new(RuntimeStop.Disconnected, errorCode);
+                Inbound(value, reply.Header);
+                int errorCode = reply.Header.Error;
+                if (errorCode == 0 && reply.Result is MultiResult multi)
+                {
+                    errorCode =
+                        multi
+                            .Members.FirstOrDefault(static member =>
+                                member.Error is -112 or -115 or -124 or -118 or -12
+                            )
+                            ?.Error
+                        ?? 0;
+                }
+                RuntimeFailure? result = null;
+                if (errorCode is -112 or -115 or -124)
+                {
+                    result = new RuntimeFailure(
+                        errorCode == -112 ? RuntimeStop.Expired : RuntimeStop.AuthFailed,
+                        errorCode
+                    );
+                    _terminalCode = errorCode;
+                    _serverExpired = result.Value.Kind == RuntimeStop.Expired;
+                    _terminalCause = new ZooKeeperSessionException(
+                        _serverExpired
+                            ? ZooKeeperSessionState.Expired
+                            : ZooKeeperSessionState.AuthFailed,
+                        _terminalCode
+                    );
+                    PublishTerminal(
+                        _serverExpired
+                            ? ZooKeeperSessionState.Expired
+                            : ZooKeeperSessionState.AuthFailed,
+                        detach: false
+                    );
+                }
+                if (errorCode is -118 or -12)
+                {
+                    Scheduler.StopAdmission();
+                    if (!_closing)
+                    {
+                        PublishState(ZooKeeperSessionState.Disconnected);
+                        if (_connectionReady.Task.IsCompleted)
+                        {
+                            _connectionReady = NewSignal();
+                        }
+                    }
+                    result = new(RuntimeStop.Disconnected, errorCode);
+                }
+                if (pending.Info.Operation == ZooKeeperOperation.CloseSession && errorCode == 0)
+                {
+                    _closeAcknowledged = true;
+                    _closeStatus = ZooKeeperCloseStatus.Acknowledged;
+                    _states.Publish(BuildSnapshot(Session.State), false);
+                    result = new(RuntimeStop.CloseAcknowledged);
+                }
+                Scheduler.Complete(value, pending, reply);
+                if (
+                    result is
+                    {
+                        Kind: RuntimeStop.Expired
+                            or RuntimeStop.AuthFailed
+                            or RuntimeStop.Disconnected
+                    }
+                )
+                {
+                    DetachRequests();
+                }
+                return result;
             }
-            if (pending.Info.Operation == ZooKeeperOperation.CloseSession && errorCode == 0)
+            catch (InvalidDataException)
             {
-                _closeAcknowledged = true;
-                _closeStatus = ZooKeeperCloseStatus.Acknowledged;
-                _states.Publish(BuildSnapshot(Session.State), false);
-                result = new(RuntimeStop.CloseAcknowledged);
+                TransportStopped(value, new(RuntimeStop.Protocol));
+                throw;
             }
-            Scheduler.Complete(value, pending, reply);
-            if (
-                result is
-                { Kind: RuntimeStop.Expired or RuntimeStop.AuthFailed or RuntimeStop.Disconnected }
-            )
-            {
-                DetachRequests();
-            }
-            return result;
         }
     }
 
@@ -573,29 +659,48 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
             {
                 return new(RuntimeStop.Stopped);
             }
+            RuntimeFailure? result;
             if (!notification.IsRecognized)
-                return new(RuntimeStop.Protocol);
-            if (notification.Type != WatchProtocol.SessionEvent)
+            {
+                result = new(RuntimeStop.Protocol);
+            }
+            else if (notification.Type != WatchProtocol.SessionEvent)
             {
                 if (notification.State != WatchProtocol.ServerConnected)
-                    return new(RuntimeStop.Protocol);
-                Inbound(value, null);
-                if (!_watches.Dispatch(notification))
                 {
-                    FaultOverflow();
-                    return new(RuntimeStop.Protocol);
+                    result = new(RuntimeStop.Protocol);
                 }
-                return null;
+                else
+                {
+                    Inbound(value, null);
+                    if (!_watches.Dispatch(notification))
+                    {
+                        FaultOverflow();
+                        result = new(RuntimeStop.Protocol);
+                    }
+                    else
+                    {
+                        return null;
+                    }
+                }
             }
-            Inbound(value, null);
-            return notification.State switch
+            else
             {
-                3 => null,
-                0 => new(RuntimeStop.Disconnected),
-                -112 => new(RuntimeStop.Expired),
-                4 => new(RuntimeStop.AuthFailed),
-                _ => new(RuntimeStop.Protocol),
-            };
+                Inbound(value, null);
+                result = notification.State switch
+                {
+                    3 => null,
+                    0 => new(RuntimeStop.Disconnected),
+                    -112 => new(RuntimeStop.Expired),
+                    4 => new(RuntimeStop.AuthFailed),
+                    _ => new(RuntimeStop.Protocol),
+                };
+            }
+            if (result is { } failure)
+            {
+                TransportStopped(value, failure);
+            }
+            return result;
         }
     }
 
