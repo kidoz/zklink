@@ -672,7 +672,9 @@ internal sealed class RequestScheduler(
             pending.Observer?.Replied(pending, reply);
             pending.Observer = null;
             if (ReferenceEquals(_maintenance, pending))
+            {
                 _maintenance = null;
+            }
             _sent.Dequeue();
             if (pending.Tombstone)
             {
@@ -779,10 +781,12 @@ internal sealed class RequestScheduler(
                 Finish(pending, new ZooKeeperException(pending.Info, RequestOutcome.NotSent));
             }
             if (_maintenance is { Sent: false, Completed: false })
+            {
                 Finish(
                     _maintenance,
                     new ZooKeeperException(_maintenance.Info, RequestOutcome.NotSent)
                 );
+            }
             foreach (var pending in _sent)
             {
                 pending.Observer?.Abandoned(pending);
@@ -825,7 +829,9 @@ internal sealed class RequestScheduler(
     {
         SessionGate.RequireHeld(gate);
         if (!pending.Sent && ReferenceEquals(_maintenance, pending))
+        {
             _maintenance = null;
+        }
         if (pending.Node is { List: not null })
         {
             _queued.Remove(pending.Node);

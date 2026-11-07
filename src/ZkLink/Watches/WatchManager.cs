@@ -44,7 +44,9 @@ internal sealed class WatchManager(
         get
         {
             lock (_gate)
+            {
                 return _handles.Count;
+            }
         }
     }
 
@@ -69,12 +71,16 @@ internal sealed class WatchManager(
                 _handles.Count >= options.Settings.MaxWatches
                 || (!_buckets.ContainsKey(key) && _buckets.Count >= options.Settings.MaxWatches)
             )
+            {
                 throw new ZooKeeperBackpressureException(info);
+            }
             if (!_buckets.TryGetValue(key, out var bucket))
             {
                 _buckets.Add(key, bucket = new Bucket());
                 if (key.Category == WatchProtocol.PersistentRecursive)
+                {
                     _recursive.Add(key.Path, bucket);
+                }
             }
             var watch = new ZooKeeperWatch(
                 this,
@@ -93,7 +99,9 @@ internal sealed class WatchManager(
     {
         SessionGate.RequireHeld(_gate);
         if (options.Settings.CompatibilityProfile == ZooKeeperCompatibilityProfile.ZooKeeper39)
+        {
             return;
+        }
         foreach (
             int category in new[]
             {
@@ -108,20 +116,28 @@ internal sealed class WatchManager(
                 category == key.Category
                 || (category <= WatchProtocol.Data && key.Category <= WatchProtocol.Data)
             )
+            {
                 continue;
+            }
             if (!_buckets.TryGetValue(new Key(key.Path, category), out var bucket))
+            {
                 continue;
+            }
             if (Shared(bucket))
+            {
                 throw new NotSupportedException(
                     "The ZooKeeper 3.8 profile cannot mix one-shot, persistent and recursive modes at the same path."
                 );
+            }
             if (
                 bucket.Dirty
                 || bucket.Removing
                 || bucket.Restoring
                 || bucket.Handles.Any(static watch => watch.Pending)
             )
+            {
                 throw new ZooKeeperBackpressureException(info);
+            }
         }
     }
 
@@ -178,14 +194,18 @@ internal sealed class WatchManager(
             Release(watch);
         }
         else
+        {
             SetActive(watch, true);
+        }
     }
 
     private void SetActive(ZooKeeperWatch watch, bool active)
     {
         SessionGate.RequireHeld(_gate);
         if (watch.Active == active)
+        {
             return;
+        }
         watch.Active = active;
         session.Telemetry.WatchDelta(active ? 1 : -1);
     }
@@ -196,7 +216,9 @@ internal sealed class WatchManager(
         watch.Suppressed = true;
         SetActive(watch, false);
         while (watch.Queue.Reader.TryRead(out _))
+        {
             budget.Release(1);
+        }
         watch.Queue.Writer.TryComplete();
     }
 
@@ -224,7 +246,9 @@ internal sealed class WatchManager(
     {
         SessionGate.RequireHeld(_gate);
         if (!_handles.Remove(watch))
+        {
             return;
+        }
         var key = For(watch);
         if (_buckets.TryGetValue(key, out var bucket))
         {
@@ -245,7 +269,9 @@ internal sealed class WatchManager(
         {
             _buckets.Remove(key);
             if (key.Category == WatchProtocol.PersistentRecursive)
+            {
                 _recursive.Remove(key.Path);
+            }
         }
     }
 
@@ -301,7 +327,9 @@ internal sealed class WatchManager(
     )
     {
         if (!Enum.IsDefined(mode))
+        {
             throw new ArgumentOutOfRangeException(nameof(mode));
+        }
         lock (_gate)
         {
             var key = For(watch);
@@ -323,15 +351,19 @@ internal sealed class WatchManager(
                 if (bucket is null)
                 {
                     if (_buckets.Count >= options.Settings.MaxWatches)
+                    {
                         throw new ZooKeeperBackpressureException(
                             new ZooKeeperRequestInfo(
                                 ZooKeeperOperation.RemoveWatches,
                                 path: watch.Path
                             )
                         );
+                    }
                     _buckets.Add(key, bucket = new Bucket());
                     if (key.Category == WatchProtocol.PersistentRecursive)
+                    {
                         _recursive.Add(key.Path, bucket);
+                    }
                 }
                 bucket.Removing = true;
                 // This ordered request covers older cleanup intents. A newer intent
@@ -340,14 +372,18 @@ internal sealed class WatchManager(
                 _cleanup.Remove(key);
             }
             if (!watch.Pending)
+            {
                 Release(watch);
+            }
             if (shared)
+            {
                 return Task.FromResult(
                     new ZooKeeperWatchRemovalResult(
                         watch.RegistrationId,
                         WatchRemovalStatus.SharedRegistrationRetained
                     )
                 );
+            }
             if (mode == WatchRemovalMode.Local)
             {
                 if (active)
@@ -356,16 +392,20 @@ internal sealed class WatchManager(
                     if (!_buckets.ContainsKey(key))
                     {
                         if (_buckets.Count >= options.Settings.MaxWatches)
+                        {
                             throw new ZooKeeperBackpressureException(
                                 new ZooKeeperRequestInfo(
                                     ZooKeeperOperation.RemoveWatches,
                                     path: watch.Path
                                 )
                             );
+                        }
                         bucket ??= new Bucket();
                         _buckets.Add(key, bucket);
                         if (key.Category == WatchProtocol.PersistentRecursive)
+                        {
                             _recursive.Add(key.Path, bucket);
+                        }
                     }
                     Cleanup(key);
                 }
@@ -566,7 +606,9 @@ internal sealed class WatchManager(
                 )
             )
         )
+        {
             throw new InvalidOperationException("Watch queue invariant violated.");
+        }
     }
 
     // Called after all reset acknowledgments, under the session gate before scheduler attachment.
@@ -577,9 +619,13 @@ internal sealed class WatchManager(
             .Where(static watch => watch.Persistent && watch.Active && !watch.Suppressed)
             .ToArray();
         if (!budget.Reserve(targets.Length))
+        {
             return false;
+        }
         foreach (var watch in targets)
+        {
             Publish(watch, ZooKeeperWatchEventKind.ReconnectedWithGap, watch.Path, null);
+        }
         return true;
     }
 
@@ -591,7 +637,9 @@ internal sealed class WatchManager(
         {
             var bucket = _buckets[key];
             if (!bucket.Dirty || bucket.Removing)
+            {
                 continue;
+            }
             if (Shared(bucket))
             {
                 // A pending read may fail; retain the old cleanup intent until a live
@@ -652,7 +700,9 @@ internal sealed class WatchManager(
             {
                 var paths = new List<string?>[Enum.GetValues<RestoreCategory>().Length];
                 for (int index = 0; index < paths.Length; index++)
+                {
                     paths[index] = [];
+                }
                 int overhead = extended
                     ? WatchProtocol.ExtendedRestoreFrameOverhead
                     : WatchProtocol.RestoreFrameOverhead;
@@ -665,7 +715,9 @@ internal sealed class WatchManager(
                 void Flush()
                 {
                     if (count == 0)
+                    {
                         return;
+                    }
                     result.Add(
                         new RestoreRequest(
                             zxid,
@@ -677,7 +729,9 @@ internal sealed class WatchManager(
                         )
                     );
                     foreach (var list in paths)
+                    {
                         list.Clear();
+                    }
                     bytes = overhead;
                     count = 0;
                 }
@@ -688,7 +742,9 @@ internal sealed class WatchManager(
                         is WatchProtocol.Persistent
                             or WatchProtocol.PersistentRecursive;
                     if (persistent != extended)
+                    {
                         continue;
+                    }
                     var categories = bucket
                         .Handles.Where(static watch => watch.Active && !watch.Suppressed)
                         .Select(watch =>
@@ -715,7 +771,9 @@ internal sealed class WatchManager(
                                 || count >= options.Limits.MaxCollectionElements
                             )
                         )
+                        {
                             Flush();
+                        }
                         paths[(int)category].Add(key.Path);
                         bytes += cost;
                         count++;
@@ -734,10 +792,14 @@ internal sealed class WatchManager(
             foreach (var pair in _buckets.ToArray())
             {
                 if (!pair.Value.Restoring)
+                {
                     continue;
+                }
                 pair.Value.Restoring = false;
                 if (!Shared(pair.Value))
+                {
                     Cleanup(pair.Key, restored: true);
+                }
             }
         }
     }
@@ -777,7 +839,9 @@ internal sealed class WatchManager(
         {
             manager.Suppress(watch);
             if (!pending.Sent)
+            {
                 manager.Abandon(watch);
+            }
         }
 
         public void Abandoned(PendingRequest pending) => manager.Abandon(watch);
@@ -791,16 +855,22 @@ internal sealed class WatchManager(
         {
             _observed = true;
             if (reply.Header.Error is WatchProtocol.Success or (int)ZooKeeperErrorCode.NoWatcher)
+            {
                 Done();
+            }
             else
+            {
                 manager.RejectCleanup(key);
+            }
         }
 
         public void Canceled(PendingRequest pending)
         {
             _observed = true;
             if (!pending.Sent)
+            {
                 manager.RetryCleanup(key);
+            }
         }
 
         public void Abandoned(PendingRequest pending)
