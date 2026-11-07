@@ -1,5 +1,13 @@
 # Production release readiness
 
+On **7 November 2026**, the owner requested a HostLoom-style NuGet release without
+the remaining soak tests and benchmarks. NuGet publication now requires a
+successful exact-source candidate, verified package provenance and installed
+consumer checks; sustained qualification remains separate. The current candidate
+[passes all 36 jobs](https://github.com/kidoz/zklink/actions/runs/42377862412).
+The interrupted soak is retained as incomplete, and controlled benchmarks were
+not run. NuGet availability does not establish full production qualification.
+
 Reviewed on **2 November 2026**. Core **0.1.0 is published**. The intended next
 production release is **1.0.0**, subject to the checks below. It is not yet
 qualified for production. Passing the current CI workflows establishes their
