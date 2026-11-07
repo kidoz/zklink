@@ -19,6 +19,12 @@ No code fixes or automatic retries are supplied. Credential storage, watch owner
 
 ## Use from this source checkout
 
+Install the analyzer package for a consuming project with:
+
+```xml
+<PackageReference Include="ZkLink.Analyzers" Version="1.0.1" PrivateAssets="all" />
+```
+
 Reference the analyzer without loading it as a runtime library:
 
 ```xml
@@ -42,4 +48,6 @@ To escalate a rule in a consuming project:
 dotnet_diagnostic.ZKL0004.severity = error
 ```
 
-The project is under development. No analyzer NuGet release, cross-platform package qualification, or Native AOT support is claimed.
+The release workflow checks a fresh package consumer, clean compilation and the
+intentional ZKL0004 diagnostic. Analyzers run in the compiler and add no ZkLink
+runtime dependency. This does not establish Native AOT support for application code.

@@ -35,4 +35,8 @@ The unpublished direct `ZooKeeperClient` registration has been replaced: migrate
 
 Calling `AddZkLink` twice in one service collection throws. Options, credentials and certificates are captured when the host connects, so keep configuration resources alive until startup completes. Use an explicitly owned `ZooKeeperClient` for a separate security or coordination identity. The helper does not add session pooling, request replay, named registrations, health checks, or configuration binding.
 
-The project produces local NuGet and portable-symbol packages. Publication, cross-platform installed-package qualification and Native AOT qualification remain separate release checks; no DI-specific Native AOT support is claimed.
+Install `ZkLink.Extensions.DependencyInjection` version `1.0.1`; it depends on the
+matching core package. The release includes portable symbols and verifies a fresh
+package consumer, assembly identity and shared accessor registration. Full
+cross-platform and Native AOT qualification remain separate; no DI-specific Native
+AOT support is claimed.

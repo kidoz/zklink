@@ -104,6 +104,29 @@ internal static class PackageCheck
         Require(HashFile(assemblyPath) == expected.GetProperty("assemblySha256").GetString());
     }
 
+    internal static void Symbols(
+        string package,
+        string symbols,
+        string packageId,
+        string revision,
+        string report
+    )
+    {
+        using var archive = ZipFile.OpenRead(package);
+        using var symbolArchive = ZipFile.OpenRead(symbols);
+        string assemblyName = $"lib/net10.0/{packageId}.dll";
+        using var assembly = new MemoryStream(Read(archive, assemblyName), writable: false);
+        using var pe = new PEReader(assembly);
+        var metadata = pe.GetMetadataReader();
+        Require(metadata.GetString(metadata.GetAssemblyDefinition().Name) == packageId);
+        var result = SymbolCheck.Run(
+            pe,
+            Read(symbolArchive, $"lib/net10.0/{packageId}.pdb"),
+            revision
+        );
+        File.WriteAllText(report, result.ToJsonString(ReportOptions) + Environment.NewLine);
+    }
+
     internal static void Require(bool condition)
     {
         if (!condition)

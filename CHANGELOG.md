@@ -12,6 +12,23 @@ not establish broader security, Native AOT or production qualification. See
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-07
+
+### Added
+
+- Publish `ZkLink`, `ZkLink.Extensions.DependencyInjection` and `ZkLink.Analyzers`
+  together at the same version, with installed-package checks for all three.
+- Include repository metadata, license and third-party notices in the analyzer
+  package. Core and DI include adjacent portable symbol packages.
+
+### Fixed
+
+- Serialize fault-proxy tests that scan host processes and align their signal
+  observation guard with the existing bounded attribution lookup.
+- Use the simpler verified-package and NuGet trusted-publishing release flow.
+  Sustained soak and controlled benchmarks remain separate production
+  qualification and are not claimed by this release.
+
 ## [1.0.0] - 2026-11-07
 
 This release preserves the existing 0.1.0 shipped API baseline; new array

@@ -3,11 +3,16 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <IsPackable>true</IsPackable>
+    <VersionPrefix>1.0.1</VersionPrefix>
     <PackageId>ZkLink.Analyzers</PackageId>
     <Title>ZkLink.Analyzers</Title>
     <Description>Roslyn analyzers for secure and asynchronous ZkLink usage.</Description>
     <PackageTags>zookeeper;zklink;roslyn;analyzers;security</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/kidoz/zklink</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/kidoz/zklink</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <IsRoslynComponent>true</IsRoslynComponent>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
@@ -20,6 +25,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="/" />
+    <None Include="../../THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="/" />
     <None
       Include="$(OutputPath)$(AssemblyName).dll"
       Pack="true"

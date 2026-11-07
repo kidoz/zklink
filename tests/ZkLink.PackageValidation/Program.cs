@@ -12,10 +12,16 @@ try
     {
         PackageCheck.Consumer(assets, assembly, manifest);
     }
+    else if (
+        args is ["symbols", var packagePath, var symbolsPath, var packageId, var source, var output]
+    )
+    {
+        PackageCheck.Symbols(packagePath, symbolsPath, packageId, source, output);
+    }
     else
     {
         Console.Error.WriteLine(
-            "Expected package <nupkg> <snupkg> <version> <revision> <report>, or consumer <assets> <assembly> <report>."
+            "Expected package <nupkg> <snupkg> <version> <revision> <report>, consumer <assets> <assembly> <report>, or symbols <nupkg> <snupkg> <id> <revision> <report>."
         );
         return 2;
     }

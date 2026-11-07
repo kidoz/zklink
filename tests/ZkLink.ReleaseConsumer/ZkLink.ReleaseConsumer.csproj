@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ZkLink" Version="$(ZkLinkPackageVersion)" />
+    <PackageReference
+      Include="ZkLink.Extensions.DependencyInjection"
+      Version="$(ZkLinkPackageVersion)"
+    />
+    <PackageReference
+      Include="ZkLink.Analyzers"
+      Version="$(ZkLinkPackageVersion)"
+      PrivateAssets="all"
+    />
+    <PackageReference
+      Include="Microsoft.Extensions.DependencyInjection"
+      Version="$(MicrosoftExtensionsVersion)"
+    />
+  </ItemGroup>
+</Project>

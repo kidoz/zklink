@@ -54,6 +54,7 @@ jobs:
           set -euo pipefail
           python3 dev/test-release-version.py
           python3 dev/test-release-candidate.py
+          python3 dev/test-release-packages.py
           version=$(python3 dev/release_version.py --tag "${RELEASE_TAG}")
           source_sha=$(git rev-parse HEAD)
           candidate_run=$(gh run list --repo "${GITHUB_REPOSITORY}" \
@@ -78,6 +79,7 @@ jobs:
       attestations: read
     outputs:
       manifest-sha256: ${{ steps.candidate.outputs.manifest-sha256 }}
+      release-manifest-sha256: ${{ steps.release.outputs.release-manifest-sha256 }}
     steps:
       - name: Check out release source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -121,6 +123,27 @@ jobs:
           ZKLINK_CANDIDATE_DIRECTORY: ${{ github.workspace }}/artifacts/candidate
           ZKLINK_CANDIDATE_MANIFEST_SHA256: ${{ steps.candidate.outputs.manifest-sha256 }}
         run: bash dev/test-core-package.sh "${PACKAGE_VERSION}"
+      - name: Test and pack DI and analyzers
+        env:
+          PACKAGE_VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          dotnet restore tests/ZkLink.Extensions.DependencyInjection.Tests --locked-mode
+          dotnet restore tests/ZkLink.Analyzers.Tests --locked-mode
+          dotnet test --project tests/ZkLink.Extensions.DependencyInjection.Tests -c Release --no-restore
+          dotnet test --project tests/ZkLink.Analyzers.Tests -c Release --no-restore
+          dotnet pack src/ZkLink.Extensions.DependencyInjection -c Release --no-restore \
+            -p:Version="${PACKAGE_VERSION}" -p:ContinuousIntegrationBuild=true -o artifacts/candidate
+          dotnet pack src/ZkLink.Analyzers -c Release --no-restore \
+            -p:Version="${PACKAGE_VERSION}" -p:ContinuousIntegrationBuild=true -o artifacts/candidate
+      - name: Validate the complete release package set
+        id: release
+        env:
+          PACKAGE_VERSION: ${{ needs.validate.outputs.version }}
+        run: python3 dev/release-packages.py manifest artifacts/candidate --version "${PACKAGE_VERSION}"
+      - name: Verify all three installed packages and analyzer diagnostics
+        env:
+          RELEASE_MANIFEST_SHA256: ${{ steps.release.outputs.release-manifest-sha256 }}
+        run: python3 dev/release-packages.py consumer artifacts/candidate --sha256 "${RELEASE_MANIFEST_SHA256}"
       - name: Upload verified publish artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
@@ -132,7 +155,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: zklink-release-verification
-          path: artifacts/packages
+          path: |
+            artifacts/packages
+            artifacts/release-consumers
           if-no-files-found: warn
 
   publish:
@@ -144,6 +169,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      attestations: write
     steps:
       - name: Check out release source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -161,26 +187,28 @@ jobs:
           global-json-file: global.json
       - name: Check package hashes before publishing
         env:
-          ZKLINK_CANDIDATE_MANIFEST_SHA256: ${{ needs.build.outputs.manifest-sha256 }}
-        run: |
-          python3 - <<'PY'
-          import os, sys
-          sys.path.insert(0, 'dev')
-          from release_candidate import read_candidate
-          read_candidate('artifacts/candidate', os.environ['ZKLINK_CANDIDATE_MANIFEST_SHA256'])
-          PY
+          RELEASE_MANIFEST_SHA256: ${{ needs.build.outputs.release-manifest-sha256 }}
+        run: python3 dev/release-packages.py verify artifacts/candidate --sha256 "${RELEASE_MANIFEST_SHA256}"
+      - name: Attest all three packages and adjacent symbols
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4
+        with:
+          subject-path: |
+            artifacts/candidate/*.nupkg
+            artifacts/candidate/*.snupkg
       - name: NuGet login
         id: nuget-login
         uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
         with:
           user: ${{ secrets.NUGET_USER }}
-      - name: Publish package and adjacent symbols to NuGet.org
+      - name: Publish all three packages and adjacent symbols to NuGet.org
         env:
           PACKAGE_VERSION: ${{ needs.validate.outputs.version }}
           NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: |
-          dotnet nuget push "artifacts/candidate/ZkLink.${PACKAGE_VERSION}.nupkg" \
-            --api-key "${NUGET_API_KEY}" --source https://api.nuget.org/v3/index.json
+          for package_id in ZkLink ZkLink.Extensions.DependencyInjection ZkLink.Analyzers; do
+            dotnet nuget push "artifacts/candidate/${package_id}.${PACKAGE_VERSION}.nupkg" \
+              --api-key "${NUGET_API_KEY}" --source https://api.nuget.org/v3/index.json
+          done
 
   verify-public:
     name: Verify public installation and symbols
@@ -202,17 +230,14 @@ jobs:
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           global-json-file: global.json
-      - name: Verify public-only installation and indexed companion symbols
+      - name: Verify all three public packages and indexed companion symbols
         env:
-          PACKAGE_VERSION: ${{ needs.validate.outputs.version }}
-        run: |
-          python3 dev/verify-published-core.py --version "${PACKAGE_VERSION}" \
-            --package "artifacts/candidate/ZkLink.${PACKAGE_VERSION}.nupkg" \
-            --symbols "artifacts/candidate/ZkLink.${PACKAGE_VERSION}.snupkg"
+          RELEASE_MANIFEST_SHA256: ${{ needs.build.outputs.release-manifest-sha256 }}
+        run: python3 dev/release-packages.py public artifacts/candidate --sha256 "${RELEASE_MANIFEST_SHA256}"
       - name: Retain public-feed verification
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: zklink-public-consumer
-          path: artifacts/published/run.*
+          path: artifacts/release-consumers/public.*
           if-no-files-found: error
