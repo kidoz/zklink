@@ -7,6 +7,9 @@ consumer checks; sustained qualification remains separate. The current candidate
 [passes all 36 jobs](https://github.com/kidoz/zklink/actions/runs/42377862412).
 The interrupted soak is retained as incomplete, and controlled benchmarks were
 not run. NuGet availability does not establish full production qualification.
+Core **1.0.0** is now published, and [release run42382051552](https://github.com/kidoz/zklink/actions/runs/42382051552)
+passes package verification, trusted publication, fresh public-only installation
+and indexed-symbol comparison.
 
 Reviewed on **2 November 2026**. Core **0.1.0 is published**. The intended next
 production release is **1.0.0**, subject to the checks below. It is not yet

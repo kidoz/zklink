@@ -12,15 +12,17 @@ ZkLink is a managed .NET client for Apache ZooKeeper: a first-class C# implement
 ## Install the core package
 
 ```sh
-dotnet add package ZkLink --version 0.1.0
+dotnet add package ZkLink --version 1.0.0
 ```
 
-The initial release targets .NET 10. APIs may change before 1.0. Optional DI and
+Core **1.0.0** is [published on NuGet](https://www.nuget.org/packages/ZkLink/1.0.0)
+and targets .NET 10. Public installation and indexed symbols are verified.
+Optional DI and
 analyzer packages remain available from source. See the [release guide](docs/how-to/release-nuget.md)
 for verification and publishing details.
 
 The [production release checklist](docs/reference/release-readiness.md) records
-the evidence and fixes still required for 1.0.0. Current work prioritizes core
+the remaining production qualification for 1.0.0. Current work prioritizes core
 correctness, production TLS behavior, sustained resource checks and validation
 of the final package across the declared client platforms.
 
