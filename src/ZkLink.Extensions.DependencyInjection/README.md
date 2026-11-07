@@ -35,7 +35,7 @@ The unpublished direct `ZooKeeperClient` registration has been replaced: migrate
 
 Calling `AddZkLink` twice in one service collection throws. Options, credentials and certificates are captured when the host connects, so keep configuration resources alive until startup completes. Use an explicitly owned `ZooKeeperClient` for a separate security or coordination identity. The helper does not add session pooling, request replay, named registrations, health checks, or configuration binding.
 
-Install `ZkLink.Extensions.DependencyInjection` version `1.0.1`; it depends on the
+Install `ZkLink.Extensions.DependencyInjection` version `1.0.2`; it depends on the
 matching core package. The release includes portable symbols and verifies a fresh
 package consumer, assembly identity and shared accessor registration.
 
