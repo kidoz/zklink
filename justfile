@@ -120,27 +120,27 @@ zk-security-concurrency:
 
 # Stop one observed follower and verify same-session recovery on both pinned versions.
 zk-follower-faults:
-    bash dev/test-zookeeper-follower-faults.sh
+    bash dev/test-zookeeper-node-faults.sh follower
 
 # Stop the observed leader and verify election plus session/watch recovery on both versions.
 zk-leader-faults:
-    bash dev/test-zookeeper-leader-faults.sh
+    bash dev/test-zookeeper-node-faults.sh leader
 
 # Lose quorum and verify retained sessions or local loss on both pinned versions.
 zk-quorum-faults:
-    bash dev/test-zookeeper-quorum-faults.sh
+    bash dev/test-zookeeper-node-faults.sh quorum
 
 # Discard each direction of client traffic independently and verify recovery or local loss.
 zk-partition-faults:
-    bash dev/test-zookeeper-partition-faults.sh
+    bash dev/test-zookeeper-node-faults.sh partition
 
 # Isolate each leader/follower peer interface and verify election and recovery.
 zk-peer-partition-faults:
-    bash dev/test-zookeeper-peer-partition-faults.sh
+    bash dev/test-zookeeper-node-faults.sh peer
 
 # Verify slow watch consumers, shared event limits and overflow on both versions.
 zk-watch-pressure-faults:
-    bash dev/test-zookeeper-watch-pressure-faults.sh
+    bash dev/test-zookeeper-node-faults.sh pressure
 
 # Verify server-confirmed expiry, terminal watches and no session replacement or replay.
 zk-session-expiry:
