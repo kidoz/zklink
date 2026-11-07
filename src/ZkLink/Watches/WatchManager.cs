@@ -426,15 +426,42 @@ internal sealed class WatchManager(
     {
         SessionGate.RequireHeld(_gate);
         if (notification.Type == WatchProtocol.SessionEvent)
+        {
             return true;
+        }
         string path = options.Paths.ToClient(notification.Path!);
         var kind = (ZooKeeperWatchEventKind)notification.Type;
-        var targets = new List<ZooKeeperWatch>();
-        AddTargets(path, WatchProtocol.Data);
-        AddTargets(path, WatchProtocol.Children);
-        AddTargets(path, WatchProtocol.Persistent);
+        int targets = ProcessTargets(path, kind, notification.Zxid, publish: false);
+        if (!budget.Reserve(targets))
+        {
+            return false;
+        }
+        _ = ProcessTargets(path, kind, notification.Zxid, publish: true);
+        return true;
+    }
+
+    private int ProcessTargets(string path, ZooKeeperWatchEventKind kind, long? zxid, bool publish)
+    {
+        int targets = 0;
+        if (_buckets.TryGetValue(new Key(path, WatchProtocol.Data), out var bucket))
+        {
+            targets += ProcessBucket(bucket, path, kind, zxid, publish);
+        }
+        if (_buckets.TryGetValue(new Key(path, WatchProtocol.Children), out bucket))
+        {
+            targets += ProcessBucket(bucket, path, kind, zxid, publish);
+        }
+        if (_buckets.TryGetValue(new Key(path, WatchProtocol.Persistent), out bucket))
+        {
+            targets += ProcessBucket(bucket, path, kind, zxid, publish);
+        }
         if (kind == ZooKeeperWatchEventKind.PersistentWatchRemoved)
-            AddTargets(path, WatchProtocol.PersistentRecursive);
+        {
+            if (_buckets.TryGetValue(new Key(path, WatchProtocol.PersistentRecursive), out bucket))
+            {
+                targets += ProcessBucket(bucket, path, kind, zxid, publish);
+            }
+        }
         else if (
             kind
             is ZooKeeperWatchEventKind.NodeCreated
@@ -447,68 +474,78 @@ internal sealed class WatchManager(
             ReadOnlySpan<char> ancestor = path;
             while (true)
             {
-                if (lookup.TryGetValue(ancestor, out var bucket))
-                    AddBucket(bucket);
+                if (lookup.TryGetValue(ancestor, out bucket))
+                {
+                    targets += ProcessBucket(bucket, path, kind, zxid, publish);
+                }
                 if (ancestor.Length == 1)
+                {
                     break;
+                }
                 int separator = ancestor.LastIndexOf('/');
                 ancestor = ancestor[..(separator == 0 ? 1 : separator)];
             }
         }
+        return targets;
+    }
 
-        if (!budget.Reserve(targets.Count))
-            return false;
-        foreach (var watch in targets)
+    private int ProcessBucket(
+        Bucket bucket,
+        string path,
+        ZooKeeperWatchEventKind kind,
+        long? zxid,
+        bool publish
+    )
+    {
+        int targets = 0;
+        foreach (var watch in bucket.Handles)
         {
+            if (!watch.Active || watch.Suppressed || !Matches(watch, kind))
+            {
+                continue;
+            }
+            targets++;
+            if (!publish)
+            {
+                continue;
+            }
             bool complete =
                 !watch.Persistent || kind == ZooKeeperWatchEventKind.PersistentWatchRemoved;
             if (complete)
-                SetActive(watch, false);
-            Publish(watch, kind, path, notification.Zxid);
-            if (complete)
-                watch.Queue.Writer.TryComplete();
-        }
-        return true;
-
-        void AddTargets(string watchedPath, int category)
-        {
-            if (!_buckets.TryGetValue(new Key(watchedPath, category), out var bucket))
-                return;
-            AddBucket(bucket);
-        }
-
-        void AddBucket(Bucket bucket)
-        {
-            foreach (var watch in bucket.Handles)
             {
-                if (!watch.Active || watch.Suppressed)
-                    continue;
-                bool matches = watch.Mode switch
-                {
-                    ZooKeeperWatchMode.OneShotExists when watch.Absent => kind
-                        is ZooKeeperWatchEventKind.NodeCreated
-                            or ZooKeeperWatchEventKind.DataWatchRemoved,
-                    ZooKeeperWatchMode.OneShotExists or ZooKeeperWatchMode.OneShotData => kind
-                        is ZooKeeperWatchEventKind.NodeDataChanged
-                            or ZooKeeperWatchEventKind.NodeDeleted
-                            or ZooKeeperWatchEventKind.DataWatchRemoved,
-                    ZooKeeperWatchMode.OneShotChildren => kind
-                        is ZooKeeperWatchEventKind.NodeChildrenChanged
-                            or ZooKeeperWatchEventKind.NodeDeleted
-                            or ZooKeeperWatchEventKind.ChildWatchRemoved,
-                    ZooKeeperWatchMode.Persistent or ZooKeeperWatchMode.PersistentRecursive => kind
-                        is ZooKeeperWatchEventKind.NodeCreated
-                            or ZooKeeperWatchEventKind.NodeDeleted
-                            or ZooKeeperWatchEventKind.NodeDataChanged
-                            or ZooKeeperWatchEventKind.NodeChildrenChanged
-                            or ZooKeeperWatchEventKind.PersistentWatchRemoved,
-                    _ => false,
-                };
-                if (matches)
-                    targets.Add(watch);
+                SetActive(watch, false);
+            }
+            Publish(watch, kind, path, zxid);
+            if (complete)
+            {
+                watch.Queue.Writer.TryComplete();
             }
         }
+        return targets;
     }
+
+    private static bool Matches(ZooKeeperWatch watch, ZooKeeperWatchEventKind kind) =>
+        watch.Mode switch
+        {
+            ZooKeeperWatchMode.OneShotExists when watch.Absent => kind
+                is ZooKeeperWatchEventKind.NodeCreated
+                    or ZooKeeperWatchEventKind.DataWatchRemoved,
+            ZooKeeperWatchMode.OneShotExists or ZooKeeperWatchMode.OneShotData => kind
+                is ZooKeeperWatchEventKind.NodeDataChanged
+                    or ZooKeeperWatchEventKind.NodeDeleted
+                    or ZooKeeperWatchEventKind.DataWatchRemoved,
+            ZooKeeperWatchMode.OneShotChildren => kind
+                is ZooKeeperWatchEventKind.NodeChildrenChanged
+                    or ZooKeeperWatchEventKind.NodeDeleted
+                    or ZooKeeperWatchEventKind.ChildWatchRemoved,
+            ZooKeeperWatchMode.Persistent or ZooKeeperWatchMode.PersistentRecursive => kind
+                is ZooKeeperWatchEventKind.NodeCreated
+                    or ZooKeeperWatchEventKind.NodeDeleted
+                    or ZooKeeperWatchEventKind.NodeDataChanged
+                    or ZooKeeperWatchEventKind.NodeChildrenChanged
+                    or ZooKeeperWatchEventKind.PersistentWatchRemoved,
+            _ => false,
+        };
 
     private void Publish(
         ZooKeeperWatch watch,
