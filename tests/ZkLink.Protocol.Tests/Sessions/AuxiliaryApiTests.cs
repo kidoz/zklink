@@ -222,6 +222,7 @@ public sealed class AuxiliaryApiTests : IAsyncLifetime
             await blocker!.ConfigureAwait(true);
         }
         await ReadFollowingCountAsync().ConfigureAwait(true);
+        await SessionTestSupport.WaitForBytesReleasedAsync(Client).ConfigureAwait(true);
         Assert.Equal(0, _peer.Requests.Count);
         Assert.Equal(0, Client.Manager.Scheduler.OwnedBytes);
     }
