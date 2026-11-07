@@ -1,11 +1,13 @@
 # Supporting public types
 
-All types below are in namespace `ZkLink`. They are implemented supporting
-contracts and have not shipped in a package. The current client exposes connection/session, node/ACL, transaction, auxiliary and watch methods. Node result wrappers are returned by the
-[node operations](nodes.md).
+All types below are in namespace `ZkLink`. The released core surface is recorded
+in the shipped baseline; candidate additions are recorded separately. The current
+client exposes connection/session, node/ACL, transaction, auxiliary and watch
+methods. Node result wrappers are returned by the [node operations](nodes.md).
 
 Exact signatures and nullable annotations are in the
-[unshipped API baseline](../../src/ZkLink/PublicAPI.Unshipped.txt). Source links
+[released API baseline](../../src/ZkLink/PublicAPI.Shipped.txt) and
+[candidate additions](../../src/ZkLink/PublicAPI.Unshipped.txt). Source links
 below provide constructor validation and XML documentation.
 
 ## Connection and session types

@@ -15,10 +15,18 @@ not establish broader security, Native AOT or production qualification. See
 ## [1.0.0] - Unreleased
 
 This candidate remains unpublished while sustained resource and performance
-qualification is in progress. The public API declarations are unchanged from
-0.1.0; the existing shipped baseline is preserved.
+qualification is in progress. The existing 0.1.0 shipped API baseline is preserved;
+new array overloads are recorded separately and the unpublished DI API is revised.
 
 ### Added
+
+- Null-preserving `byte[]?` overloads for node create/update, transaction create/update
+  descriptors and `ZNodeData` construction, alongside the existing memory overloads.
+- A constructor-injectable `IZooKeeperClientAccessor` for host-owned sessions. This
+  replaces direct client registration in the unpublished DI integration and avoids
+  per-resolution disposal tracking and child-scope disposal failures.
+- NuGet package metadata and portable symbols for the DI project. Publication and
+  DI-specific Native AOT qualification remain separate checks.
 
 - Soak socket ownership checks now retain original handles and exact connection
   endpoints, excluding unrelated namespace listeners that share a port number.

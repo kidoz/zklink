@@ -37,7 +37,7 @@ correctness, security, resource, benchmark or publication requirement.
 | Sustained resource ownership | The latest 3.8.7 workload completed six hours; 3.9.6 failed after about 90 minutes waiting for watch restoration, with a proxy framing error. The older two-hour `DeleteAsync` timeout remains unresolved | Investigate the retained timeout/frame failures, retain the corrected initial-retry and cross-session write-fence checks, then complete both durations and review heap, threads, sockets, counters and cleanup. Reconcile measured runtime inputs with the candidate |
 | Performance evidence | Existing protocol/allocation, live CRUD, watch fan-out and 10,000-watch recovery suites produce raw reports | Repeat existing commands on a controlled runner and retain a reviewed report. No throughput target or timing gate is inferred from shared-runner smoke results |
 | Final artifact and publication | Shared-candidate distribution passes hosted verification. Public-feed installation and symbol-server verification pass against published 0.1.0 | Complete final-candidate qualification, then publish those exact package bytes |
-| API and operator documentation | The shipped baseline records 0.1.0; SDK comparison and the 401-entry declaration review find no API changes; usage and failure semantics are documented | Review behavioral compatibility and intentional changes, freeze the 1.0.0 API, reconcile defaults/support claims and document the tested release matrix |
+| API and operator documentation | The shipped baseline records 0.1.0; new null-preserving array overloads are unshipped additions. The unpublished DI API now exposes a singleton client accessor; usage and failure semantics are documented | Review behavioral compatibility and intentional changes, freeze the 1.0.0 API, reconcile defaults/support claims and document the tested release matrix |
 
 The current package checks pass on Linux, Windows and macOS, including the
 published 0.1.0 baseline and expected breaking-change rejections. The independent
@@ -131,9 +131,13 @@ has passed against the published 0.1.0 release. Hosted verification of the share
 candidate path passes; these changes do not complete sustained qualification.
 
 The working tree now prepares version 1.0.0 and enables AOT compatibility
-analysis for that unpublished candidate. The 401 public API declarations remain
-unchanged from the shipped 0.1.0 baseline. Neither the metadata nor these passing
-checks authorize publication before the remaining evidence is complete.
+analysis for that unpublished candidate. The 401 declarations in the shipped
+0.1.0 baseline are preserved; the candidate adds five null-preserving array
+overloads in the unshipped baseline. These API changes have local managed and
+installed-package evidence and require a fresh candidate for final managed/native
+qualification. Older evidence remains scoped to its recorded inputs. Neither the
+metadata nor these passing checks authorize publication before the remaining
+evidence is complete.
 
 Verification after the metadata change exposed a watch-pressure counter timeout
 before the next round's event burst. Earlier rounds drained to zero and fixture
