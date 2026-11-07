@@ -690,25 +690,25 @@ internal sealed class RequestScheduler(
             if (reply.Header.Error != 0)
             {
                 var outcome = reply.Header.Error
-                    is -6
-                        or -8
-                        or -101
-                        or -102
-                        or -103
-                        or -108
-                        or -110
-                        or -111
-                        or -112
-                        or -113
-                        or -114
-                        or -115
-                        or -119
-                        or -120
-                        or -121
-                        or -123
-                        or -124
-                        or -125
-                        or -127
+                    is (int)ZooKeeperErrorCode.Unimplemented
+                        or (int)ZooKeeperErrorCode.BadArguments
+                        or (int)ZooKeeperErrorCode.NoNode
+                        or (int)ZooKeeperErrorCode.NoAuth
+                        or (int)ZooKeeperErrorCode.BadVersion
+                        or (int)ZooKeeperErrorCode.NoChildrenForEphemerals
+                        or (int)ZooKeeperErrorCode.NodeExists
+                        or (int)ZooKeeperErrorCode.NotEmpty
+                        or (int)ZooKeeperErrorCode.SessionExpired
+                        or (int)ZooKeeperErrorCode.InvalidCallback
+                        or (int)ZooKeeperErrorCode.InvalidAcl
+                        or (int)ZooKeeperErrorCode.AuthFailed
+                        or (int)ZooKeeperErrorCode.NotReadOnly
+                        or (int)ZooKeeperErrorCode.EphemeralOnLocalSession
+                        or (int)ZooKeeperErrorCode.NoWatcher
+                        or (int)ZooKeeperErrorCode.ReconfigurationDisabled
+                        or (int)ZooKeeperErrorCode.SessionClosedRequiresSaslAuth
+                        or (int)ZooKeeperErrorCode.QuotaExceeded
+                        or (int)ZooKeeperErrorCode.ThrottledOperation
                     ? RequestOutcome.Rejected
                     : RequestOutcome.Unknown;
                 pending.Completion.TrySetException(
