@@ -13,33 +13,17 @@ internal sealed class AsyncPulse
     internal async Task WaitAsync(CancellationToken cancellationToken) =>
         _ = await _channel.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
 
-    internal async Task WaitAsync(
-        TimeSpan delay,
-        TimeProvider timeProvider,
-        CancellationToken cancellationToken
-    )
+    internal async Task WaitAsync(TimeSpan delay, ITimer timer, CancellationToken cancellationToken)
     {
-        using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var signal = _channel.Reader.ReadAsync(stop.Token).AsTask();
         var rounded = TimeSpan.FromMilliseconds(Math.Max(1, Math.Ceiling(delay.TotalMilliseconds)));
-        var timer = Task.Delay(rounded, timeProvider, stop.Token);
-        var winner = await Task.WhenAny(signal, timer).ConfigureAwait(false);
-        await stop.CancelAsync().ConfigureAwait(false);
+        timer.Change(rounded, Timeout.InfiniteTimeSpan);
         try
         {
-            await winner.ConfigureAwait(false);
+            _ = await _channel.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { }
-        try
+        finally
         {
-            await signal.ConfigureAwait(false);
+            timer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         }
-        catch (OperationCanceledException) { }
-        try
-        {
-            await timer.ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { }
-        cancellationToken.ThrowIfCancellationRequested();
     }
 }

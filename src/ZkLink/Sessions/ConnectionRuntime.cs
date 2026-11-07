@@ -212,6 +212,12 @@ internal sealed class ConnectionRuntime(
 
     private async Task<RuntimeFailure> HeartbeatAsync(CancellationToken cancellationToken)
     {
+        using var timer = time.CreateTimer(
+            static state => ((AsyncPulse)state!).Set(),
+            _activity,
+            Timeout.InfiniteTimeSpan,
+            Timeout.InfiniteTimeSpan
+        );
         try
         {
             while (true)
@@ -261,7 +267,7 @@ internal sealed class ConnectionRuntime(
                         next = idle;
                     }
                 }
-                await _activity.WaitAsync(next, time, cancellationToken).ConfigureAwait(false);
+                await _activity.WaitAsync(next, timer, cancellationToken).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

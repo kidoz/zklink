@@ -1,4 +1,5 @@
 using ZkLink.Protocol;
+using ZkLink.Sessions;
 
 namespace ZkLink.Protocol.Tests.Sessions;
 
@@ -175,6 +176,37 @@ public sealed class SessionLifecycleTests : IAsyncLifetime
                 client.WaitForConnectionAsync(TestContext.Current.CancellationToken)
             )
             .ConfigureAwait(true);
+    }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T09")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Reliability",
+        "CA2025",
+        Justification = "Both waits complete before the reusable manual timer leaves scope and is disposed."
+    )]
+    public async Task TimedPulseReusesOneTimerAcrossActivityAndExpiration()
+    {
+        var time = new ManualTimeProvider();
+        var pulse = new AsyncPulse();
+        using var timer = time.CreateTimer(
+            static state => ((AsyncPulse)state!).Set(),
+            pulse,
+            Timeout.InfiniteTimeSpan,
+            Timeout.InfiniteTimeSpan
+        );
+        var token = TestContext.Current.CancellationToken;
+        var first = pulse.WaitAsync(TimeSpan.FromMilliseconds(100), timer, token);
+        await time.WaitForTimerAsync(TimeSpan.FromMilliseconds(100), token).ConfigureAwait(true);
+
+        pulse.Set();
+        await first.ConfigureAwait(true);
+        var second = pulse.WaitAsync(TimeSpan.FromMilliseconds(200), timer, token);
+        await time.WaitForTimerAsync(TimeSpan.FromMilliseconds(200), token).ConfigureAwait(true);
+        time.Advance(TimeSpan.FromMilliseconds(200));
+
+        await second.ConfigureAwait(true);
+        Assert.Equal(1, time.CreatedTimerCount);
     }
 
     [Fact(Timeout = 10000)]

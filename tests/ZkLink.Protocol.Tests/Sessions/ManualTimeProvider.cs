@@ -5,6 +5,7 @@ internal sealed class ManualTimeProvider : TimeProvider
     private readonly object _gate = new();
     private readonly List<ManualTimer> _timers = [];
     private long _ticks;
+    private int _createdTimers;
     private TaskCompletionSource _changed = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public override long TimestampFrequency => TimeSpan.TicksPerSecond;
 
@@ -18,6 +19,8 @@ internal sealed class ManualTimeProvider : TimeProvider
 
     public override DateTimeOffset GetUtcNow() => DateTimeOffset.UnixEpoch.AddTicks(GetTimestamp());
 
+    internal int CreatedTimerCount => Volatile.Read(ref _createdTimers);
+
     public override ITimer CreateTimer(
         TimerCallback callback,
         object? state,
@@ -25,6 +28,7 @@ internal sealed class ManualTimeProvider : TimeProvider
         TimeSpan period
     )
     {
+        Interlocked.Increment(ref _createdTimers);
         var timer = new ManualTimer(this, callback, state);
         timer.Change(dueTime, period);
         return timer;
