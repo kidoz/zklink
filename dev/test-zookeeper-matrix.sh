@@ -211,6 +211,7 @@ for version in 3.8.7 3.9.6; do
           test_filter=(--filter-class "*TtlDisabledTests")
         fi
       fi
+      # Bash 3.2 needs the guarded expansion below for an empty array with nounset.
       test_execution=()
       if [[ "${authentication}" == true ]]; then
         test_execution=(--output Detailed --show-stdout All --show-live-output on --timeout 3m)
@@ -218,7 +219,7 @@ for version in 3.8.7 3.9.6; do
       endpoints="$(compose port zoo1 2181),$(compose port zoo2 2181),$(compose port zoo3 2181)"
       if ! ZKLINK_TEST_CONNECTION_STRING="${endpoints}" ZKLINK_TEST_SERVER_VERSION="${version}" ZKLINK_TEST_TTL_SETTING="${fixture_setting}" \
         dotnet test --project tests/ZkLink.IntegrationTests -c Release --no-build --no-restore \
-        "${test_filter[@]}" "${test_execution[@]}" --results-directory "${artifacts}/${fixture_key}-results" >"${artifacts}/${fixture_key}-operations.txt" 2>&1; then
+        "${test_filter[@]}" ${test_execution[@]+"${test_execution[@]}"} --results-directory "${artifacts}/${fixture_key}-results" >"${artifacts}/${fixture_key}-operations.txt" 2>&1; then
         cat "${artifacts}/${fixture_key}-operations.txt" >&2
         echo "ZkLink operation tests failed on ${fixture_key}; see ${artifacts}" >&2
         exit 1
