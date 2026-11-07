@@ -187,16 +187,18 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
         {
             while (!_stop.IsCancellationRequested)
             {
-                var budget =
-                    _sessionId == 0
-                        ? _options.Settings.InitialConnectTimeout
-                            - _time.GetElapsedTime(initialStarted)
-                        : _negotiated!.Value - InboundSilence;
+                var budget = ConnectionBudget(initialStarted);
                 if (budget <= TimeSpan.Zero)
                 {
                     lock (_gate)
                     {
-                        if (_sessionId == 0)
+                        if (
+                            _sessionId == 0
+                            || (
+                                !_initialReady.Task.IsCompletedSuccessfully
+                                && InitialConnectRemaining(initialStarted) <= TimeSpan.Zero
+                            )
+                        )
                         {
                             _terminalCause = new ZooKeeperConnectionException(
                                 lastFailure.Failure == ZooKeeperConnectionFailure.Unreachable
@@ -264,7 +266,27 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                         _password
                     )
                         .RunAsync(
-                            () => deadline.CancelAfter(Timeout.InfiniteTimeSpan),
+                            () =>
+                            {
+                                // The endpoint-attempt limit ends at handshake acceptance;
+                                // the initial total deadline still includes authentication.
+                                if (_initialReady.Task.IsCompletedSuccessfully)
+                                {
+                                    deadline.CancelAfter(Timeout.InfiniteTimeSpan);
+                                }
+                                else
+                                {
+                                    var remaining = InitialConnectRemaining(initialStarted);
+                                    if (remaining > TimeSpan.Zero)
+                                    {
+                                        deadline.CancelAfter(remaining);
+                                    }
+                                    else
+                                    {
+                                        deadline.Cancel();
+                                    }
+                                }
+                            },
                             attempt.Token
                         )
                         .ConfigureAwait(false);
@@ -280,6 +302,14 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                     );
                     lock (_gate)
                     {
+                        attempt.Token.ThrowIfCancellationRequested();
+                        if (
+                            !_initialReady.Task.IsCompletedSuccessfully
+                            && InitialConnectRemaining(initialStarted) <= TimeSpan.Zero
+                        )
+                        {
+                            throw new OperationCanceledException(attempt.Token);
+                        }
                         if (_closing || IsTerminal(Session.State))
                         {
                             break;
@@ -425,11 +455,7 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                 }
                 if (last)
                 {
-                    var remaining =
-                        _sessionId == 0
-                            ? _options.Settings.InitialConnectTimeout
-                                - _time.GetElapsedTime(initialStarted)
-                            : _negotiated!.Value - InboundSilence;
+                    var remaining = ConnectionBudget(initialStarted);
                     if (remaining > TimeSpan.Zero)
                     {
                         await Task.Delay(_random.Backoff(failures++, remaining), _time, _stop.Token)
@@ -486,6 +512,25 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
             CryptographicOperations.ZeroMemory(_password);
             _options.Dispose();
         }
+    }
+
+    private TimeSpan InitialConnectRemaining(long started) =>
+        _options.Settings.InitialConnectTimeout - _time.GetElapsedTime(started);
+
+    private TimeSpan ConnectionBudget(long initialStarted)
+    {
+        var remaining = _initialReady.Task.IsCompletedSuccessfully
+            ? TimeSpan.MaxValue
+            : InitialConnectRemaining(initialStarted);
+        if (_sessionId != 0)
+        {
+            var recovery = _negotiated!.Value - InboundSilence;
+            if (recovery < remaining)
+            {
+                remaining = recovery;
+            }
+        }
+        return remaining;
     }
 
     internal void Inbound(long value, ReplyHeader? reply)

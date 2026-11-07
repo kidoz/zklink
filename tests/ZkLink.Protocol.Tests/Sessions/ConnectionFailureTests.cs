@@ -89,6 +89,114 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
         Assert.True(peer.IsDisposed);
     }
 
+    [Theory(Timeout = 10000)]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    [Trait("Acceptance", "T08")]
+    [Trait("Acceptance", "T21")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Reliability",
+        "CA2025",
+        Justification = "The connection Task is awaited by ThrowsAsync before the authentication configuration leaves scope."
+    )]
+    public async Task InitialDeadlineIncludesAuthenticationAndAcceptedSessionRetries(
+        bool retry,
+        bool delayedTimer
+    )
+    {
+        using var authentication = ZooKeeperAuthentication.Digest("user", "disposable");
+        var first = Peer();
+        first.ReplyAuth = false;
+        var connecting = _fixture.ConnectAsync(
+            first,
+            new ZooKeeperClientOptions
+            {
+                ConnectionString = "one:2181,two:2181",
+                Tls = ZooKeeperTlsOptions.Disabled(),
+                AllowUnsafePlaintextDigest = true,
+                Authentication = [authentication],
+                InitialConnectTimeout = TimeSpan.FromMilliseconds(100),
+                ConnectAttemptTimeout = TimeSpan.FromMilliseconds(100),
+            },
+            TestContext.Current.CancellationToken
+        );
+        await SessionTestSupport.NextAsync(first).ConfigureAwait(true);
+        var auth = await SessionTestSupport.NextAsync(first).ConfigureAwait(true);
+        Assert.Equal(100, auth.Opcode);
+        _fixture.Time.Advance(TimeSpan.FromMilliseconds(60));
+        SessionPeer? second = null;
+        if (retry)
+        {
+            second = Peer();
+            second.ReplyAuth = false;
+            _fixture.Connector.Add(second);
+            first.Drop();
+            await SessionTestSupport.NextAsync(second).ConfigureAwait(true);
+            auth = await SessionTestSupport.NextAsync(second).ConfigureAwait(true);
+            Assert.Equal(100, auth.Opcode);
+        }
+
+        _fixture.Time.Advance(TimeSpan.FromMilliseconds(40), invokeCallbacks: !delayedTimer);
+        if (delayedTimer)
+        {
+            // A late timer callback must not allow a late auth success to publish readiness.
+            (second ?? first).Reply(auth);
+        }
+
+        var error = await Assert
+            .ThrowsAsync<ZooKeeperConnectionException>(() => SessionTestSupport.Bounded(connecting))
+            .ConfigureAwait(true);
+        Assert.Equal(ZooKeeperConnectionFailure.Timeout, error.Failure);
+        Assert.True(first.IsDisposed);
+        if (second is not null)
+        {
+            Assert.True(second.IsDisposed);
+        }
+    }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T08")]
+    [Trait("Acceptance", "T21")]
+    public async Task InitialDeadlineDoesNotLimitAuthenticationAfterTheClientWasReady()
+    {
+        using var authentication = ZooKeeperAuthentication.Digest("user", "disposable");
+        var first = Peer();
+        var client = await _fixture
+            .ConnectAsync(
+                first,
+                new ZooKeeperClientOptions
+                {
+                    ConnectionString = "one:2181,two:2181",
+                    Tls = ZooKeeperTlsOptions.Disabled(),
+                    AllowUnsafePlaintextDigest = true,
+                    Authentication = [authentication],
+                    InitialConnectTimeout = TimeSpan.FromMilliseconds(100),
+                },
+                TestContext.Current.CancellationToken
+            )
+            .ConfigureAwait(true);
+        await SessionTestSupport.NextAsync(first).ConfigureAwait(true);
+        await SessionTestSupport.NextAsync(first).ConfigureAwait(true);
+        _fixture.Time.Advance(TimeSpan.FromMilliseconds(150));
+        var second = Peer();
+        second.ReplyAuth = false;
+        _fixture.Connector.Add(second);
+        first.Drop();
+        await SessionTestSupport.NextAsync(second).ConfigureAwait(true);
+        var auth = await SessionTestSupport.NextAsync(second).ConfigureAwait(true);
+        var ready = client.WaitForConnectionAsync(TestContext.Current.CancellationToken);
+        _fixture.Time.Advance(TimeSpan.FromMilliseconds(150));
+        Assert.False(ready.IsCompleted);
+        second.Reply(auth);
+
+        await SessionTestSupport.Bounded(ready).ConfigureAwait(true);
+
+        Assert.Equal(123, client.Session.SessionId);
+        Assert.Equal(2, client.Session.ConnectionGeneration);
+    }
+
     [Fact(Timeout = 10000)]
     [Trait("Acceptance", "T08")]
     public async Task InitialHandshakeAttemptCanTimeOutAndRetryBeforeApplicationAdmission()

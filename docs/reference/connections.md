@@ -26,7 +26,7 @@ client, except that endpoint updates affect future connection attempts.
 | `EnableTtlNodes` | False; operator assertion that every endpoint enables extended node types; required for TTL creation |
 | `CompatibilityProfile` | `ZooKeeper38`; `ZooKeeper39` enables independent watch modes at one path; assert all endpoints qualify, without negotiated discovery |
 | `SessionTimeout` | 30 seconds requested; actual negotiated timeout governs liveness |
-| `InitialConnectTimeout` | 30 seconds across endpoint attempts; completion also waits for owned TLS cleanup |
+| `InitialConnectTimeout` | 30 seconds through initial authentication and readiness, across endpoint attempts; completion also waits for owned TLS cleanup |
 | `ConnectAttemptTimeout` | 5 seconds for DNS, TCP, TLS and the handshake; reduced by remaining initial/recovery time. Also bounds each platform certificate download where supported |
 | `OperationTimeout` | 30 seconds from invocation, including queue time |
 | `CloseTimeout` | 5 seconds to obtain acknowledgment before cleanup |
@@ -44,6 +44,9 @@ negotiated inbound liveness timers. Valid replies refresh those timers, so a
 progressing restore can exceed `ConnectAttemptTimeout` and the negotiated session
 timeout in total. Inbound silence triggers transport recovery at two thirds of
 the negotiated timeout and local session loss at the full timeout.
+Before the client first becomes ready, the total `InitialConnectTimeout` still
+applies through authentication and any retries of the accepted session. Later
+reconnects use the negotiated session budget rather than that initial deadline.
 
 Timeouts require positive whole milliseconds, at most `int.MaxValue` milliseconds.
 Frame/data limits do not change the server's Jute limits. Chroot is namespace

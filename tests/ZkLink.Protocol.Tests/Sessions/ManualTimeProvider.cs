@@ -47,10 +47,18 @@ internal sealed class ManualTimeProvider : TimeProvider
         }
     }
 
-    internal void Advance(TimeSpan amount)
+    internal void Advance(TimeSpan amount, bool invokeCallbacks = true)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(amount, TimeSpan.Zero);
         var target = checked(GetTimestamp() + amount.Ticks);
+        if (!invokeCallbacks)
+        {
+            lock (_gate)
+            {
+                _ticks = target;
+            }
+            return;
+        }
         while (true)
         {
             ManualTimer? due;
@@ -62,7 +70,7 @@ internal sealed class ManualTimeProvider : TimeProvider
                     _ticks = target;
                     return;
                 }
-                _ticks = due.Next;
+                _ticks = Math.Max(_ticks, due.Next);
                 due.Next = due.Period > 0 ? checked(due.Next + due.Period) : long.MaxValue;
             }
             due.Callback(due.State);
