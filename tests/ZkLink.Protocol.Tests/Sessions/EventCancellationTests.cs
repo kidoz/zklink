@@ -48,7 +48,7 @@ public sealed class EventCancellationTests
         lock (gate)
         {
             intent.Replied(
-                new PendingRequest(info, 0, 1, 0, default),
+                SessionTestSupport.CreatePendingRequest(info, options, gate),
                 new WireReply(
                     new ReplyHeader(1, 1, (int)ZooKeeperErrorCode.NoNode),
                     new EmptyResult()

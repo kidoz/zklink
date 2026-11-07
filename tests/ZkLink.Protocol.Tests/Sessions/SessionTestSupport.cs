@@ -1,4 +1,7 @@
 using System.Threading.Channels;
+using ZkLink.Configuration;
+using ZkLink.Requests;
+using ZkLink.Sessions;
 
 namespace ZkLink.Protocol.Tests.Sessions;
 
@@ -21,6 +24,20 @@ internal static class SessionTestSupport
 
     internal static Task Bounded(Task task) =>
         task.WaitAsync(Guard, TestContext.Current.CancellationToken);
+
+    internal static PendingRequest CreatePendingRequest(
+        ZooKeeperRequestInfo info,
+        ClientOptionsSnapshot options,
+        object gate
+    ) =>
+        new(
+            new RequestScheduler(gate, options, new ManualTimeProvider(), new AsyncPulse()),
+            info,
+            0,
+            1,
+            0,
+            default
+        );
 
     internal static async Task WaitForBytesReleasedAsync(ZooKeeperClient client)
     {

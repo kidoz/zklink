@@ -14,13 +14,13 @@ internal sealed class PendingRequest
     );
 
     internal PendingRequest(
+        RequestScheduler owner,
         ZooKeeperRequestInfo info,
         int bytes,
         long generation,
         long started,
         CancellationToken token,
-        bool control = false,
-        RequestScheduler? owner = null
+        bool control = false
     )
     {
         Owner = owner;
@@ -37,7 +37,7 @@ internal sealed class PendingRequest
         await task.ConfigureAwait(false);
 
     internal Task<WireReply> Task { get; }
-    internal readonly RequestScheduler? Owner;
+    internal readonly RequestScheduler Owner;
     internal ZooKeeperRequestInfo Info;
     internal readonly int ReservedBytes;
     internal readonly long Generation;
@@ -245,13 +245,13 @@ internal sealed class RequestScheduler(
                 return Task.FromException<WireReply>(new ZooKeeperBackpressureException(info));
             }
             pending = new PendingRequest(
+                this,
                 info,
                 maintenance ? 0 : size,
                 _generation,
                 started,
                 cancellationToken,
-                maintenance,
-                this
+                maintenance
             )
             {
                 Observer = observer,
@@ -309,7 +309,7 @@ internal sealed class RequestScheduler(
                             static state =>
                             {
                                 var pending = (PendingRequest)state!;
-                                pending.Owner!.Cancel(pending, false);
+                                pending.Owner.Cancel(pending, false);
                             },
                             pending
                         );
@@ -326,7 +326,7 @@ internal sealed class RequestScheduler(
                                 static state =>
                                 {
                                     var pending = (PendingRequest)state!;
-                                    pending.Owner!.Cancel(pending, true);
+                                    pending.Owner.Cancel(pending, true);
                                 },
                                 pending,
                                 remaining,
@@ -485,13 +485,13 @@ internal sealed class RequestScheduler(
                 return _close;
             }
             _close = new PendingRequest(
+                this,
                 new ZooKeeperRequestInfo(ZooKeeperOperation.CloseSession),
                 0,
                 _generation,
                 timeProvider.GetTimestamp(),
                 default,
-                true,
-                this
+                true
             )
             {
                 Preparing = false,

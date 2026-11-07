@@ -34,7 +34,7 @@ public sealed class WatchManagerTests
         var manager = new WatchManager(gate, options, new EventBudget(gate, 8, telemetry), session);
         var info = new ZooKeeperRequestInfo(ZooKeeperOperation.AddWatch, path: "/node");
         var intent = manager.Begin("/node", ZooKeeperWatchMode.Persistent, info);
-        var pending = new PendingRequest(info, 0, 1, 0, default);
+        var pending = SessionTestSupport.CreatePendingRequest(info, options, gate);
         var reply = new WireReply(new ReplyHeader(1, 1, 0), new EmptyResult());
         lock (gate)
         {
@@ -313,7 +313,7 @@ public sealed class WatchManagerTests
                 new EventBudget(Gate, 8, telemetry),
                 Session
             );
-            Pending = new PendingRequest(Info, 0, 1, 0, default);
+            Pending = SessionTestSupport.CreatePendingRequest(Info, _options, Gate);
         }
 
         internal ZooKeeperWatch Register()
