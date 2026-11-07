@@ -74,8 +74,24 @@ After all required checks pass, prepare a draft GitHub release for `vVERSION`
 targeting the exact candidate commit. Attach `candidate.json`, the original
 `.nupkg` and `.snupkg`, `release-evidence.json` and `release-evidence.zip`.
 Publishing the GitHub release invokes [Release](../../.github/workflows/release.yml).
-A manual run can inspect an existing draft through its `release_tag` input and
-does not push to NuGet.
+A manual run defaults to validation only. It checks out the selected `release_tag`,
+then pins the package job to that exact commit, even when the workflow runs from
+`main`. To validate an existing release or draft:
+
+```sh
+gh workflow run release.yml --ref main -f release_tag=v1.0.0
+```
+
+To explicitly request a fresh NuGet publication run for the same version:
+
+```sh
+gh workflow run release.yml --ref main -f release_tag=v1.0.0 -f publish=true
+```
+
+Both modes require the original candidate assets and complete qualification
+evidence. The publication option enables trusted publishing and public-feed
+verification only after those checks pass. Runs for the same release tag share
+one concurrency group.
 
 Check that every required asset is attached before publishing the draft:
 
