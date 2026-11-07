@@ -21,6 +21,19 @@ internal static class SessionTestSupport
 
     internal static Task Bounded(Task task) =>
         task.WaitAsync(Guard, TestContext.Current.CancellationToken);
+
+    internal static async Task WaitForBytesReleasedAsync(ZooKeeperClient client)
+    {
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken
+        );
+        stop.CancelAfter(Guard);
+        while (client.Manager.Scheduler.OwnedBytes != 0)
+        {
+            stop.Token.ThrowIfCancellationRequested();
+            await Task.Yield();
+        }
+    }
 }
 
 internal sealed class StateObserver : IAsyncDisposable

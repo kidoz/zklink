@@ -122,6 +122,7 @@ public sealed class WatchCancellationSharingTests
             Reply(peer, request, pendingMode, missing);
         }
         await BarrierAsync(client, peer, token).ConfigureAwait(true);
+        await SessionTestSupport.WaitForBytesReleasedAsync(client).ConfigureAwait(true);
         Assert.Equal(1, client.Manager.WatchCount);
         Assert.Equal(0, peer.Requests.Count);
         Assert.Equal(0, client.Manager.Scheduler.PendingCount);
@@ -173,6 +174,7 @@ public sealed class WatchCancellationSharingTests
         }
         Assert.False(await events.MoveNextAsync().ConfigureAwait(true));
         await BarrierAsync(client, peer, token).ConfigureAwait(true);
+        await SessionTestSupport.WaitForBytesReleasedAsync(client).ConfigureAwait(true);
         Assert.Equal(ZooKeeperSessionState.Connected, client.Session.State);
         Assert.Equal(generation, client.Session.ConnectionGeneration);
         Assert.Equal(0, client.Manager.WatchCount);
