@@ -718,13 +718,23 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
-            return
-                _sent.TryPeek(out var pending)
-                && pending.Info.Operation != ZooKeeperOperation.CloseSession
-                ? options.Settings.OperationTimeout
+            TimeSpan? oldest = null;
+            foreach (var pending in _sent)
+            {
+                if (pending.Control)
+                {
+                    continue;
+                }
+                var remaining =
+                    options.Settings.OperationTimeout
                     + sessionTimeout
-                    - timeProvider.GetElapsedTime(pending.Started)
-                : null;
+                    - timeProvider.GetElapsedTime(pending.Started);
+                if (oldest is null || remaining < oldest.Value)
+                {
+                    oldest = remaining;
+                }
+            }
+            return oldest;
         }
     }
 

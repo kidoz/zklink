@@ -486,6 +486,33 @@ public sealed class RequestLifecycleTests : IDisposable
 
     [Fact(Timeout = 10000)]
     [Trait("Acceptance", "T14")]
+    public async Task NewerMaintenanceDoesNotHideAnOlderApplicationRecoveryDeadline()
+    {
+        var application = Submit(token: TestContext.Current.CancellationToken);
+        _time.Advance(TimeSpan.FromMilliseconds(29));
+        var maintenance = _scheduler.Submit(
+            new WatchRequest(
+                ZooKeeperOperation.RemoveWatches,
+                "/a",
+                ZkLink.Watches.WatchProtocol.Any
+            ),
+            new ZooKeeperRequestInfo(ZooKeeperOperation.RemoveWatches, path: "/a"),
+            TestContext.Current.CancellationToken,
+            watchOperation: true,
+            maintenance: true
+        );
+        Assert.Equal(ZooKeeperOperation.RemoveWatches, Take().Info.Operation);
+        Assert.Equal(ZooKeeperOperation.Sync, Take().Info.Operation);
+
+        _time.Advance(TimeSpan.FromMilliseconds(671));
+
+        await Assert.ThrowsAsync<ZooKeeperTimeoutException>(() => application).ConfigureAwait(true);
+        await Assert.ThrowsAsync<ZooKeeperTimeoutException>(() => maintenance).ConfigureAwait(true);
+        Assert.Equal(TimeSpan.Zero, _scheduler.OldestRemaining(TimeSpan.FromMilliseconds(600)));
+    }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T14")]
     public async Task PingAcknowledgmentsDoNotExtendTheOldestUnansweredRequestBudget()
     {
         var task = Submit(token: TestContext.Current.CancellationToken);
