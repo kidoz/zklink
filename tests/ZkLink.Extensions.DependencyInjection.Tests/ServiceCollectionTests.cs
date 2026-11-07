@@ -57,9 +57,11 @@ public sealed class ServiceCollectionTests
             Assert.Single(provider.GetServices<IHostedService>())
         );
 
-        var error = Assert.Throws<InvalidOperationException>(() =>
-            provider.GetRequiredService<ZooKeeperClient>()
-        );
+        var accessor = provider.GetRequiredService<IZooKeeperClientAccessor>();
+        Assert.False(accessor is IDisposable);
+        Assert.False(accessor is IAsyncDisposable);
+        Assert.Null(provider.GetService<ZooKeeperClient>());
+        var error = Assert.Throws<InvalidOperationException>(() => accessor.Client);
         Assert.Contains("after host startup", error.Message, StringComparison.Ordinal);
     }
 
@@ -70,7 +72,7 @@ public sealed class ServiceCollectionTests
         "CA2025",
         Justification = "The server task is cancelled and awaited in finally before the listener and cancellation source are disposed."
     )]
-    public async Task ContainerChecksLifetimeOnEveryResolutionAndSharesTheStartedClient()
+    public async Task HostedConsumerAndChildScopesShareClientWithoutAcquiringDisposalOwnership()
     {
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(
             TestContext.Current.CancellationToken
@@ -80,40 +82,81 @@ public sealed class ServiceCollectionTests
         var server = ServeSessionAsync(listener, stop.Token);
         try
         {
-            var services = new ServiceCollection();
-            services.AddZkLink(
-                new ZooKeeperClientOptions
+            using var host = new HostBuilder()
+                .ConfigureServices(services =>
                 {
-                    ConnectionString = "127.0.0.1:" + ((IPEndPoint)listener.LocalEndpoint).Port,
-                    Tls = ZooKeeperTlsOptions.Disabled(),
-                }
+                    services.AddZkLink(
+                        new ZooKeeperClientOptions
+                        {
+                            ConnectionString =
+                                "127.0.0.1:" + ((IPEndPoint)listener.LocalEndpoint).Port,
+                            Tls = ZooKeeperTlsOptions.Disabled(),
+                        }
+                    );
+                    services.AddHostedService(provider => new ClientConsumer(
+                        provider.GetRequiredService<IZooKeeperClientAccessor>()
+                    ));
+                })
+                .Build();
+            var provider = host.Services;
+            var accessor = provider.GetRequiredService<IZooKeeperClientAccessor>();
+            Assert.Throws<InvalidOperationException>(() => accessor.Client);
+            await host.StartAsync(stop.Token);
+            var client = accessor.Client;
+            var consumer = Assert.Single(
+                provider.GetServices<IHostedService>().OfType<ClientConsumer>()
             );
-            await using var provider = services.BuildServiceProvider();
-            Assert.Throws<InvalidOperationException>(() =>
-                provider.GetRequiredService<ZooKeeperClient>()
-            );
-            var lifetime = provider.GetRequiredService<ZkLinkConnectionHost>();
-            await lifetime.StartAsync(stop.Token);
-            var client = provider.GetRequiredService<ZooKeeperClient>();
-            Assert.Same(client, provider.GetRequiredService<ZooKeeperClient>());
+            Assert.Same(client, consumer.StartedClient);
+            for (var i = 0; i < 10_000; i++)
+            {
+                Assert.Same(accessor, provider.GetRequiredService<IZooKeeperClientAccessor>());
+                Assert.Same(client, accessor.Client);
+            }
+            using (var scope = provider.CreateScope())
+            {
+                Assert.Same(
+                    accessor,
+                    scope.ServiceProvider.GetRequiredService<IZooKeeperClientAccessor>()
+                );
+            }
             await using (var scope = provider.CreateAsyncScope())
             {
-                Assert.Same(client, scope.ServiceProvider.GetRequiredService<ZooKeeperClient>());
+                Assert.Same(
+                    accessor,
+                    scope.ServiceProvider.GetRequiredService<IZooKeeperClientAccessor>()
+                );
             }
 
             Assert.NotEqual(ZooKeeperSessionState.Closed, client.Session.State);
-            Assert.Same(client, provider.GetRequiredService<ZooKeeperClient>());
-            await lifetime.StopAsync(stop.Token);
+            await client.WaitForConnectionAsync(stop.Token);
+            await host.StopAsync(stop.Token);
+            Assert.Same(client, consumer.StoppedClient);
             Assert.Equal(ZooKeeperCloseStatus.Acknowledged, client.Session.CloseStatus);
-            Assert.Throws<InvalidOperationException>(() =>
-                provider.GetRequiredService<ZooKeeperClient>()
-            );
+            Assert.Throws<InvalidOperationException>(() => accessor.Client);
             await server.ConfigureAwait(true);
         }
         finally
         {
             await stop.CancelAsync();
             await server.ConfigureAwait(true);
+        }
+    }
+
+    private sealed class ClientConsumer(IZooKeeperClientAccessor accessor) : IHostedService
+    {
+        public ZooKeeperClient? StartedClient { get; private set; }
+        public ZooKeeperClient? StoppedClient { get; private set; }
+
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            StartedClient = accessor.Client;
+            return StartedClient.WaitForConnectionAsync(cancellationToken);
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken)
+        {
+            StoppedClient = accessor.Client;
+            return Task.CompletedTask;
         }
     }
 

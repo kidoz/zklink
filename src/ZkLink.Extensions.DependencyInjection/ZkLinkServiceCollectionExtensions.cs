@@ -9,8 +9,8 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class ZkLinkServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers one host-owned <see cref="ZooKeeperClient"/> and its asynchronous connection lifetime.
-    /// The client can be resolved after host startup and before shutdown.
+    /// Registers a singleton <see cref="IZooKeeperClientAccessor"/> and an asynchronous host-owned connection lifetime.
+    /// The accessor can be constructor-injected; its Client is available after ZkLink startup and before shutdown.
     /// </summary>
     /// <param name="services">The service collection being composed.</param>
     /// <param name="options">The client options captured when the host connects.</param>
@@ -38,9 +38,7 @@ public static class ZkLinkServiceCollectionExtensions
         services.AddSingleton<IHostedService>(static provider =>
             provider.GetRequiredService<ZkLinkConnectionHost>()
         );
-        services.AddTransient(static provider =>
-            provider.GetRequiredService<ZkLinkConnectionHost>().Client
-        );
+        services.AddSingleton<IZooKeeperClientAccessor, ZkLinkClientAccessor>();
         return services;
     }
 }

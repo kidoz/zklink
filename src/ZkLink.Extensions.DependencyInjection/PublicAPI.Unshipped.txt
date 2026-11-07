@@ -1,3 +1,5 @@
 #nullable enable
+ZkLink.Extensions.DependencyInjection.IZooKeeperClientAccessor
+ZkLink.Extensions.DependencyInjection.IZooKeeperClientAccessor.Client.get -> ZkLink.ZooKeeperClient!
 Microsoft.Extensions.DependencyInjection.ZkLinkServiceCollectionExtensions
 static Microsoft.Extensions.DependencyInjection.ZkLinkServiceCollectionExtensions.AddZkLink(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, ZkLink.ZooKeeperClientOptions! options) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
