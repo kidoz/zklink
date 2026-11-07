@@ -6,6 +6,17 @@ using System.Text.Json;
 
 namespace ZkLink.FaultTests;
 
+// These tests inspect live host process/socket state. Concurrent lsof scans
+// compete with the bounded diagnostic lookup and obscure the framing assertion.
+[CollectionDefinition("FaultProxy", DisableParallelization = true)]
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Maintainability",
+    "CA1515",
+    Justification = "xUnit collection definitions must be public for discovery (xUnit1027)."
+)]
+public sealed class FaultProxyIsolation;
+
+[Collection("FaultProxy")]
 [Trait("Fixture", "ProxyUnit")]
 public sealed class FaultProxyAttributionTests
 {

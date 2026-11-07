@@ -4,11 +4,15 @@ using System.Net.Sockets;
 
 namespace ZkLink.FaultTests;
 
+[Collection("FaultProxy")]
 [Trait("Fixture", "ProxyUnit")]
 public sealed class FaultProxySignalTests
 {
     private const int TestTimeoutMilliseconds = 15_000;
-    private static readonly TimeSpan SignalGuard = TimeSpan.FromSeconds(1);
+
+    // Attribution can use its two-second capture guard and two-second reap
+    // guard before the original framing failure completes the forwarding task.
+    private static readonly TimeSpan SignalGuard = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan MissingSignalGuard = TimeSpan.FromMilliseconds(100);
 
     [Theory(Timeout = TestTimeoutMilliseconds)]

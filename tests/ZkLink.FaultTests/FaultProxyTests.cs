@@ -4,6 +4,7 @@ using System.Net.Sockets;
 
 namespace ZkLink.FaultTests;
 
+[Collection("FaultProxy")]
 [Trait("Fixture", "ProxyUnit")]
 public sealed class FaultProxyTests
 {
