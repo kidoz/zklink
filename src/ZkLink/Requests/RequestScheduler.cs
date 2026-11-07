@@ -744,7 +744,7 @@ internal sealed class RequestScheduler(
             TimeSpan? oldest = null;
             foreach (var pending in _sent)
             {
-                if (pending.Control)
+                if (pending.Info.Operation == ZooKeeperOperation.CloseSession)
                 {
                     continue;
                 }

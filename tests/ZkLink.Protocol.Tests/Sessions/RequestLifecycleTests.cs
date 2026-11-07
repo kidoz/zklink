@@ -654,4 +654,59 @@ public sealed class RequestLifecycleTests : IDisposable
         Reply(pending);
         Assert.Null(_scheduler.OldestRemaining(TimeSpan.FromMilliseconds(600)));
     }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T14")]
+    public async Task UnansweredMaintenanceRetainsARecoveryDeadlineDespitePingAcknowledgments()
+    {
+        var task = _scheduler.Submit(
+            new WatchRequest(
+                ZooKeeperOperation.RemoveWatches,
+                "/a",
+                ZkLink.Watches.WatchProtocol.Any
+            ),
+            new ZooKeeperRequestInfo(ZooKeeperOperation.RemoveWatches, path: "/a"),
+            TestContext.Current.CancellationToken,
+            watchOperation: true,
+            maintenance: true
+        );
+        var pending = Take();
+        _time.Advance(TimeSpan.FromMilliseconds(100));
+        var error = await Assert
+            .ThrowsAsync<ZooKeeperTimeoutException>(() => task)
+            .ConfigureAwait(true);
+        Assert.Equal(RequestOutcome.Unknown, error.Outcome);
+        Assert.False(_scheduler.MaintenanceAvailable);
+        Assert.Equal(1, _scheduler.PendingCount);
+        Assert.Equal(
+            TimeSpan.FromMilliseconds(600),
+            _scheduler.OldestRemaining(TimeSpan.FromMilliseconds(600))
+        );
+
+        _scheduler.QueuePing();
+        Assert.True(_scheduler.Take(1).Ping);
+        Assert.True(_scheduler.ConsumePing(1));
+        _time.Advance(TimeSpan.FromMilliseconds(600));
+
+        Assert.Equal(TimeSpan.Zero, _scheduler.OldestRemaining(TimeSpan.FromMilliseconds(600)));
+        Reply(pending);
+        Assert.True(_scheduler.MaintenanceAvailable);
+        Assert.Equal(0, _scheduler.PendingCount);
+        Assert.Null(_scheduler.OldestRemaining(TimeSpan.FromMilliseconds(600)));
+    }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T14")]
+    public async Task CloseDoesNotUseTheOperationRecoveryDeadline()
+    {
+        var close = _scheduler.EnqueueClose();
+        Assert.Same(close, Take());
+
+        _time.Advance(TimeSpan.FromMilliseconds(700));
+
+        Assert.Null(_scheduler.OldestRemaining(TimeSpan.FromMilliseconds(600)));
+        Assert.False(close.Task.IsCompleted);
+        Reply(close);
+        await close.Task.WaitAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+    }
 }
