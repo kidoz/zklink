@@ -256,7 +256,7 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                             transportSpan
                         )
                         .ConfigureAwait(false);
-                    await new SessionEstablisher(
+                    var restoredZxid = await new SessionEstablisher(
                         this,
                         transport,
                         _options,
@@ -316,6 +316,9 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                         }
                         // Commit restoration and readiness under one gate so disposal
                         // cannot fall between clearing the snapshot and becoming Connected.
+                        // Partial attempts must not advance the watermark of watches
+                        // whose reset batch has not yet been acknowledged.
+                        _lastZxid = restoredZxid;
                         _watches.Restored();
                         _active = runtime;
                         if (!PublishState(ZooKeeperSessionState.Connected))

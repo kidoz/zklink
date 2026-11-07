@@ -113,7 +113,7 @@ public sealed class WatchRecoveryTests : IAsyncLifetime
         Assert.Equal(RequestOutcome.Unknown, failure.Outcome);
         var firstBatch = await NextDuringRecoveryAsync(second).ConfigureAwait(true);
         Assert.Equal(2, RestorePaths(firstBatch).Length);
-        second.Reply(firstBatch);
+        second.Reply(firstBatch, zxid: StaleZxid);
         var lastBatch = await NextDuringRecoveryAsync(second).ConfigureAwait(true);
         Assert.Single(RestorePaths(lastBatch));
         long failedGeneration = Client.Session.ConnectionGeneration;
@@ -223,7 +223,7 @@ public sealed class WatchRecoveryTests : IAsyncLifetime
         await AssertAdmissionClosedAsync(second).ConfigureAwait(true);
         var third = Peer();
         _fixture.Connector.Add(third);
-        second.Reply(reset, (int)code);
+        second.Reply(reset, (int)code, zxid: StaleZxid);
         AssertResume(await NextDuringRecoveryAsync(third).ConfigureAwait(true));
         reset = await NextDuringRecoveryAsync(third).ConfigureAwait(true);
         Assert.Equal("/node", Assert.Single(RestorePaths(reset)));
@@ -533,6 +533,121 @@ public sealed class WatchRecoveryTests : IAsyncLifetime
             .ConfigureAwait(true);
         Assert.Equal(nextZxid, Client.Session.LastReplyZxid);
     }
+
+    [Theory(Timeout = TestTimeoutMilliseconds)]
+    [InlineData(ZooKeeperWatchMode.OneShotExists)]
+    [InlineData(ZooKeeperWatchMode.OneShotData)]
+    [InlineData(ZooKeeperWatchMode.OneShotChildren)]
+    [Trait("Acceptance", "T26")]
+    [Trait("Acceptance", "T27")]
+    public async Task InterruptedOneShotRestoreRetainsTheWatermarkForUnacknowledgedBatches(
+        ZooKeeperWatchMode mode
+    )
+    {
+        const long changedZxid = 30;
+        const long restoredZxid = 40;
+        string[] watchedPaths = ["/a", "/b", "/c"];
+        var watches = new List<ZooKeeperWatch>();
+        foreach (var path in watchedPaths)
+        {
+            var pending = mode switch
+            {
+                ZooKeeperWatchMode.OneShotExists => OnlyWatchAsync(
+                    Client.ExistsAndWatchAsync(path, TestContext.Current.CancellationToken)
+                ),
+                ZooKeeperWatchMode.OneShotData => OnlyWatchAsync(
+                    Client.GetDataAndWatchAsync(path, TestContext.Current.CancellationToken)
+                ),
+                _ => OnlyWatchAsync(
+                    Client.GetChildrenAndWatchAsync(path, TestContext.Current.CancellationToken)
+                ),
+            };
+            var packet = await SessionTestSupport.NextAsync(First).ConfigureAwait(true);
+            var bytes = new byte[PacketBytes];
+            var writer = new JuteWriter(bytes, ProtocolFixtures.Limits);
+            writer.WriteReplyHeader(new ReplyHeader(packet.Xid, Watermark, WatchProtocol.Success));
+            if (mode == ZooKeeperWatchMode.OneShotData)
+            {
+                writer.WriteNullBuffer();
+            }
+            if (mode == ZooKeeperWatchMode.OneShotChildren)
+            {
+                writer.WriteInt32(0);
+            }
+            writer.WriteStat(ProtocolFixtures.Stat);
+            First.Inject(bytes[..writer.WrittenCount]);
+            watches.Add(await pending.ConfigureAwait(true));
+        }
+
+        var second = Peer();
+        _fixture.Connector.Add(second);
+        First.Drop();
+        AssertResume(await NextDuringRecoveryAsync(second).ConfigureAwait(true));
+        var firstBatch = await NextDuringRecoveryAsync(second).ConfigureAwait(true);
+        second.Reply(firstBatch, zxid: restoredZxid);
+        await NextDuringRecoveryAsync(second).ConfigureAwait(true);
+        Assert.Equal(Watermark, Client.Session.LastReplyZxid);
+
+        var third = Peer();
+        _fixture.Connector.Add(third);
+        second.Drop();
+        AssertResume(await NextDuringRecoveryAsync(third).ConfigureAwait(true));
+        var readiness = Client.WaitForConnectionAsync(TestContext.Current.CancellationToken);
+        for (var index = 0; index < 2; index++)
+        {
+            var retry = await NextDuringRecoveryAsync(third).ConfigureAwait(true);
+            var input = new JuteReader(retry.Bytes, ProtocolFixtures.Limits);
+            input.ReadRequestHeader();
+            var relativeZxid = input.ReadInt64();
+            Assert.Equal(Watermark, relativeZxid);
+            var dataPaths = input.ReadStringVector()!;
+            Assert.Empty(input.ReadStringVector()!);
+            var childPaths = input.ReadStringVector()!;
+            var paths = mode == ZooKeeperWatchMode.OneShotChildren ? childPaths : dataPaths;
+            Assert.Equal(watchedPaths.Skip(index * 2).Take(2), paths);
+            // Match Apache DataTree.setWatches: a data/children change is replayed
+            // only when its mzxid/pzxid is newer than the supplied watermark.
+            if (paths.Contains("/c") && changedZxid > relativeZxid)
+            {
+                var bytes = new byte[PacketBytes];
+                var writer = new JuteWriter(bytes, ProtocolFixtures.Limits);
+                writer.WriteReplyHeader(new ReplyHeader(WatchProtocol.NotificationXid, -1, 0));
+                writer.WriteInt32(
+                    (int)(
+                        mode == ZooKeeperWatchMode.OneShotChildren
+                            ? ZooKeeperWatchEventKind.NodeChildrenChanged
+                            : ZooKeeperWatchEventKind.NodeDataChanged
+                    )
+                );
+                writer.WriteInt32(WatchProtocol.ServerConnected);
+                writer.WriteString("/c");
+                third.Inject(bytes[..writer.WrittenCount]);
+            }
+            Assert.False(readiness.IsCompleted);
+            Assert.Equal(Watermark, Client.Session.LastReplyZxid);
+            third.Reply(retry, zxid: restoredZxid);
+        }
+        await readiness.ConfigureAwait(true);
+        Assert.Equal(restoredZxid, Client.Session.LastReplyZxid);
+        Assert.Equal(0, watches[0].Queue.Reader.Count);
+        Assert.Equal(0, watches[1].Queue.Reader.Count);
+        var events = watches[2]
+            .ReadEventsAsync(TestContext.Current.CancellationToken)
+            .GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        await using var lifetime = events.ConfigureAwait(true);
+        Assert.True(await events.MoveNextAsync().ConfigureAwait(true));
+        Assert.Equal("/c", events.Current.Path);
+        Assert.Equal(
+            mode == ZooKeeperWatchMode.OneShotChildren
+                ? ZooKeeperWatchEventKind.NodeChildrenChanged
+                : ZooKeeperWatchEventKind.NodeDataChanged,
+            events.Current.Kind
+        );
+        Assert.False(await events.MoveNextAsync().ConfigureAwait(true));
+    }
+
+    private static async Task<ZooKeeperWatch> OnlyWatchAsync<T>(Task<WatchedResult<T>> task) =>
+        (await task.ConfigureAwait(false)).Watch;
 
     private async Task<ZooKeeperWatch> RegisterAsync(string path)
     {

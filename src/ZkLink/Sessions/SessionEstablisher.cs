@@ -22,7 +22,10 @@ internal sealed class SessionEstablisher(
         "CA2025",
         Justification = "The liveness task is cancelled and awaited in finally before its source is disposed."
     )]
-    internal async Task RunAsync(Action handshakeAccepted, CancellationToken cancellationToken)
+    internal async Task<long> RunAsync(
+        Action handshakeAccepted,
+        CancellationToken cancellationToken
+    )
     {
         var packet = new byte[45];
         try
@@ -79,7 +82,7 @@ internal sealed class SessionEstablisher(
         {
             await AuthenticateAsync(establishment.Token).ConfigureAwait(false);
             owner.BeginWatchRestoration();
-            await RestoreWatchesAsync(establishment.Token).ConfigureAwait(false);
+            return await RestoreWatchesAsync(establishment.Token).ConfigureAwait(false);
         }
         finally
         {
@@ -200,14 +203,15 @@ internal sealed class SessionEstablisher(
         authSpan.Complete();
     }
 
-    private Task RestoreWatchesAsync(CancellationToken token)
+    private Task<long> RestoreWatchesAsync(CancellationToken token)
     {
         var span = ZooKeeperTelemetry.Begin(time, TelemetryKind.Restore);
         return ZooKeeperTelemetry.ObserveAsync(RestoreWatchesCoreAsync(token), span);
     }
 
-    private async Task RestoreWatchesCoreAsync(CancellationToken token)
+    private async Task<long> RestoreWatchesCoreAsync(CancellationToken token)
     {
+        var restoredZxid = lastZxid;
         var batches = owner.WatchRestoration();
         foreach (var batch in batches)
         {
@@ -276,7 +280,7 @@ internal sealed class SessionEstablisher(
                     translated,
                     options.Limits
                 );
-                owner.EstablishmentInbound(reply.Header);
+                owner.EstablishmentInbound();
                 if (reply.Header.Error != WatchProtocol.Success)
                     throw new ZooKeeperConnectionException(
                         reply.Header.Error switch
@@ -297,8 +301,13 @@ internal sealed class SessionEstablisher(
                         transport.Endpoint,
                         reply.Header.Error
                     );
+                if (reply.Header.Zxid > 0)
+                {
+                    restoredZxid = reply.Header.Zxid;
+                }
                 break;
             }
         }
+        return restoredZxid;
     }
 }
