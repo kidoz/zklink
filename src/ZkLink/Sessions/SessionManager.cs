@@ -157,6 +157,7 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
             throw new ArgumentOutOfRangeException(nameof(values));
         }
         var copy = Snapshot.List(values);
+        _options.ValidateEndpoints(copy);
         lock (_gate)
         {
             if (_closing || IsTerminal(Session.State))

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using ZkLink.Protocol;
@@ -72,6 +73,10 @@ internal sealed class ClientOptionsSnapshot : IDisposable
                 "Plaintext digest requires the explicit unsafe development override.",
                 nameof(options)
             );
+        }
+        if (!options.Tls.Enabled && options.Authentication.Count != 0)
+        {
+            ValidatePlaintextDigestEndpoints(parsed.Endpoints);
         }
         var total = 0;
         foreach (var auth in options.Authentication)
@@ -163,6 +168,31 @@ internal sealed class ClientOptionsSnapshot : IDisposable
                 root.Dispose();
             }
             certificate?.Dispose();
+        }
+    }
+
+    internal void ValidateEndpoints(IReadOnlyList<ZooKeeperEndpoint> endpoints)
+    {
+        if (!Settings.Tls.Enabled && Authentication.Length != 0)
+        {
+            ValidatePlaintextDigestEndpoints(endpoints);
+        }
+    }
+
+    private static void ValidatePlaintextDigestEndpoints(IReadOnlyList<ZooKeeperEndpoint> endpoints)
+    {
+        foreach (var endpoint in endpoints)
+        {
+            if (
+                !IPAddress.TryParse(endpoint.Host, out var address)
+                || !IPAddress.IsLoopback(address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address)
+            )
+            {
+                throw new ArgumentException(
+                    "Plaintext digest requires literal loopback addresses for every endpoint.",
+                    nameof(endpoints)
+                );
+            }
         }
     }
 

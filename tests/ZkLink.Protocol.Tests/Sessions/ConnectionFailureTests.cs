@@ -113,7 +113,7 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
             first,
             new ZooKeeperClientOptions
             {
-                ConnectionString = "one:2181,two:2181",
+                ConnectionString = "127.0.0.1:2181,127.0.0.2:2181",
                 Tls = ZooKeeperTlsOptions.Disabled(),
                 AllowUnsafePlaintextDigest = true,
                 Authentication = [authentication],
@@ -168,7 +168,7 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
                 first,
                 new ZooKeeperClientOptions
                 {
-                    ConnectionString = "one:2181,two:2181",
+                    ConnectionString = "127.0.0.1:2181,127.0.0.2:2181",
                     Tls = ZooKeeperTlsOptions.Disabled(),
                     AllowUnsafePlaintextDigest = true,
                     Authentication = [authentication],

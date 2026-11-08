@@ -27,7 +27,7 @@ public sealed class AuthenticationSessionTests : IAsyncLifetime
         using var secondAuth = ZooKeeperAuthentication.Digest("second", "password");
         var credentials = new List<ZooKeeperAuthentication> { firstAuth, secondAuth };
         var options = SessionFixture.Options(
-            connection: "one:2181,two:2181",
+            connection: "127.0.0.1:2181,127.0.0.2:2181",
             authentication: credentials
         );
         var connecting = _fixture.ConnectAsync(
@@ -126,11 +126,120 @@ public sealed class AuthenticationSessionTests : IAsyncLifetime
         using var auth = ZooKeeperAuthentication.Digest("user", "password");
         var options = new ZooKeeperClientOptions
         {
-            ConnectionString = "localhost",
+            ConnectionString = "127.0.0.1",
             Tls = ZooKeeperTlsOptions.Disabled(),
             Authentication = [auth],
         };
         Assert.Throws<ArgumentException>(() => ClientOptionsSnapshot.Capture(options));
+    }
+
+    [Theory]
+    [InlineData("127.0.0.1:2181")]
+    [InlineData("127.0.0.1:2181,127.0.0.2:2182/app")]
+    [InlineData("[::1]:2181")]
+    [InlineData("[::ffff:127.0.0.1]:2181")]
+    [Trait("Acceptance", "T21")]
+    public void PlaintextDigestOverrideAcceptsOnlyLiteralLoopbackEndpoints(string connection)
+    {
+        using var auth = ZooKeeperAuthentication.Digest("user", "password");
+        using var snapshot = ClientOptionsSnapshot.Capture(
+            SessionFixture.Options(connection: connection, authentication: [auth])
+        );
+        Assert.Single(snapshot.Authentication);
+    }
+
+    [Theory]
+    [InlineData("remote.example:2181")]
+    [InlineData("localhost:2181")]
+    [InlineData("127.0.0.1:2181,remote.example:2181")]
+    [InlineData("192.0.2.1:2181,127.0.0.1:2181")]
+    [InlineData("127.0.0.1:2181,[2001:db8::1]:2181")]
+    [InlineData("[::ffff:192.0.2.1]:2181")]
+    [InlineData("0.0.0.0:2181")]
+    [InlineData("[::]:2181")]
+    [Trait("Acceptance", "T21")]
+    public void PlaintextDigestOverrideRejectsRemoteMixedAndDnsEndpoints(string connection)
+    {
+        using var auth = ZooKeeperAuthentication.Digest("user", "password");
+        var error = Assert.Throws<ArgumentException>(() =>
+            ClientOptionsSnapshot.Capture(
+                SessionFixture.Options(connection: connection, authentication: [auth])
+            )
+        );
+        Assert.DoesNotContain("password", error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    [Trait("Acceptance", "T21")]
+    public void RemoteEndpointsRemainAvailableWithTlsOrWithoutCredentials(
+        bool tls,
+        bool authenticate
+    )
+    {
+        using var auth = ZooKeeperAuthentication.Digest("user", "password");
+        using var snapshot = ClientOptionsSnapshot.Capture(
+            new ZooKeeperClientOptions
+            {
+                ConnectionString = "remote.example:2181",
+                Tls = tls ? ZooKeeperTlsOptions.Required() : ZooKeeperTlsOptions.Disabled(),
+                Authentication = authenticate ? [auth] : [],
+            }
+        );
+        Assert.Equal(tls, snapshot.Settings.Tls.Enabled);
+    }
+
+    [Theory(Timeout = 10000)]
+    [InlineData("remote.example")]
+    [InlineData("192.0.2.1")]
+    [InlineData("localhost")]
+    [InlineData("2001:db8::1")]
+    [Trait("Acceptance", "T08")]
+    [Trait("Acceptance", "T21")]
+    public async Task EndpointUpdatesCannotEscapePlaintextDigestLoopbackBoundary(string host)
+    {
+        _first.ReplyAuth = true;
+        _second.ReplyAuth = true;
+        using var auth = ZooKeeperAuthentication.Digest("user", "password");
+        var client = await _fixture
+            .ConnectAsync(
+                _first,
+                SessionFixture.Options(
+                    connection: "127.0.0.1:2181,127.0.0.2:2181",
+                    authentication: [auth]
+                ),
+                TestContext.Current.CancellationToken
+            )
+            .ConfigureAwait(true);
+        await _fixture
+            .Connector.Attempts.Reader.ReadAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        await client
+            .UpdateEndpointsAsync(
+                [new ZooKeeperEndpoint("127.0.0.2")],
+                TestContext.Current.CancellationToken
+            )
+            .ConfigureAwait(true);
+        Assert.Throws<ArgumentException>(() =>
+        {
+            _ = client.UpdateEndpointsAsync(
+                [new ZooKeeperEndpoint("127.0.0.3"), new ZooKeeperEndpoint(host)],
+                TestContext.Current.CancellationToken
+            );
+        });
+        _fixture.Connector.Add(_second);
+        _first.Drop();
+        var attempt = await _fixture
+            .Connector.Attempts.Reader.ReadAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        Assert.Equal("127.0.0.2", attempt.Host);
+        await SessionTestSupport.NextAsync(_second).ConfigureAwait(true);
+        await SessionTestSupport.NextAsync(_second).ConfigureAwait(true);
+        await SessionTestSupport
+            .Bounded(client.WaitForConnectionAsync(TestContext.Current.CancellationToken))
+            .ConfigureAwait(true);
+        Assert.Equal(123, client.Session.SessionId);
     }
 
     [Fact(Timeout = 10000)]

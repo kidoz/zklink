@@ -6,7 +6,7 @@ namespace ZkLink.Samples.Basic;
 internal static class SampleClientOptionsFactory
 {
     internal const string PlaintextError =
-        "The --plaintext sample flag requires only loopback endpoints. Use TLS for remote servers.";
+        "The --plaintext sample flag requires only literal loopback endpoints. Use TLS for remote servers.";
 
     internal static bool IsLoopbackConnectionString(string connectionString)
     {
@@ -35,11 +35,8 @@ internal static class SampleClientOptionsFactory
                 ? endpoint.IndexOf(']', StringComparison.Ordinal) + 1
                 : endpoint.IndexOf(':', StringComparison.Ordinal);
         var host = end < 0 ? endpoint.AsSpan() : endpoint.AsSpan(0, end);
-        return host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
-            || (
-                IPAddress.TryParse(host, out var address)
-                && IPAddress.IsLoopback(address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address)
-            );
+        return IPAddress.TryParse(host, out var address)
+            && IPAddress.IsLoopback(address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address);
     }
 
     internal static ZooKeeperClientOptions Create(

@@ -15,7 +15,7 @@ public sealed class ZooKeeperClientOptions
     /// <summary>Gets configured authentication entries; they are replayed before readiness on reconnect.</summary>
     public IReadOnlyList<ZooKeeperAuthentication> Authentication { get; init; } = [];
 
-    /// <summary>Gets an explicit unsafe development opt-in for digest over plaintext.</summary>
+    /// <summary>Gets an explicit unsafe development opt-in for digest over plaintext to literal loopback endpoints only.</summary>
     public bool AllowUnsafePlaintextDigest { get; init; }
 
     /// <summary>Gets explicit permission to create TTL nodes; every endpoint must have extended node types enabled.</summary>

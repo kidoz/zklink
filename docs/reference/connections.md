@@ -22,7 +22,7 @@ client, except that endpoint updates affect future connection attempts.
 | `Chroot` | Optional; must agree with an embedded chroot; `/` means no prefix |
 | `Tls` | `ZooKeeperTlsOptions.Required()`; secure ports must be explicit |
 | `Authentication` | Empty; at most 32 digest entries, each frame-bounded; combined credentials at most 32 MiB |
-| `AllowUnsafePlaintextDigest` | False; explicit opt-in required for digest over plaintext |
+| `AllowUnsafePlaintextDigest` | False; explicit opt-in and literal loopback addresses required for every plaintext digest endpoint, including endpoint updates; DNS names (including localhost), remote and mixed lists are rejected |
 | `EnableTtlNodes` | False; operator assertion that every endpoint enables extended node types; required for TTL creation |
 | `CompatibilityProfile` | `ZooKeeper38`; `ZooKeeper39` enables independent watch modes at one path; assert all endpoints qualify, without negotiated discovery |
 | `SessionTimeout` | 30 seconds requested; actual negotiated timeout governs liveness |

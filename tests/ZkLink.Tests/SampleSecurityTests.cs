@@ -5,7 +5,6 @@ namespace ZkLink.Tests;
 public sealed class SampleSecurityTests
 {
     [Theory]
-    [InlineData("localhost:2181")]
     [InlineData("127.0.0.1:2181,127.0.0.2:2182/app")]
     [InlineData("[::1]:2181")]
     [InlineData("[::ffff:127.0.0.1]:2181")]
@@ -24,6 +23,7 @@ public sealed class SampleSecurityTests
     }
 
     [Theory]
+    [InlineData("localhost:2181")]
     [InlineData("remote.example:2181")]
     [InlineData("127.0.0.1:2181,remote.example:2181")]
     [InlineData("[2001:db8::1]:2181")]

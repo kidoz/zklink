@@ -9,6 +9,11 @@ not establish broader security, Native AOT or production qualification. See
 
 ## [Unreleased]
 
+### Fixed
+
+- Restrict unsafe plaintext digest authentication in the core to literal loopback
+  endpoints, rejecting DNS names (including localhost), remote and mixed lists.
+
 ## [1.0.3] - 2026-11-07
 
 ### Fixed

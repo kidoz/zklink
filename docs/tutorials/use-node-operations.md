@@ -21,7 +21,7 @@ just zk-down 3.9.6
 Expect `Node create/read/update/delete completed.` and `Close: Acknowledged`.
 The password is disposable and is not printed. `--plaintext` explicitly selects
 the local development fixture and its unsafe plaintext-digest override. Every
-endpoint must be a loopback address or `localhost`; mixed local/remote lists are
+endpoint must be a literal loopback address (for example `127.0.0.1` or `[::1]`); DNS names including `localhost` and mixed local/remote lists are
 rejected. Use TLS for protected credentials outside this fixture.
 
 ## Understand the calls

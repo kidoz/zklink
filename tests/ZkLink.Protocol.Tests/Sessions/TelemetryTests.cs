@@ -326,7 +326,7 @@ public sealed class TelemetryTests
             .ConnectAsync(
                 first,
                 SessionFixture.Options(
-                    connection: "one:2181,two:2181",
+                    connection: "127.0.0.1:2181,127.0.0.2:2181",
                     authentication: [credentials]
                 ),
                 TestContext.Current.CancellationToken

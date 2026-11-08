@@ -347,7 +347,7 @@ internal sealed class SessionFixture : IAsyncDisposable
         int queued = 1024,
         int bytes = 32 * 1024 * 1024,
         int events = 64,
-        string connection = "first:2181",
+        string connection = "127.0.0.1:2181",
         IReadOnlyList<ZooKeeperAuthentication>? authentication = null,
         int collections = 100_000,
         bool enableTtlNodes = false,
