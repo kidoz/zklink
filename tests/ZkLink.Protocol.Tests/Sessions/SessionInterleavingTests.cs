@@ -10,18 +10,36 @@ namespace ZkLink.Protocol.Tests.Sessions;
 public sealed class SessionInterleavingTests
 {
     private const int Seed = 20261108;
+    private const int HeldWriteSeed = 166;
     private const int Depth = 12;
+    private const string HeldWriteSteps =
+        "CallerSubmit,ReaderNotification,WriterTake,WriteCompletion,CallerSubmit,ReaderReply,ReaderNotification,OperationTimer,CallerClose,HeartbeatSample,HeartbeatSample,HeartbeatSample";
 
     [Fact(Timeout = 10000)]
     [Trait("Acceptance", "T13")]
     public async Task SeededInterleavingKeepsTheSessionOracles()
     {
-        var token = TestContext.Current.CancellationToken;
+        var steps = await RunSeedAsync(Seed, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        Assert.Equal(Depth, steps.Split(',').Length);
+    }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T13")]
+    public async Task HeldWriteSeedInterleavesReplyTimerAndClose()
+    {
+        var steps = await RunSeedAsync(HeldWriteSeed, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        Assert.Equal(HeldWriteSteps, steps);
+    }
+
+    private static async Task<string> RunSeedAsync(int seed, CancellationToken token)
+    {
         var fixture = new SessionFixture();
         var peer = new SessionPeer { ReplyApplications = false };
         try
         {
-            await RunAsync(fixture, peer, token).ConfigureAwait(true);
+            return await RunAsync(fixture, peer, seed, token).ConfigureAwait(true);
         }
         finally
         {
@@ -32,9 +50,10 @@ public sealed class SessionInterleavingTests
         }
     }
 
-    private static async Task RunAsync(
+    private static async Task<string> RunAsync(
         SessionFixture fixture,
         SessionPeer peer,
+        int seed,
         CancellationToken token
     )
     {
@@ -43,9 +62,9 @@ public sealed class SessionInterleavingTests
             .ConfigureAwait(true);
         var handshake = await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
         Assert.True(handshake.Handshake);
-        var harness = new Harness(fixture, peer, client);
+        var harness = new Harness(fixture, peer, client, seed);
         await harness.InstallWatchAsync(token).ConfigureAwait(true);
-        var mix = Seed;
+        var mix = seed;
         try
         {
             for (var step = 0; step < Depth; step++)
@@ -66,6 +85,7 @@ public sealed class SessionInterleavingTests
                 }
             }
             Assert.Equal(Depth, harness.Steps.Count);
+            return string.Join(",", harness.Steps);
         }
         finally
         {
@@ -90,7 +110,12 @@ public sealed class SessionInterleavingTests
         OperationTimer,
     }
 
-    private sealed class Harness(SessionFixture fixture, SessionPeer peer, ZooKeeperClient client)
+    private sealed class Harness(
+        SessionFixture fixture,
+        SessionPeer peer,
+        ZooKeeperClient client,
+        int seed
+    )
     {
         private const int SubmitLimit = 4;
         private readonly List<Call> _calls = [];
@@ -275,7 +300,7 @@ public sealed class SessionInterleavingTests
         }
 
         internal string Sequence(string reason) =>
-            "seed=" + Seed + " " + reason + " steps=" + string.Join(",", Steps);
+            "seed=" + seed + " " + reason + " steps=" + string.Join(",", Steps);
 
         private bool Open =>
             !_closed
@@ -387,7 +412,11 @@ public sealed class SessionInterleavingTests
             for (var spin = 0; spin < 8 && !closing.IsCompleted; spin++)
             {
                 token.ThrowIfCancellationRequested();
-                if (!_writeHeld)
+                while (_unreplied.Count > 0 && !closing.IsCompleted)
+                {
+                    await ReplyAsync(token).ConfigureAwait(true);
+                }
+                if (!_writeHeld || closing.IsCompleted)
                 {
                     await Task.Yield();
                     continue;
