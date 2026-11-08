@@ -547,6 +547,8 @@ public sealed class NodeOperationsTests : IAsyncLifetime
                 TestContext.Current.CancellationToken
             )
             .ConfigureAwait(true);
+        await WaitForAclVisibilityAsync(parent, 0, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
         ZooKeeperClient guest = await ConnectAsync(authenticated: false).ConfigureAwait(true);
         await using var guestLifetime = guest.ConfigureAwait(true);
         await guest
@@ -577,6 +579,8 @@ public sealed class NodeOperationsTests : IAsyncLifetime
                 ZNodeVersion.Any,
                 TestContext.Current.CancellationToken
             )
+            .ConfigureAwait(true);
+        await WaitForAclVisibilityAsync(parent, 1, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         await guest
             .DeleteAsync(parent + "/child", ZNodeVersion.Any, TestContext.Current.CancellationToken)
