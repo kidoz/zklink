@@ -17,7 +17,7 @@ public sealed class SoakTests : IAsyncLifetime
     private static readonly TimeSpan RoundGuard = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan CleanupGuard = TimeSpan.FromSeconds(15);
     private readonly SoakSettings _settings = SoakSettings.Read();
-    private readonly LiveZooKeeperFixture _fixture = new();
+    private readonly LiveZooKeeperFixture _fixture = SoakFixture.Create();
     private static string Endpoint =>
         Environment.GetEnvironmentVariable("ZKLINK_FAULT_ENDPOINT")
         ?? throw new InvalidOperationException("The owned soak forwarding target is required.");

@@ -11,6 +11,9 @@ broader security, Native AOT or production qualification. See
 
 ### Fixed
 
+- Keep isolated-soak maintenance connections behind an owned loopback relay to
+  the verified leader, preserving plaintext-digest restrictions and cleanup.
+
 - Restrict unsafe plaintext digest authentication in the core to literal loopback
   endpoints, rejecting DNS names (including localhost), remote and mixed lists.
 - Align recursive-watch matching with the existing routing rule excluding

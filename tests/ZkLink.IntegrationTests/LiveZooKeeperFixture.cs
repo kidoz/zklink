@@ -4,7 +4,10 @@ namespace ZkLink.IntegrationTests;
 
 // These are required live tests: the matrix runner supplies configuration, and missing
 // configuration fails initialization. Ordinary server-free jobs run their own projects.
-internal sealed class LiveZooKeeperFixture : IAsyncLifetime
+internal sealed class LiveZooKeeperFixture(
+    string? connectionString = null,
+    IAsyncDisposable? connectionLifetime = null
+) : IAsyncLifetime
 {
     internal static readonly CreateOptions OwnerCreate = new([
         new(ZooKeeperPermissions.All, "auth", ""),
@@ -27,7 +30,8 @@ internal sealed class LiveZooKeeperFixture : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         _connection =
-            Environment.GetEnvironmentVariable("ZKLINK_TEST_CONNECTION_STRING")
+            connectionString
+            ?? Environment.GetEnvironmentVariable("ZKLINK_TEST_CONNECTION_STRING")
             ?? throw new InvalidOperationException(
                 "Run just zk-operations-matrix to supply the required isolated live ensemble."
             );
@@ -51,21 +55,29 @@ internal sealed class LiveZooKeeperFixture : IAsyncLifetime
 
     public async ValueTask DisposeAsync()
     {
-        if (_client is null)
-        {
-            return;
-        }
         try
         {
-            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            if (_created)
+            if (_client is null)
             {
-                await DeleteTreeAsync(Root, cleanup.Token).ConfigureAwait(false);
+                return;
+            }
+            try
+            {
+                using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                if (_created)
+                {
+                    await DeleteTreeAsync(Root, cleanup.Token).ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                await _client.DisposeAsync().ConfigureAwait(false);
             }
         }
         finally
         {
-            await _client.DisposeAsync().ConfigureAwait(false);
+            if (connectionLifetime is not null)
+                await connectionLifetime.DisposeAsync().ConfigureAwait(false);
         }
     }
 

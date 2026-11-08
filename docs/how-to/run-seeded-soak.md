@@ -43,8 +43,13 @@ This command builds with the pinned host SDK, then executes the test DLL in a
 runtime-only .NET image pinned by digest in `dev/dotnet-soak-runtime.env`. The
 container runs as the invoking nonroot user, mounts the compiled tests read-only,
 and writes to the owned evidence directory. It shares the selected follower's
-network namespace and publishes no additional ports. Maintenance connects to the
-observed leader's private address. It has no Docker socket or privileged access.
+network namespace and publishes no additional ports. Maintenance clients connect
+through a fixture-owned loopback byte relay to the observed leader's private
+address. This keeps the core's literal-loopback plaintext-digest guard intact
+while preserving independent leader write fences. The relay remains available
+through namespace cleanup and is disposed with the maintenance client; it is
+outside the per-round fault-proxy socket scope. The runtime has no Docker socket
+or privileged access.
 Host loopback traffic cannot connect directly to these proxy listeners.
 
 The supervisor records source and binary hashes, runtime platform/image,

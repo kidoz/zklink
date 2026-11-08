@@ -14,7 +14,7 @@ public sealed class SoakDeadlineTests : IAsyncLifetime
     // The controlled-peer check asserts the exact boundary without this allowance.
     private static readonly TimeSpan SystemTimerResolutionAllowance = TimeSpan.FromMilliseconds(20);
     private static readonly TimeSpan ObservationGuard = TimeSpan.FromSeconds(10);
-    private readonly LiveZooKeeperFixture _fixture = new();
+    private readonly LiveZooKeeperFixture _fixture = SoakFixture.Create();
 
     public ValueTask InitializeAsync() => _fixture.InitializeAsync();
 

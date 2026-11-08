@@ -183,7 +183,7 @@ def run(args):
         environment = {"TESTINGPLATFORM_TELEMETRY_OPTOUT": "1", "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
                        "XDG_DATA_HOME": "/tmp/zklink-test-data", "XDG_CONFIG_HOME": "/tmp/zklink-test-config",
                        "ZKLINK_FAULT_ROLE": "soak", "ZKLINK_TEST_SERVER_VERSION": args.version,
-                       "ZKLINK_FAULT_ENDPOINT": "127.0.0.1:2181", "ZKLINK_TEST_CONNECTION_STRING": leader_ip + ":2181",
+                       "ZKLINK_FAULT_ENDPOINT": "127.0.0.1:2181", "ZKLINK_SOAK_MAINTENANCE_ENDPOINT": leader_ip + ":2181",
                        "ZKLINK_SOAK_DURATION_SECONDS": str(args.seconds), "ZKLINK_SOAK_SEED": str(args.seed),
                        "ZKLINK_SOAK_RESULT_FILE": container_evidence + "/" + args.version + "-soak.jsonl"}
         create = ["create", "--name", manifest["containerName"], "--network", "container:" + target["Id"],
