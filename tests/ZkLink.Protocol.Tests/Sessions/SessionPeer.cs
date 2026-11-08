@@ -29,7 +29,11 @@ internal sealed class SessionPeer : Stream
     private readonly TaskCompletionSource _applicationWriteHeld = new(
         TaskCreationOptions.RunContinuationsAsynchronously
     );
+    private TaskCompletionSource _holdEntered = new(
+        TaskCreationOptions.RunContinuationsAsynchronously
+    );
     internal Task ApplicationWriteHeld => _applicationWriteHeld.Task;
+    internal Task HoldEntered => _holdEntered.Task;
     private TaskCompletionSource? _heldPingWrite;
     private readonly TaskCompletionSource _pingWriteHeld = new(
         TaskCreationOptions.RunContinuationsAsynchronously
@@ -62,6 +66,8 @@ internal sealed class SessionPeer : Stream
         HoldApplicationWrite = false;
         _heldWrite?.TrySetResult();
     }
+
+    internal void ReleaseHeldWrite() => _heldWrite?.TrySetResult();
 
     internal void ReleasePingWrite()
     {
@@ -209,6 +215,9 @@ internal sealed class SessionPeer : Stream
                         HeldWriterMemory = buffer;
                         _heldWrite = new(TaskCreationOptions.RunContinuationsAsynchronously);
                         _applicationWriteHeld.TrySetResult();
+                        var entered = _holdEntered;
+                        _holdEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                        entered.TrySetResult();
                         await _heldWrite.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
                     }
                 }
