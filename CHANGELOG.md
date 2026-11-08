@@ -13,6 +13,8 @@ not establish broader security, Native AOT or production qualification. See
 
 - Restrict unsafe plaintext digest authentication in the core to literal loopback
   endpoints, rejecting DNS names (including localhost), remote and mixed lists.
+- Align recursive-watch matching with the existing routing rule excluding
+  child-list notifications.
 
 ## [1.0.3] - 2026-11-07
 

@@ -578,11 +578,16 @@ internal sealed class WatchManager(
                 is ZooKeeperWatchEventKind.NodeChildrenChanged
                     or ZooKeeperWatchEventKind.NodeDeleted
                     or ZooKeeperWatchEventKind.ChildWatchRemoved,
-            ZooKeeperWatchMode.Persistent or ZooKeeperWatchMode.PersistentRecursive => kind
+            ZooKeeperWatchMode.Persistent => kind
                 is ZooKeeperWatchEventKind.NodeCreated
                     or ZooKeeperWatchEventKind.NodeDeleted
                     or ZooKeeperWatchEventKind.NodeDataChanged
                     or ZooKeeperWatchEventKind.NodeChildrenChanged
+                    or ZooKeeperWatchEventKind.PersistentWatchRemoved,
+            ZooKeeperWatchMode.PersistentRecursive => kind
+                is ZooKeeperWatchEventKind.NodeCreated
+                    or ZooKeeperWatchEventKind.NodeDeleted
+                    or ZooKeeperWatchEventKind.NodeDataChanged
                     or ZooKeeperWatchEventKind.PersistentWatchRemoved,
             _ => false,
         };
