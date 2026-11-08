@@ -2,9 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-ZkLink is in initial development. The first core release is **0.1.0**; APIs may
-change before 1.0. Release verification covers the documented scenarios and does
-not establish broader security, Native AOT or production qualification. See
+ZkLink is in initial development. The initial core release was **0.1.0**.
+Release verification covers the documented scenarios and does not establish
+broader security, Native AOT or production qualification. See
 [README.md](README.md) for the current status and verified scope.
 
 ## [Unreleased]
@@ -15,6 +15,8 @@ not establish broader security, Native AOT or production qualification. See
   endpoints, rejecting DNS names (including localhost), remote and mixed lists.
 - Align recursive-watch matching with the existing routing rule excluding
   child-list notifications.
+- Consolidate current capability and Native AOT claims and preserve superseded
+  release evidence in historical records.
 
 ## [1.0.3] - 2026-11-07
 
