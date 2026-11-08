@@ -42,10 +42,8 @@ public sealed class RequestTransitionTableTests : IDisposable
         PendingRequest? pending = null;
         try
         {
-            pending = await AdmittedRequestAsync(
-                admission,
-                TestContext.Current.CancellationToken
-            ).ConfigureAwait(true);
+            pending = await AdmittedRequestAsync(admission, TestContext.Current.CancellationToken)
+                .ConfigureAwait(true);
             AssertRequest(pending, preparing: true, released: false);
             Assert.True(_scheduler.OwnedBytes > 0);
             PendingRequest? close = null;
@@ -87,10 +85,8 @@ public sealed class RequestTransitionTableTests : IDisposable
         PendingRequest? pending = null;
         try
         {
-            pending = await AdmittedRequestAsync(
-                admission,
-                TestContext.Current.CancellationToken
-            ).ConfigureAwait(true);
+            pending = await AdmittedRequestAsync(admission, TestContext.Current.CancellationToken)
+                .ConfigureAwait(true);
             AssertRequest(pending, preparing: true, released: false);
             Assert.True(_scheduler.OwnedBytes > 0);
         }
@@ -99,9 +95,7 @@ public sealed class RequestTransitionTableTests : IDisposable
             admission.Release.TrySetResult();
         }
 
-        await Assert
-            .ThrowsAsync<InvalidDataException>(() => admission.Submit)
-            .ConfigureAwait(true);
+        await Assert.ThrowsAsync<InvalidDataException>(() => admission.Submit).ConfigureAwait(true);
         AssertRequest(pending!, preparing: false, completed: true, released: true);
         Assert.Equal(0, _scheduler.OwnedBytes);
         Assert.Equal(0, _scheduler.PendingCount);
@@ -112,9 +106,7 @@ public sealed class RequestTransitionTableTests : IDisposable
     public async Task DetachDuringWriteCompletesWithoutReleaseUntilTheWriteFinishes()
     {
         var task = Submit("/a", TestContext.Current.CancellationToken);
-        var release = new TaskCompletionSource(
-            TaskCreationOptions.RunContinuationsAsynchronously
-        );
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var (pending, writing) = _scheduler.WriteNext(
             1,
             _ => release.Task,
@@ -128,13 +120,7 @@ public sealed class RequestTransitionTableTests : IDisposable
         release.TrySetResult();
         await writing!.ConfigureAwait(true);
         _scheduler.WriteFinished(pending);
-        AssertRequest(
-            pending,
-            prepared: true,
-            sent: true,
-            completed: true,
-            released: true
-        );
+        AssertRequest(pending, prepared: true, sent: true, completed: true, released: true);
         Assert.Equal(0, _scheduler.OwnedBytes);
         var error = await Assert.ThrowsAsync<ZooKeeperException>(() => task).ConfigureAwait(true);
         Assert.Equal(RequestOutcome.Unknown, error.Outcome);
@@ -216,9 +202,7 @@ public sealed class RequestTransitionTableTests : IDisposable
     public async Task EnqueueCloseDuringWriteTombstonesWithoutCompletingTheRequest()
     {
         var task = Submit("/a", TestContext.Current.CancellationToken);
-        var release = new TaskCompletionSource(
-            TaskCreationOptions.RunContinuationsAsynchronously
-        );
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var (pending, writing) = _scheduler.WriteNext(
             1,
             _ => release.Task,
@@ -241,13 +225,7 @@ public sealed class RequestTransitionTableTests : IDisposable
         Assert.False(pending.Released);
         Assert.True(_scheduler.OwnedBytes > 0);
         Reply(pending);
-        AssertRequest(
-            pending,
-            prepared: true,
-            sent: true,
-            completed: true,
-            released: true
-        );
+        AssertRequest(pending, prepared: true, sent: true, completed: true, released: true);
         Assert.Equal(0, Tombstones(_scheduler));
     }
 
@@ -318,8 +296,7 @@ public sealed class RequestTransitionTableTests : IDisposable
         CancellationToken cancellationToken
     )
     {
-        var finished = await Task
-            .WhenAny(admission.Entered.Task, admission.Submit)
+        var finished = await Task.WhenAny(admission.Entered.Task, admission.Submit)
             .WaitAsync(SessionTestSupport.Guard, cancellationToken)
             .ConfigureAwait(true);
         if (finished == admission.Submit)
@@ -663,7 +640,12 @@ public sealed class WatchTransitionTableTests
                     null
                 )
             );
-            Manager = new WatchManager(Gate, _options, new EventBudget(Gate, 8, telemetry), Session);
+            Manager = new WatchManager(
+                Gate,
+                _options,
+                new EventBudget(Gate, 8, telemetry),
+                Session
+            );
         }
 
         internal Registration Begin(string path, ZooKeeperWatchMode mode)
@@ -768,9 +750,7 @@ public sealed class SessionTransitionTableTests : IAsyncLifetime
         var states = new StateObserver(client);
         await using var statesLifetime = states.ConfigureAwait(true);
         var close = client.CloseAsync(TestContext.Current.CancellationToken);
-        var closing = await states
-            .WaitAsync(ZooKeeperSessionState.Closing)
-            .ConfigureAwait(true);
+        var closing = await states.WaitAsync(ZooKeeperSessionState.Closing).ConfigureAwait(true);
         Assert.Equal(ZooKeeperSessionState.Closing, closing.State);
         await SessionTestSupport.Bounded(close).ConfigureAwait(true);
         Assert.Equal(ZooKeeperSessionState.Closed, client.Session.State);
@@ -850,7 +830,10 @@ public sealed class SessionTransitionTableTests : IAsyncLifetime
     {
         var client = await SessionTestSupport
             .Bounded(
-                _fixture.ConnectAsync(peer, cancellationToken: TestContext.Current.CancellationToken)
+                _fixture.ConnectAsync(
+                    peer,
+                    cancellationToken: TestContext.Current.CancellationToken
+                )
             )
             .ConfigureAwait(true);
         var handshake = await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
