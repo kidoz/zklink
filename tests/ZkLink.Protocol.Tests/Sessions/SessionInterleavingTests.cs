@@ -33,6 +33,45 @@ public sealed class SessionInterleavingTests
         Assert.Equal(HeldWriteSteps, steps);
     }
 
+    [Theory(Timeout = 10000)]
+    [InlineData(null, RequestOutcome.NotSent)]
+    [InlineData(1, RequestOutcome.Unknown)]
+    [Trait("Acceptance", "T13")]
+    public async Task TimerStepWaitsForDelayedCallerCompletion(int? xid, RequestOutcome outcome)
+    {
+        var token = TestContext.Current.CancellationToken;
+        using var peer = new SessionPeer();
+        var fixture = new SessionFixture();
+        await using var fixtureLifetime = fixture.ConfigureAwait(true);
+        var client = await fixture
+            .ConnectAsync(peer, cancellationToken: token)
+            .ConfigureAwait(true);
+        var harness = new Harness(fixture, peer, client, HeldWriteSeed);
+        using var cancel = new CancellationTokenSource();
+        var completion = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        harness.Calls.Add(new Call(completion.Task, cancel, "/delayed") { Xid = xid });
+        // Hold the public completion to reproduce a continuation that has not yet
+        // run after the scheduler's synchronous timer callback.
+        Task firing = harness.ApplyAsync(Step.OperationTimer, token);
+        try
+        {
+            Assert.False(firing.IsCompleted);
+        }
+        finally
+        {
+            completion.SetException(
+                new ZooKeeperTimeoutException(
+                    new ZooKeeperRequestInfo(ZooKeeperOperation.Sync, path: "/delayed"),
+                    outcome
+                )
+            );
+            _ = completion.Task.Exception;
+        }
+        await firing.WaitAsync(SessionTestSupport.Guard, token).ConfigureAwait(true);
+    }
+
     private static async Task<string> RunSeedAsync(int seed, CancellationToken token)
     {
         var fixture = new SessionFixture();
@@ -136,11 +175,7 @@ public sealed class SessionInterleavingTests
         {
             peer.HoldApplicationWrite = true;
             var entered = peer.HoldEntered;
-            var adding = client.AddWatchAsync(
-                "/node",
-                PersistentWatchMode.Persistent,
-                token
-            );
+            var adding = client.AddWatchAsync("/node", PersistentWatchMode.Persistent, token);
             await entered.WaitAsync(SessionTestSupport.Guard, token).ConfigureAwait(true);
             _writeHeld = true;
             var packet = await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
@@ -249,7 +284,9 @@ public sealed class SessionInterleavingTests
             }
             Assert.True(client.Session.LastReplyZxid >= _zxid, sequence);
             _zxid = client.Session.LastReplyZxid;
-            Assert.Null(client.Manager.Scheduler.Expected(client.Session.ConnectionGeneration + 1, 1));
+            Assert.Null(
+                client.Manager.Scheduler.Expected(client.Session.ConnectionGeneration + 1, 1)
+            );
             var writing = 0;
             foreach (var pending in Snapshot())
             {
@@ -280,10 +317,7 @@ public sealed class SessionInterleavingTests
             var sent = Sent(client.Manager.Scheduler).ToArray();
             for (var index = 1; index < sent.Length; index++)
             {
-                Assert.True(
-                    sent[index - 1].Info.RequestId < sent[index].Info.RequestId,
-                    sequence
-                );
+                Assert.True(sent[index - 1].Info.RequestId < sent[index].Info.RequestId, sequence);
             }
             if (_watch is not null)
             {
@@ -302,9 +336,7 @@ public sealed class SessionInterleavingTests
         internal string Sequence(string reason) =>
             "seed=" + seed + " " + reason + " steps=" + string.Join(",", Steps);
 
-        private bool Open =>
-            !_closed
-            && client.Session.State is ZooKeeperSessionState.Connected;
+        private bool Open => !_closed && client.Session.State is ZooKeeperSessionState.Connected;
 
         private async Task ReplyAsync(CancellationToken token)
         {
@@ -424,8 +456,7 @@ public sealed class SessionInterleavingTests
                 var entered = peer.HoldEntered;
                 peer.ReleaseHeldWrite();
                 _writeHeld = false;
-                var done = await Task
-                    .WhenAny(closing, entered)
+                var done = await Task.WhenAny(closing, entered)
                     .WaitAsync(SessionTestSupport.Guard, token)
                     .ConfigureAwait(true);
                 if (done == entered)
@@ -455,14 +486,17 @@ public sealed class SessionInterleavingTests
             fixture.Time.Advance(TimeSpan.FromMilliseconds(100));
             foreach (var call in pending)
             {
-                if (!call.Task.IsCompleted)
-                {
-                    continue;
-                }
-                await Assert
-                    .ThrowsAnyAsync<ZooKeeperException>(() => call.Task)
+                // The timer faults the scheduler completion synchronously, but the
+                // public task has asynchronous continuations. Observe that outcome
+                // before another step can treat the call as a successful reply.
+                var error = await Assert
+                    .ThrowsAsync<ZooKeeperTimeoutException>(() => call.Task)
                     .WaitAsync(SessionTestSupport.Guard, token)
                     .ConfigureAwait(true);
+                Assert.Equal(
+                    call.Xid.HasValue ? RequestOutcome.Unknown : RequestOutcome.NotSent,
+                    error.Outcome
+                );
             }
         }
 
