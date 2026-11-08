@@ -35,7 +35,7 @@ The unpublished direct `ZooKeeperClient` registration has been replaced: migrate
 
 Calling `AddZkLink` twice in one service collection throws. Options, credentials and certificates are captured when the host connects, so keep configuration resources alive until startup completes. Use an explicitly owned `ZooKeeperClient` for a separate security or coordination identity. The helper does not add session pooling, request replay, named registrations, health checks, or configuration binding.
 
-Install `ZkLink.Extensions.DependencyInjection` version `1.0.2`; it depends on the
+Install `ZkLink.Extensions.DependencyInjection` version `1.0.3`; it depends on the
 matching core package. The release includes portable symbols and verifies a fresh
 package consumer, assembly identity and shared accessor registration.
 
@@ -49,6 +49,6 @@ ZooKeeper 3.8.7 and 3.9.6 with TLS and mTLS. See the
 and evidence scope. This verifies the documented host integration; it does not
 establish compatibility for arbitrary application registrations or dependencies.
 
-The public **1.0.2** packages pass this matrix in
+The public **1.0.2** packages passed this matrix in
 [verification run 42410311495](https://github.com/kidoz/zklink/actions/runs/42410311495):
-all eight jobs pass, with 48 native DI lifecycle cases and no trim/AOT warnings.
+all eight jobs passed, with 48 native DI lifecycle cases and no trim/AOT warnings.

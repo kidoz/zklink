@@ -12,16 +12,16 @@ ZkLink is a managed .NET client for Apache ZooKeeper: a first-class C# implement
 ## Install the core package
 
 ```sh
-dotnet add package ZkLink --version 1.0.2
+dotnet add package ZkLink --version 1.0.3
 ```
 
-All three packages are published at **1.0.2** and target .NET 10 applications:
+All three packages are published at **1.0.3** and target .NET 10 applications:
 
 | Package | Purpose |
 | --- | --- |
-| [ZkLink](https://www.nuget.org/packages/ZkLink/1.0.2) | Core client with no third-party runtime dependencies |
-| [ZkLink.Extensions.DependencyInjection](https://www.nuget.org/packages/ZkLink.Extensions.DependencyInjection/1.0.2) | Optional DI and host-owned session lifetime |
-| [ZkLink.Analyzers](https://www.nuget.org/packages/ZkLink.Analyzers/1.0.2) | Optional compiler diagnostics; use `PrivateAssets="all"` |
+| [ZkLink](https://www.nuget.org/packages/ZkLink/1.0.3) | Core client with no third-party runtime dependencies |
+| [ZkLink.Extensions.DependencyInjection](https://www.nuget.org/packages/ZkLink.Extensions.DependencyInjection/1.0.3) | Optional DI and host-owned session lifetime |
+| [ZkLink.Analyzers](https://www.nuget.org/packages/ZkLink.Analyzers/1.0.3) | Optional compiler diagnostics; use `PrivateAssets="all"` |
 
 See the [release guide](docs/how-to/release-nuget.md) for verification and publishing
 details. Core and DI include portable symbols; analyzers are compiler-only.
@@ -38,7 +38,7 @@ of the final package across the declared client platforms.
 - **Code:** checked protocol encoding/decoding for node, ACL, transaction and control messages; bounded asynchronous framing; new/resume handshake records; connection-string parsing and namespace translation. Public supporting types include immutable results, create options and failure/removal contracts. One explicit session per client, negotiated-timeout heartbeats, endpoint rotation, same-session reconnect, cancellation outcomes and close cleanup are implemented. Sent application requests are never replayed automatically.
 - **Tests:** xUnit suites cover Apache Java fixtures for all implemented opcodes, transaction success/error shapes, every reply split and truncation, all UTF-16 path code units, chroot boundaries and supporting public contracts. A bounded scripted stream and loopback fake server exercise delayed delivery, partial writes, dropped replies and handshake exchanges. Virtual-time tests exercise session and request lifecycles. Loopback TLS tests check chain/name validation, certificate expiry and mutual authentication. The managed connection sample has passed digest auth, sync and acknowledged close on every node of both pinned versions. Live .NET tests cover CRUD, versions, null/empty and 1,000,000-byte data, create modes, chroot, ACL authorization and acknowledged-close ephemeral deletion on both pinned versions. Live transaction tests verify atomic success/rollback, independent read errors, and committed writes whose replies are dropped, followed by same-session resume without replay. Auxiliary tests verify session-scoped textual ephemeral prefixes, chroot, recursive counts, permissions and server identities. One-shot watch tests cover events, sharing/removal, chroot, re-registration and same-session restoration after a connection cut. Persistent/recursive watch tests cover repeated delivery, profile-specific removal and reconnect gaps. Broader live faults remain unverified.
 - **Build:** SDK 10.0.403 is pinned, with central dependency versions and lock files; core has no third-party runtime dependencies. Public API changes are checked against nullable baselines. The [build workflow](.github/workflows/build.yml) defines Linux/Windows/macOS checks and separate Gradle-based Apache Java verification. All four native targets passed [publish and secure live checks](docs/how-to/verify-native-aot.md#evidence-and-remaining-qualification), with retained execution artifacts.
-- **Distribution:** local core candidates include package metadata, documentation, notices and source/symbol information. [Package inspection and installed-consumer identity checks](docs/how-to/verify-core-package.md) pass on Linux, Windows and macOS; Linux live-consumer checks cover both server versions. The current core package is version 1.0.2, with 0.1.0 retained as the API compatibility baseline; broader production and Native AOT qualification remain open. The project is [MIT-licensed](LICENSE); see the [dependency inventory](THIRD-PARTY-NOTICES.md).
+- **Distribution:** local core candidates include package metadata, documentation, notices and source/symbol information. [Package inspection and installed-consumer identity checks](docs/how-to/verify-core-package.md) pass on Linux, Windows and macOS; Linux live-consumer checks cover both server versions. The current core package is version 1.0.3, with 0.1.0 retained as the API compatibility baseline; broader production and Native AOT qualification remain open. The project is [MIT-licensed](LICENSE); see the [dependency inventory](THIRD-PARTY-NOTICES.md).
 
 The library lives in `src/`; `tests/` contains public-contract tests, protocol tests and an optional Java oracle. The [basic sample](samples/ZkLink.Samples.Basic) can connect, exercise CRUD with `--nodes`, run transactions with `--transactions`, query ephemerals/counts/identities with `--auxiliary`, and exercise one-shot, persistent and recursive watches with `--watches`.
 

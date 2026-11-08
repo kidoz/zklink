@@ -1,11 +1,11 @@
 # Current capabilities
 
-Reviewed against repository records on **8 November 2026**. The documented public
-release is **1.0.2** for `ZkLink`, `ZkLink.Extensions.DependencyInjection` and
-`ZkLink.Analyzers`; source projects prepare **1.0.3**. A source version or changelog
-entry alone does not establish publication. See the [changelog](../../CHANGELOG.md)
-for changes and [production release readiness](release-readiness.md) for open
-qualification requirements. No full production qualification is claimed.
+Reviewed against repository records and the public NuGet feed on **8 November
+2026**. The documented public release is **1.0.3** for `ZkLink`,
+`ZkLink.Extensions.DependencyInjection` and `ZkLink.Analyzers`. See the
+[changelog](../../CHANGELOG.md) for changes and [production release
+readiness](release-readiness.md) for open qualification requirements. No full
+production qualification is claimed.
 
 ## Capabilities and limits
 
@@ -34,7 +34,8 @@ all eight jobs pass, including rooted/unrooted publication without trim/AOT
 warnings, direct executable identity and 48 secure native DI lifecycle cases
 across the four targets and both server patches. The live fixtures use private
 PKI with `NoCheck`. Dedicated core online-revocation controls are separate.
-These recorded runs do not verify subsequent 1.0.3 source changes.
+These recorded runs cover the 1.0.2 packages and do not verify the published
+1.0.3 source.
 
 See [Native AOT verification](../how-to/verify-native-aot.md) for exact scope,
 commands and platform limits. Full production and sustained qualification remain

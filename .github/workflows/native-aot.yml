@@ -9,7 +9,7 @@ on:
         description: Published NuGet version to verify (empty builds source candidates)
         required: false
         type: string
-        default: '1.0.2'
+        default: '1.0.3'
   workflow_call:
     inputs:
       published_version:

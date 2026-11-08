@@ -27,7 +27,7 @@ These projects sit outside normal solution restore because publication requires
 the fresh candidate feed and a target RID.
 
 To verify an already published version, set `ZKLINK_AOT_PUBLISHED_VERSION`, for
-example `ZKLINK_AOT_PUBLISHED_VERSION=1.0.2 just aot-check` on macOS/Linux. The
+example `ZKLINK_AOT_PUBLISHED_VERSION=1.0.3 just aot-check` on macOS/Linux. The
 publisher downloads the core and DI packages from NuGet's public feed, checks their
 shared source revision/version and records their package and compiler-input hashes.
 `just aot-portable-check` supports the same setting. The Native AOT workflow also
