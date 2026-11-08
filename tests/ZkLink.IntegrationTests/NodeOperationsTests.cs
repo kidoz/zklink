@@ -406,13 +406,24 @@ public sealed class NodeOperationsTests : IAsyncLifetime
     [Trait("Acceptance", "T19")]
     public async Task AclReadWriteAndAdminRightsAreIndependentAndVersionsStayDistinct()
     {
+        try
+        {
+            await VerifyAclRightsAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        }
+        catch (ZooKeeperException error)
+        {
+            throw new InvalidOperationException(
+                $"ACL rights check failed: {DescribeFailure(error)}",
+                error
+            );
+        }
+    }
+
+    private async Task VerifyAclRightsAsync(CancellationToken cancellationToken)
+    {
         string path = Root + "/acl";
         ZooKeeperAcl owner = Assert.Single(
-            (
-                await Client
-                    .GetAclAsync(Root, TestContext.Current.CancellationToken)
-                    .ConfigureAwait(true)
-            ).Acl
+            (await Client.GetAclAsync(Root, cancellationToken).ConfigureAwait(true)).Acl
         );
         Assert.Equal("digest", owner.Scheme); // The server expanded the authenticated creator ACL.
         await Client
@@ -420,26 +431,19 @@ public sealed class NodeOperationsTests : IAsyncLifetime
                 path,
                 null,
                 new CreateOptions([owner, new(ZooKeeperPermissions.Read, "world", "anyone")]),
-                TestContext.Current.CancellationToken
+                cancellationToken
             )
             .ConfigureAwait(true);
+        await WaitForAclVisibilityAsync(path, 0, cancellationToken).ConfigureAwait(true);
         ZooKeeperClient guest = await ConnectAsync(authenticated: false).ConfigureAwait(true);
         await using var guestLifetime = guest.ConfigureAwait(true);
-        await guest.GetDataAsync(path, TestContext.Current.CancellationToken).ConfigureAwait(true);
+        await guest.GetDataAsync(path, cancellationToken).ConfigureAwait(true);
         await RejectedAsync(
-                () =>
-                    guest.SetDataAsync(
-                        path,
-                        null,
-                        ZNodeVersion.Any,
-                        TestContext.Current.CancellationToken
-                    ),
+                () => guest.SetDataAsync(path, null, ZNodeVersion.Any, cancellationToken),
                 ZooKeeperErrorCode.NoAuth
             )
             .ConfigureAwait(true);
-        ZNodeAcl masked = await guest
-            .GetAclAsync(path, TestContext.Current.CancellationToken)
-            .ConfigureAwait(true);
+        ZNodeAcl masked = await guest.GetAclAsync(path, cancellationToken).ConfigureAwait(true);
         ZooKeeperAcl maskedDigest = Assert.Single(masked.Acl, entry => entry.Scheme == "digest");
         bool digestMasked = maskedDigest.Id.EndsWith(":x", StringComparison.Ordinal);
         Assert.True(digestMasked, "A read-only caller must receive a masked digest identity.");
@@ -450,7 +454,7 @@ public sealed class NodeOperationsTests : IAsyncLifetime
                         path,
                         [ZooKeeperAcl.OpenUnsafe],
                         ZNodeVersion.Any,
-                        TestContext.Current.CancellationToken
+                        cancellationToken
                     ),
                 ZooKeeperErrorCode.NoAuth
             )
@@ -460,9 +464,10 @@ public sealed class NodeOperationsTests : IAsyncLifetime
                 path,
                 [owner, new(ZooKeeperPermissions.Write, "world", "anyone")],
                 ZNodeVersion.Exact(0),
-                TestContext.Current.CancellationToken
+                cancellationToken
             )
             .ConfigureAwait(true);
+        await WaitForAclVisibilityAsync(path, 1, cancellationToken).ConfigureAwait(true);
         Assert.Equal(1, aclStat.Aversion);
         Assert.Equal(0, aclStat.Version);
         ZNodeStat dataStat = await guest
@@ -470,14 +475,14 @@ public sealed class NodeOperationsTests : IAsyncLifetime
                 path,
                 ReadOnlyMemory<byte>.Empty,
                 ZNodeVersion.Exact(0),
-                TestContext.Current.CancellationToken
+                cancellationToken
             )
             .ConfigureAwait(true);
         Assert.Equal(1, dataStat.Version);
         Assert.Equal(1, dataStat.Aversion);
         Assert.Equal(0, dataStat.Cversion);
         await RejectedAsync(
-                () => guest.GetDataAsync(path, TestContext.Current.CancellationToken),
+                () => guest.GetDataAsync(path, cancellationToken),
                 ZooKeeperErrorCode.NoAuth
             )
             .ConfigureAwait(true);
@@ -486,17 +491,12 @@ public sealed class NodeOperationsTests : IAsyncLifetime
             2,
             (
                 await guest
-                    .SetDataAsync(
-                        path,
-                        null,
-                        ZNodeVersion.Exact(1),
-                        TestContext.Current.CancellationToken
-                    )
+                    .SetDataAsync(path, null, ZNodeVersion.Exact(1), cancellationToken)
                     .ConfigureAwait(true)
             ).Version
         );
         await RejectedAsync(
-                () => guest.GetAclAsync(path, TestContext.Current.CancellationToken),
+                () => guest.GetAclAsync(path, cancellationToken),
                 ZooKeeperErrorCode.NoAuth
             )
             .ConfigureAwait(true);
@@ -505,30 +505,26 @@ public sealed class NodeOperationsTests : IAsyncLifetime
                 path,
                 [owner, new(ZooKeeperPermissions.Admin, "world", "anyone")],
                 ZNodeVersion.Exact(1),
-                TestContext.Current.CancellationToken
+                cancellationToken
             )
             .ConfigureAwait(true);
+        await WaitForAclVisibilityAsync(path, 2, cancellationToken).ConfigureAwait(true);
         ZNodeStat adminChange = await guest
             .SetAclAsync(
                 path,
                 [owner, new(ZooKeeperPermissions.Read, "world", "anyone")],
                 ZNodeVersion.Exact(2),
-                TestContext.Current.CancellationToken
+                cancellationToken
             )
             .ConfigureAwait(true);
+        await WaitForAclVisibilityAsync(path, 3, cancellationToken).ConfigureAwait(true);
         Assert.Equal(3, adminChange.Aversion);
         await RejectedAsync(
-                () =>
-                    guest.SetDataAsync(
-                        path,
-                        null,
-                        ZNodeVersion.Any,
-                        TestContext.Current.CancellationToken
-                    ),
+                () => guest.SetDataAsync(path, null, ZNodeVersion.Any, cancellationToken),
                 ZooKeeperErrorCode.NoAuth
             )
             .ConfigureAwait(true);
-        await guest.CloseAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        await guest.CloseAsync(cancellationToken).ConfigureAwait(true);
     }
 
     [Fact(Timeout = 60000)]
@@ -660,13 +656,68 @@ public sealed class NodeOperationsTests : IAsyncLifetime
         Assert.Equal(0, created.Stat.Version);
     }
 
+    private async Task WaitForAclVisibilityAsync(
+        string path,
+        int expectedVersion,
+        CancellationToken cancellationToken
+    )
+    {
+        // An ACL reply can precede application on another ensemble member. Read
+        // the exact ACL version everywhere before checking another session's rights.
+        using var guard = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        guard.CancelAfter(TimeSpan.FromSeconds(5));
+        int endpointIndex = 0;
+        int? observedVersion = null;
+        try
+        {
+            foreach (string endpoint in ConnectionString.Split(','))
+            {
+                endpointIndex++;
+                observedVersion = null;
+                ZooKeeperClient observer = await _fixture
+                    .ConnectAsync(connectionString: endpoint, cancellationToken: guard.Token)
+                    .ConfigureAwait(true);
+                await using var lifetime = observer.ConfigureAwait(true);
+                while (true)
+                {
+                    await observer.SyncAsync(path, guard.Token).ConfigureAwait(true);
+                    ZNodeAcl acl = await observer
+                        .GetAclAsync(path, guard.Token)
+                        .ConfigureAwait(true);
+                    observedVersion = acl.Stat.Aversion;
+                    if (observedVersion == expectedVersion)
+                    {
+                        break;
+                    }
+                    Assert.True(
+                        observedVersion < expectedVersion,
+                        $"ACL version exceeded {expectedVersion} on endpoint {endpointIndex}: {observedVersion}."
+                    );
+                    await Task.Delay(TimeSpan.FromMilliseconds(10), guard.Token)
+                        .ConfigureAwait(true);
+                }
+            }
+        }
+        catch (OperationCanceledException error)
+            when (guard.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"ACL version {expectedVersion} was not visible on endpoint {endpointIndex} within five seconds; last observed version: {observedVersion}.",
+                error
+            );
+        }
+    }
+
+    private static string DescribeFailure(ZooKeeperException error) =>
+        $"operation={error.Request.Operation}, outcome={error.Outcome}, serverCode={error.ErrorCode} ({error.KnownErrorCode}), requestId={error.Request.RequestId}";
+
     private static async Task RejectedAsync(Func<Task> action, ZooKeeperErrorCode code)
     {
         ZooKeeperException error = await Assert
             .ThrowsAsync<ZooKeeperException>(action)
             .ConfigureAwait(false);
-        Assert.Equal(code, error.KnownErrorCode);
-        Assert.Equal(RequestOutcome.Rejected, error.Outcome);
+        Assert.True(error.KnownErrorCode == code, $"Expected {code}; {DescribeFailure(error)}");
+        Assert.True(error.Outcome == RequestOutcome.Rejected, DescribeFailure(error));
         Assert.NotNull(error.Request.RequestId);
     }
 }
