@@ -78,6 +78,8 @@ internal sealed class ElectionSample(ZooKeeperClientOptions options) : ISampleSt
                 catch (OperationCanceledException) when (waits.IsCancellationRequested) { }
             }
 
+            // The participants closed different sessions; synchronize this observer.
+            await client.SyncAsync(root, cancellationToken).ConfigureAwait(false);
             var remaining = await client
                 .GetChildrenAsync(root, cancellationToken)
                 .ConfigureAwait(false);
@@ -97,6 +99,7 @@ internal sealed class ElectionSample(ZooKeeperClientOptions options) : ISampleSt
             // Cancellation and ambiguous creates still need cleanup. This private parent is
             // owned only by this run, so remove any candidate whose create reply was lost.
             using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await client.SyncAsync(root, cleanup.Token).ConfigureAwait(false);
             if (await client.ExistsAsync(root, cleanup.Token).ConfigureAwait(false) is not null)
             {
                 var remaining = await client

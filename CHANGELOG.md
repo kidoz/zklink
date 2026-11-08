@@ -11,6 +11,11 @@ not establish broader security, Native AOT or production qualification. See
 
 ## [1.0.3] - 2026-11-07
 
+### Fixed
+
+- Synchronize election cleanup reads after other participants close, preventing
+  stale candidate listings from being mistaken for leftover ephemeral nodes.
+
 ### Added
 
 - Verify packed `ZkLink` and `ZkLink.Extensions.DependencyInjection` hosts under

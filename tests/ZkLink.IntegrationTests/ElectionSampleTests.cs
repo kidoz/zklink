@@ -50,6 +50,7 @@ public sealed class ElectionSampleTests : IAsyncLifetime
             Assert.False(last.IsCompleted);
             await first.CloseAsync(token).ConfigureAwait(true);
             await next.WaitAsync(TimeSpan.FromSeconds(10), token).ConfigureAwait(true);
+            await _fixture.Client.SyncAsync(_fixture.Root, token).ConfigureAwait(true);
             Assert.Null(await _fixture.Client.ExistsAsync(a.Path, token).ConfigureAwait(true));
             Assert.Null(await b.GetPredecessorAsync(token).ConfigureAwait(true));
             Assert.Equal(b.Path, await c.GetPredecessorAsync(token).ConfigureAwait(true));
@@ -58,6 +59,9 @@ public sealed class ElectionSampleTests : IAsyncLifetime
             await last.WaitAsync(TimeSpan.FromSeconds(10), token).ConfigureAwait(true);
             Assert.Null(await c.GetPredecessorAsync(token).ConfigureAwait(true));
             await third.CloseAsync(token).ConfigureAwait(true);
+            Assert.Equal(ZooKeeperCloseStatus.Acknowledged, third.Session.CloseStatus);
+            // This independent observer must catch up with the closing participant.
+            await _fixture.Client.SyncAsync(_fixture.Root, token).ConfigureAwait(true);
             Assert.Empty(
                 (
                     await _fixture
@@ -169,6 +173,7 @@ public sealed class ElectionSampleTests : IAsyncLifetime
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => wait).ConfigureAwait(true);
         Assert.NotNull(await _fixture.Client.ExistsAsync(a.Path, token).ConfigureAwait(true));
         await second.CloseAsync(token).ConfigureAwait(true);
+        await _fixture.Client.SyncAsync(_fixture.Root, token).ConfigureAwait(true);
         Assert.Null(await _fixture.Client.ExistsAsync(b.Path, token).ConfigureAwait(true));
         await first.CloseAsync(token).ConfigureAwait(true);
     }
@@ -185,6 +190,7 @@ public sealed class ElectionSampleTests : IAsyncLifetime
         await _fixture
             .Client.DeleteAsync(candidate.Path, ZNodeVersion.Any, token)
             .ConfigureAwait(true);
+        await client.SyncAsync(_fixture.Root, token).ConfigureAwait(true);
         await Assert
             .ThrowsAsync<InvalidOperationException>(() => candidate.WaitForLeadershipAsync(token))
             .ConfigureAwait(true);

@@ -32,6 +32,11 @@ participants share a disposable digest identity so the creator ACL lets each
 read the others' nodes. The coordinator owns namespace cleanup. `--plaintext`
 selects the local fixture explicitly; the normal client default is TLS.
 
+Before checking or performing cleanup, the coordinator calls `SyncAsync` on its
+own session. Its subsequent reads must include changes made by the participants'
+separate sessions; a successful participant close alone does not synchronize the
+coordinator's view.
+
 ## Follow the algorithm
 
 [ElectionCandidate.cs](../../samples/ZkLink.Samples.Basic/ElectionCandidate.cs)
