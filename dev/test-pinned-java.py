@@ -112,6 +112,34 @@ class PinnedJavaTests(unittest.TestCase):
             with self.subTest(system=system, arch=arch), self.assertRaises(ValueError):
                 java.select_pin(system, arch)
 
+    def test_gradle_pin_matches_wrapper_and_rejects_checksum_drift(self):
+        root = Path(self.directory.name)
+        properties = root / "tests/ZkLink.JavaOracle/gradle/wrapper/gradle-wrapper.properties"
+        properties.parent.mkdir(parents=True)
+        original = (ACTION.parents[2] / properties.relative_to(root)).read_text()
+        properties.write_text(original)
+        pin = java.select_gradle_pin(root)
+        self.assertEqual("gradle-9.8.2-bin.zip", pin["name"])
+        properties.write_text(original.replace(pin["sha256"], "0" * 64))
+        with self.assertRaisesRegex(ValueError, "does not match"):
+            java.select_gradle_pin(root)
+
+    def test_gradle_seed_is_verified_and_does_not_mark_wrapper_installed(self):
+        pin = dict(self.pin, wrapper_url="https://services.gradle.org/distributions/gradle-9.8.2-bin.zip")
+        home = Path(self.directory.name) / "gradle-home"
+        self.archive.write_bytes(self.payload)
+        java.seed_gradle_archive(self.archive, pin, home)
+        destination = java.wrapper_archive_path(pin["wrapper_url"], home)
+        # Matches the path produced by the actual pinned Gradle wrapper.
+        self.assertEqual(home / "wrapper/dists/gradle-9.8.2-bin/8wepis63pzuhrlfaiy04bagwu/gradle-9.8.2-bin.zip",
+                         destination)
+        self.assertEqual(self.payload, destination.read_bytes())
+        self.assertFalse(destination.with_name(destination.name + ".ok").exists())
+        self.assertFalse(destination.with_name(destination.name + ".seed-part").exists())
+        self.archive.write_bytes(b"x" * len(self.payload))
+        with self.assertRaisesRegex(ValueError, "unverified"):
+            java.seed_gradle_archive(self.archive, pin, home)
+
 
 if __name__ == "__main__":
     unittest.main()

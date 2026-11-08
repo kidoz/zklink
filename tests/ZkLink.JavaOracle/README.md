@@ -14,6 +14,7 @@ Use the pinned .NET SDK and JDK 25 for the full verification command. Local veri
 
 CI uses the [shared pinned Java action](../../.github/actions/setup-pinned-java)
 to restore or download a size- and SHA-256-verified JDK archive before installation.
+It also seeds the matching verified Gradle ZIP for the normal wrapper to install.
 The Gradle wrapper allows a 60-second network timeout and three download retries
 with an initial 1-second backoff; its version and distribution checksum remain
 pinned. These retries cover wrapper acquisition, not test failures.

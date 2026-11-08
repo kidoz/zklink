@@ -1,0 +1,8 @@
+{
+  "name": "gradle-9.8.2-bin.zip",
+  "api_url": "https://api.github.com/repos/gradle/gradle-distributions/releases/assets/656830895",
+  "download_url": "https://github.com/gradle/gradle-distributions/releases/download/v9.8.2/gradle-9.8.2-bin.zip",
+  "wrapper_url": "https://services.gradle.org/distributions/gradle-9.8.2-bin.zip",
+  "bytes": 151620138,
+  "sha256": "21bd5da2de49b642904077f38c0efdc7778e92b3ed0889392dca61b97e389607"
+}

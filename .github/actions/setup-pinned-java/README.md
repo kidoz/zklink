@@ -25,6 +25,17 @@ To update the JDK, review the exact assets and published checksum files in the
 then update all pins together. Never resolve a moving `latest` version at runtime.
 The checksum in the cache key makes a pin change select a fresh cache entry.
 
+The same action also caches the exact Gradle 9.8.2 distribution in `gradle.json`.
+It requires that pin to match the normal wrapper URL and checksum, then copies
+the verified ZIP into the wrapper's distribution download directory. The actual
+wrapper still validates the SHA-256 and installs Gradle; this action never
+creates an installation marker or changes the wrapper URL. A cache miss uses
+the same bounded release-asset API/browser retries as the JDK download.
+The archive stays in a separate cache because the wrapper deletes its ZIP after
+installation. Cache entries are scoped by the cache service to the runner OS.
+The wrapper directory calculation follows
+[Gradle 9.8.2 PathAssembler](https://github.com/gradle/gradle/blob/v9.8.2/platforms/core-runtime/wrapper-shared/src/main/java/org/gradle/wrapper/PathAssembler.java).
+
 Run downloader failure/cache regression checks with:
 
 ```sh
