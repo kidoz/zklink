@@ -1,0 +1,36 @@
+name: Set up pinned Java
+description: Cache, verify and install the exact Temurin JDK used by fixtures
+runs:
+  using: composite
+  steps:
+    - name: Select pinned archive
+      id: pin
+      shell: python
+      run: |
+        import os, runpy, sys
+        sys.argv = ["download.py", "describe"]
+        runpy.run_path(os.path.join(os.environ["GITHUB_ACTION_PATH"], "download.py"), run_name="__main__")
+    - name: Restore JDK archive
+      id: cache
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        path: ${{ steps.pin.outputs.archive }}
+        key: ${{ steps.pin.outputs.cache-key }}
+    - name: Verify or download JDK archive
+      shell: python
+      run: |
+        import os, runpy, sys
+        sys.argv = ["download.py", "ensure"]
+        runpy.run_path(os.path.join(os.environ["GITHUB_ACTION_PATH"], "download.py"), run_name="__main__")
+    - name: Cache verified JDK archive
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        path: ${{ steps.pin.outputs.archive }}
+        key: ${{ steps.pin.outputs.cache-key }}
+    - name: Install verified JDK
+      uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+      with:
+        distribution: jdkfile
+        java-version: ${{ steps.pin.outputs.java-version }}
+        jdk-file: ${{ steps.pin.outputs.archive }}

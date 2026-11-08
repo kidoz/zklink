@@ -129,10 +129,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
       - name: Install pinned fixture JDK
         if: matrix.fixture == 'java'
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
-        with:
-          distribution: temurin
-          java-version: '25.0.5+8.0.LTS'
+        uses: ./.github/actions/setup-pinned-java
       - name: Download the shared candidate
         if: inputs.candidate_artifact != ''
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7

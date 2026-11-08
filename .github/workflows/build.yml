@@ -311,10 +311,7 @@ jobs:
           global-json-file: global.json
       - name: Install Java for server session control
         if: matrix.role == 'expiry'
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
-        with:
-          distribution: temurin
-          java-version: '25.0.5+8.0.LTS'
+        uses: ./.github/actions/setup-pinned-java
       - name: Verify faults and watch pressure on both pinned versions
         env:
           ZKLINK_MATRIX_ARTIFACT_ROOT: ${{ github.workspace }}/artifacts/${{ matrix.role }}-faults
@@ -459,11 +456,10 @@ jobs:
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           global-json-file: global.json
+      - name: Test pinned Java download failures and cache integrity
+        run: python dev/test-pinned-java.py
       - name: Install Java reference runtime
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
-        with:
-          distribution: temurin
-          java-version: '25.0.5+8.0.LTS'
+        uses: ./.github/actions/setup-pinned-java
       - name: Verify fixtures and C# requests using Gradle
         run: bash dev/test-jute-oracle.sh
       - name: Retain allocation baseline

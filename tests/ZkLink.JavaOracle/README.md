@@ -12,6 +12,12 @@ bash dev/test-jute-oracle.sh
 
 Use the pinned .NET SDK and JDK 25 for the full verification command. Local verification and CI select Temurin 25.0.5+8. The checked-in Gradle 9.8.2 wrapper downloads its checksum-verified distribution; a global Gradle installation is unnecessary. Dependencies resolve from Maven Central with exact version locks and SHA-256 verification metadata. The Java code compiles for Java 17.
 
+CI uses the [shared pinned Java action](../../.github/actions/setup-pinned-java)
+to restore or download a size- and SHA-256-verified JDK archive before installation.
+The Gradle wrapper allows a 60-second network timeout and three download retries
+with an initial 1-second backoff; its version and distribution checksum remain
+pinned. These retries cover wrapper acquisition, not test failures.
+
 The script creates fresh Java/C# output directories under ignored `artifacts/jute-oracle/`, compares regenerated fixtures with the checked-in files, restores locked .NET dependencies, runs the protocol tests with C# byte output enabled, and asks Java to deserialize and assert those C# requests. Missing prerequisites, changed bytes, missing output files and mismatched values fail verification. Checked-in fixtures are never replaced automatically.
 
 The project exposes Gradle tasks `generateFixtures`, `verifyFixtures` and `verifyCSharpRequests`; `check` also verifies Java-generated fixtures. For example:
