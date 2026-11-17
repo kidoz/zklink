@@ -46,7 +46,9 @@ tests check those boundaries.
 The session manager owns credentials, endpoint selection, liveness and connection
 generations. The scheduler owns queued packets, positive request IDs and pending
 reply order. A shared gate makes readiness, admission and state subscription
-changes atomic. Socket I/O and user continuations run outside that gate.
+changes atomic. Under that gate the scheduler assigns the request ID and hands
+the encoded packet to the sole transport writer. The writer can then send it
+even if the caller cancels. Socket I/O and user continuations run outside the gate.
 
 Disconnect revokes admission before notifying callers. The old transport is
 closed before reconnecting with the same credentials; sent application requests

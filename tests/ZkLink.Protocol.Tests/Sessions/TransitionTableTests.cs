@@ -107,7 +107,8 @@ public sealed class RequestTransitionTableTests : IDisposable
     {
         var task = Submit("/a", TestContext.Current.CancellationToken);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var (pending, writing) = _scheduler.WriteNext(
+        var (pending, writing) = ConnectionRuntime.WriteNext(
+            _scheduler,
             1,
             _ => release.Task,
             TestContext.Current.CancellationToken
@@ -132,7 +133,8 @@ public sealed class RequestTransitionTableTests : IDisposable
     {
         using var stop = new CancellationTokenSource();
         var task = Submit("/a", stop.Token);
-        var (pending, writing) = _scheduler.WriteNext(
+        var (pending, writing) = ConnectionRuntime.WriteNext(
+            _scheduler,
             1,
             _ => stop.CancelAsync(),
             TestContext.Current.CancellationToken
@@ -203,7 +205,8 @@ public sealed class RequestTransitionTableTests : IDisposable
     {
         var task = Submit("/a", TestContext.Current.CancellationToken);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var (pending, writing) = _scheduler.WriteNext(
+        var (pending, writing) = ConnectionRuntime.WriteNext(
+            _scheduler,
             1,
             _ => release.Task,
             TestContext.Current.CancellationToken
@@ -241,8 +244,11 @@ public sealed class RequestTransitionTableTests : IDisposable
             .ThrowsAsync<ZooKeeperException>(() => rejected)
             .ConfigureAwait(true);
         Assert.Equal(RequestOutcome.NotSent, error.Outcome);
-        var taken = _scheduler.Take(1);
-        Assert.True(taken.Ping);
+        var taken = _scheduler.Take(1, TestContext.Current.CancellationToken);
+        Assert.Equal(
+            -2,
+            System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(taken.Packet.Span)
+        );
         Assert.Null(taken.Request);
         Assert.True(_scheduler.PingPending);
         Assert.True(_scheduler.ConsumePing(1));
@@ -353,8 +359,11 @@ public sealed class RequestTransitionTableTests : IDisposable
 
     private PendingRequest Take(long generation = 1, bool finishWrite = true)
     {
-        (var pending, var ping) = _scheduler.Take(generation);
-        Assert.False(ping);
+        (var pending, var packet) = _scheduler.Take(
+            generation,
+            TestContext.Current.CancellationToken
+        );
+        Assert.False(packet.IsEmpty);
         Assert.NotNull(pending);
         if (finishWrite)
         {

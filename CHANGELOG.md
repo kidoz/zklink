@@ -17,6 +17,8 @@ broader security, Native AOT or production qualification. See
   a successful server-confirmed removal returns the original disposition.
 - Bind the hosted connection to the options passed to `AddZkLink` regardless of
   later options registrations.
+- Perform transport writes outside the session lock after the writer takes
+  ownership of the encoded packet.
 
 - Keep isolated-soak maintenance connections behind an owned loopback relay to
   the verified leader, preserving plaintext-digest restrictions and cleanup.

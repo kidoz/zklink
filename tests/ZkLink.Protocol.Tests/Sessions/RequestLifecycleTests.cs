@@ -13,11 +13,12 @@ public sealed class RequestLifecycleTests : IDisposable
         SessionFixture.Options(inFlight: 2, queued: 2, bytes: 128)
     );
     private readonly ManualTimeProvider _time = new();
+    private readonly object _gate = new();
     private readonly RequestScheduler _scheduler;
 
     public RequestLifecycleTests()
     {
-        _scheduler = new RequestScheduler(new object(), _options, _time, new AsyncPulse());
+        _scheduler = new RequestScheduler(_gate, _options, _time, new AsyncPulse());
         _scheduler.Attach(1, new ZooKeeperEndpoint("peer", 2181));
     }
 
@@ -36,8 +37,8 @@ public sealed class RequestLifecycleTests : IDisposable
 
     private PendingRequest Take(bool finishWrite = true)
     {
-        (var pending, var ping) = _scheduler.Take(1);
-        Assert.False(ping);
+        (var pending, var packet) = _scheduler.Take(1, TestContext.Current.CancellationToken);
+        Assert.False(packet.IsEmpty);
         Assert.NotNull(pending);
         if (finishWrite)
         {
@@ -75,7 +76,7 @@ public sealed class RequestLifecycleTests : IDisposable
         Assert.True(pending.IsCanceled);
         Assert.Equal(0, _scheduler.OwnedBytes);
         Assert.Equal(0, _scheduler.PendingCount);
-        Assert.Null(_scheduler.Take(1).Request);
+        Assert.Null(_scheduler.Take(1, TestContext.Current.CancellationToken).Request);
     }
 
     [Fact(Timeout = 10000)]
@@ -89,7 +90,7 @@ public sealed class RequestLifecycleTests : IDisposable
             .ConfigureAwait(true);
         Assert.Equal(RequestOutcome.NotSent, error.Outcome);
         Assert.Equal(0, _scheduler.OwnedBytes);
-        Assert.Null(_scheduler.Take(1).Request);
+        Assert.Null(_scheduler.Take(1, TestContext.Current.CancellationToken).Request);
     }
 
     [Theory(Timeout = 10000)]
@@ -116,7 +117,8 @@ public sealed class RequestLifecycleTests : IDisposable
         var next = Submit("/next", TestContext.Current.CancellationToken);
         var writes = 0;
 
-        var handoff = _scheduler.WriteNext(
+        var handoff = ConnectionRuntime.WriteNext(
+            _scheduler,
             1,
             _ =>
             {
@@ -202,9 +204,14 @@ public sealed class RequestLifecycleTests : IDisposable
         await Assert.ThrowsAsync<ZooKeeperTimeoutException>(() => first).ConfigureAwait(true);
         await Assert.ThrowsAsync<ZooKeeperTimeoutException>(() => second).ConfigureAwait(true);
         var third = Submit(token: TestContext.Current.CancellationToken);
-        Assert.Null(_scheduler.Take(1).Request);
+        Assert.Null(_scheduler.Take(1, TestContext.Current.CancellationToken).Request);
         _scheduler.QueuePing();
-        Assert.True(_scheduler.Take(1).Ping);
+        Assert.Equal(
+            -2,
+            BinaryPrimitives.ReadInt32BigEndian(
+                _scheduler.Take(1, TestContext.Current.CancellationToken).Packet.Span
+            )
+        );
         Assert.True(_scheduler.ConsumePing(1));
         Reply(p1);
         var p3 = Take();
@@ -276,7 +283,9 @@ public sealed class RequestLifecycleTests : IDisposable
         // Simulate the corrupt xid set that triggers the allocator's invariant guard.
         AllocatedXids(_scheduler).Add(1);
 
-        Assert.Throws<InvalidOperationException>(() => _scheduler.Take(1));
+        Assert.Throws<InvalidOperationException>(() =>
+            _scheduler.Take(1, TestContext.Current.CancellationToken)
+        );
         Assert.Equal(1, _scheduler.PendingCount);
         Assert.False(task.IsCompleted);
         _scheduler.Detach();
@@ -362,7 +371,7 @@ public sealed class RequestLifecycleTests : IDisposable
         Assert.Equal(RequestOutcome.Unknown, uncertain.Outcome);
         Assert.Equal(RequestOutcome.NotSent, notSent.Outcome);
         _scheduler.Attach(2, new ZooKeeperEndpoint("new", 2181));
-        Assert.Null(_scheduler.Take(2).Request);
+        Assert.Null(_scheduler.Take(2, TestContext.Current.CancellationToken).Request);
         Assert.Equal(0, _scheduler.OwnedBytes);
     }
 
@@ -397,11 +406,12 @@ public sealed class RequestLifecycleTests : IDisposable
         var writes = 0;
         if (handoff)
         {
-            var (request, write) = _scheduler.WriteNext(
+            var (request, write) = ConnectionRuntime.WriteNext(
+                _scheduler,
                 1,
-                pending =>
+                packet =>
                 {
-                    Assert.Same(close, pending);
+                    Assert.True(packet.Span.SequenceEqual(close.Packet));
                     writes++;
                     return Task.CompletedTask;
                 },
@@ -415,7 +425,8 @@ public sealed class RequestLifecycleTests : IDisposable
         var frozen = _scheduler.FreezeClose(close);
         Assert.Equal(handoff ? RequestOutcome.Unknown : RequestOutcome.NotSent, frozen.Outcome);
         Assert.Equal(handoff, frozen.Info.RequestId.HasValue);
-        var next = _scheduler.WriteNext(
+        var next = ConnectionRuntime.WriteNext(
+            _scheduler,
             1,
             _ =>
             {
@@ -446,7 +457,8 @@ public sealed class RequestLifecycleTests : IDisposable
         using var stop = new CancellationTokenSource();
         await stop.CancelAsync();
         Assert.Throws<OperationCanceledException>(() =>
-            _scheduler.WriteNext(
+            ConnectionRuntime.WriteNext(
+                _scheduler,
                 1,
                 _ => throw new InvalidOperationException("Unexpected transport handoff"),
                 stop.Token
@@ -466,11 +478,13 @@ public sealed class RequestLifecycleTests : IDisposable
     {
         using var stop = new CancellationTokenSource();
         var task = Submit(token: stop.Token);
-        var (pending, writing) = _scheduler.WriteNext(
+        var (pending, writing) = ConnectionRuntime.WriteNext(
+            _scheduler,
             1,
-            request =>
+            packet =>
             {
-                Assert.NotNull(request);
+                Assert.Equal(1, BinaryPrimitives.ReadInt32BigEndian(packet.Span));
+                Assert.False(Monitor.IsEntered(_gate));
                 return stop.CancelAsync();
             },
             TestContext.Current.CancellationToken
@@ -519,7 +533,8 @@ public sealed class RequestLifecycleTests : IDisposable
         // hands work to the writer before the scheduler's callback can remove it.
         using var callback = stop.Token.Register(() =>
         {
-            handoff = _scheduler.WriteNext(
+            handoff = ConnectionRuntime.WriteNext(
+                _scheduler,
                 1,
                 _ =>
                 {
@@ -601,7 +616,7 @@ public sealed class RequestLifecycleTests : IDisposable
         var close = _scheduler.EnqueueClose();
 
         Assert.Same(close, Take());
-        Assert.Null(_scheduler.Take(1).Request);
+        Assert.Null(_scheduler.Take(1, TestContext.Current.CancellationToken).Request);
         var error = await Assert
             .ThrowsAsync<ZooKeeperException>(() => maintenance)
             .ConfigureAwait(true);
@@ -648,7 +663,12 @@ public sealed class RequestLifecycleTests : IDisposable
         await Assert.ThrowsAsync<ZooKeeperTimeoutException>(() => task).ConfigureAwait(true);
         _time.Advance(TimeSpan.FromMilliseconds(600));
         _scheduler.QueuePing();
-        Assert.True(_scheduler.Take(1).Ping);
+        Assert.Equal(
+            -2,
+            BinaryPrimitives.ReadInt32BigEndian(
+                _scheduler.Take(1, TestContext.Current.CancellationToken).Packet.Span
+            )
+        );
         _scheduler.ConsumePing(1);
         Assert.Equal(TimeSpan.Zero, _scheduler.OldestRemaining(TimeSpan.FromMilliseconds(600)));
         Reply(pending);
@@ -684,7 +704,12 @@ public sealed class RequestLifecycleTests : IDisposable
         );
 
         _scheduler.QueuePing();
-        Assert.True(_scheduler.Take(1).Ping);
+        Assert.Equal(
+            -2,
+            BinaryPrimitives.ReadInt32BigEndian(
+                _scheduler.Take(1, TestContext.Current.CancellationToken).Packet.Span
+            )
+        );
         Assert.True(_scheduler.ConsumePing(1));
         _time.Advance(TimeSpan.FromMilliseconds(600));
 

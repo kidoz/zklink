@@ -31,7 +31,6 @@ internal sealed class ConnectionRuntime(
     TimeSpan timeout
 )
 {
-    private static readonly byte[] PingPacket = [255, 255, 255, 254, 0, 0, 0, 11];
     private readonly AsyncPulse _activity = new();
     private long _lastWrite = time.GetTimestamp();
     internal long Generation { get; } = generation;
@@ -152,18 +151,16 @@ internal sealed class ConnectionRuntime(
 
     private async Task<RuntimeFailure> WriteAsync(CancellationToken cancellationToken)
     {
-        Func<PendingRequest?, Task> write = pending =>
-            transport.Writer.WriteAsync(
-                pending is null ? PingPacket : pending.Packet!,
-                cancellationToken
-            );
+        Func<ReadOnlyMemory<byte>, Task> write = packet =>
+            transport.Writer.WriteAsync(packet, cancellationToken);
         try
         {
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 owner.PrepareWatchCleanup(Generation);
-                (var pending, var writing) = scheduler.WriteNext(
+                (var pending, var writing) = WriteNext(
+                    scheduler,
                     Generation,
                     write,
                     cancellationToken
@@ -207,6 +204,32 @@ internal sealed class ConnectionRuntime(
         catch (ObjectDisposedException)
         {
             return Stop(new(RuntimeStop.Disconnected));
+        }
+    }
+
+    internal static (PendingRequest? Request, Task? Write) WriteNext(
+        RequestScheduler scheduler,
+        long generation,
+        Func<ReadOnlyMemory<byte>, Task> write,
+        CancellationToken writerToken
+    )
+    {
+        var (pending, packet) = scheduler.Take(generation, writerToken);
+        if (packet.IsEmpty)
+        {
+            return (null, null);
+        }
+        try
+        {
+            return (pending, write(packet));
+        }
+        catch
+        {
+            if (pending is not null)
+            {
+                scheduler.WriteFinished(pending);
+            }
+            throw;
         }
     }
 

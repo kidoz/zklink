@@ -209,7 +209,9 @@ public sealed class TelemetryTests
         Assert.True(capture.Value("zklink.requests.bytes") > bytes);
         if (sent)
         {
-            wire = Assert.IsType<PendingRequest>(scheduler.Take(Generation).Request);
+            wire = Assert.IsType<PendingRequest>(
+                scheduler.Take(Generation, TestContext.Current.CancellationToken).Request
+            );
             scheduler.WriteFinished(wire);
         }
         clock.Advance(timedOut ? options.Settings.OperationTimeout : Elapsed);
@@ -497,7 +499,9 @@ public sealed class TelemetryTests
         var close = scheduler.EnqueueClose();
         capture.Collect();
         Assert.Equal(1, capture.Value("zklink.requests.outstanding"));
-        var closing = Assert.IsType<PendingRequest>(scheduler.Take(Generation).Request);
+        var closing = Assert.IsType<PendingRequest>(
+            scheduler.Take(Generation, TestContext.Current.CancellationToken).Request
+        );
         scheduler.WriteFinished(closing);
         scheduler.Complete(
             Generation,

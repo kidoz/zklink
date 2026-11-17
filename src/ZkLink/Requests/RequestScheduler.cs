@@ -68,6 +68,7 @@ internal sealed class RequestScheduler(
     TelemetryState? telemetry = null
 )
 {
+    private static readonly byte[] PingPacket = [255, 255, 255, 254, 0, 0, 0, 11];
     private readonly TelemetryState? _telemetry = telemetry;
     private readonly LinkedList<PendingRequest> _queued = [];
     private readonly Queue<PendingRequest> _sent = [];
@@ -505,13 +506,19 @@ internal sealed class RequestScheduler(
         }
     }
 
-    internal (PendingRequest? Request, bool Ping) Take(long value)
+    // Returning a packet transfers it irrevocably to the sole transport writer.
+    // Writing retains its buffer across cancellation, early reply, or detach.
+    internal (PendingRequest? Request, ReadOnlyMemory<byte> Packet) Take(
+        long value,
+        CancellationToken writerToken
+    )
     {
         lock (gate)
         {
+            writerToken.ThrowIfCancellationRequested();
             if (value != _generation || _generation == 0)
             {
-                return (null, false);
+                return (null, default);
             }
             while (true)
             {
@@ -521,7 +528,7 @@ internal sealed class RequestScheduler(
                     _pingQueued = false;
                     _pingSent = true;
                     _pingStarted = timeProvider.GetTimestamp();
-                    return (null, true);
+                    return (null, PingPacket);
                 }
                 if (
                     pending is null
@@ -538,7 +545,7 @@ internal sealed class RequestScheduler(
                         || _queued.First is not { Value.Prepared: true } head
                     )
                     {
-                        return (null, false);
+                        return (null, default);
                     }
                     pending = head.Value;
                 }
@@ -577,24 +584,8 @@ internal sealed class RequestScheduler(
                 pending.Writing = true;
                 _sent.Enqueue(pending);
                 BinaryPrimitives.WriteInt32BigEndian(pending.Packet!, xid);
-                return (pending, false);
+                return (pending, pending.Packet!);
             }
-        }
-    }
-
-    // Dequeue and initiate the transport write under one gate. Cancellation cannot
-    // observe Sent while the writer is still waiting to hand the frame off.
-    internal (PendingRequest? Request, Task? Write) WriteNext(
-        long value,
-        Func<PendingRequest?, Task> write,
-        CancellationToken cancellationToken
-    )
-    {
-        lock (gate)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var (pending, ping) = Take(value);
-            return pending is null && !ping ? (null, null) : (pending, write(pending));
         }
     }
 
