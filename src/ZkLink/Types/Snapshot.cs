@@ -22,15 +22,15 @@ internal static class Snapshot
         return new ReadOnlyMemory<byte>(bytes.ToArray());
     }
 
-    internal static ReadOnlyCollection<T> List<T>(IReadOnlyList<T> source)
+    internal static ReadOnlyCollection<T> List<T>(
+        IReadOnlyList<T> source,
+        int maxCount = ProtocolLimits.AbsoluteMaxCollectionElements
+    )
         where T : class
     {
         ArgumentNullException.ThrowIfNull(source);
         var count = source.Count;
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(
-            count,
-            ProtocolLimits.AbsoluteMaxCollectionElements
-        );
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(count, maxCount);
         var copy = new T[count];
         for (var i = 0; i < count; i++)
         {

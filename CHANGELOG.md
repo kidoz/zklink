@@ -11,6 +11,9 @@ broader security, Native AOT or production qualification. See
 
 ### Fixed
 
+- Apply digest transport policy and credential size limits to a single captured
+  authentication list.
+
 - Keep isolated-soak maintenance connections behind an owned loopback relay to
   the verified leader, preserving plaintext-digest restrictions and cleanup.
 

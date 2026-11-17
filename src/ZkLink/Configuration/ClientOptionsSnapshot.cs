@@ -59,35 +59,21 @@ internal sealed class ClientOptionsSnapshot : IDisposable
             options.MaxDataBytes
         );
         ArgumentOutOfRangeException.ThrowIfLessThan(options.MaxFrameBytes, 45);
-        if (options.Authentication.Count > 32)
+        var authentication = Snapshot.List(options.Authentication, maxCount: 32);
+        if (!options.Tls.Enabled && authentication.Count != 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(options));
-        }
-        if (
-            !options.Tls.Enabled
-            && options.Authentication.Count != 0
-            && !options.AllowUnsafePlaintextDigest
-        )
-        {
-            throw new ArgumentException(
-                "Plaintext digest requires the explicit unsafe development override.",
-                nameof(options)
-            );
-        }
-        if (!options.Tls.Enabled && options.Authentication.Count != 0)
-        {
-            ValidatePlaintextDigestEndpoints(parsed.Endpoints);
-        }
-        var total = 0;
-        foreach (var auth in options.Authentication)
-        {
-            if (auth is null)
+            if (!options.AllowUnsafePlaintextDigest)
             {
                 throw new ArgumentException(
-                    "Authentication entries cannot be null.",
+                    "Plaintext digest requires the explicit unsafe development override.",
                     nameof(options)
                 );
             }
+            ValidatePlaintextDigestEndpoints(parsed.Endpoints);
+        }
+        var total = 0;
+        foreach (var auth in authentication)
+        {
             var length = auth.Length;
             if (length > options.MaxFrameBytes - 26 || length > 32 * 1024 * 1024 - total)
             {
@@ -118,9 +104,9 @@ internal sealed class ClientOptionsSnapshot : IDisposable
                 }
                 certificate = new X509Certificate2(clientCertificate);
             }
-            foreach (var authentication in options.Authentication)
+            foreach (var auth in authentication)
             {
-                copies.Add(authentication.Copy());
+                copies.Add(auth.Copy());
             }
             var settings = new ZooKeeperClientOptions
             {

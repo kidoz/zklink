@@ -1,4 +1,5 @@
 using System.Text;
+using NSubstitute;
 using ZkLink.Configuration;
 using ZkLink.Protocol;
 
@@ -261,6 +262,24 @@ public sealed class AuthenticationSessionTests : IAsyncLifetime
         Assert.Equal(ZooKeeperConnectionFailure.SessionRejected, error.Failure);
         Assert.Equal(-112, error.ErrorCode);
         Assert.True(_first.IsDisposed);
+    }
+
+    [Fact]
+    [Trait("Acceptance", "T21")]
+    public void CredentialCaptureReadsOneBoundedViewOfTheConfiguration()
+    {
+        using var auth = ZooKeeperAuthentication.Digest("user", "fixture");
+        var entries = Substitute.For<IReadOnlyList<ZooKeeperAuthentication>>();
+        entries.Count.Returns(1);
+        entries[0].Returns(auth);
+        using var snapshot = ClientOptionsSnapshot.Capture(
+            SessionFixture.Options(authentication: entries)
+        );
+
+        Assert.Single(snapshot.Authentication);
+        _ = entries.Received(1).Count;
+        _ = entries.Received(1)[0];
+        entries.DidNotReceive().GetEnumerator();
     }
 
     [Fact]
