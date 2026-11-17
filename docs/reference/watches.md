@@ -114,10 +114,14 @@ cannot remove a later re-registration.
 
 A canceled or failed confirmation never revives local delivery. A definitive
 cleanup rejection retains bounded metadata without continuously retrying; an
-explicit confirmation retry or transport teardown can release it. Confirmation
-while disconnected fails with request-outcome metadata; local disposal still
-works. Repeated disposal is safe. Local removal completes its local action even
-if the supplied token is already canceled.
+explicit confirmation retry or transport teardown can release it. A confirmation
+that needs a server reply fails with request-outcome metadata while disconnected.
+Local disposal still works.
+
+Repeating a successful server-confirmed removal on the same handle returns its
+original disposition, even after another watch is registered at that path. The
+replacement keeps receiving events. Repeated disposal is safe. Local removal
+completes its local action even if the supplied token is already canceled.
 
 ## Cancellation and reconnect
 

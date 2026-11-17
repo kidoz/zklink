@@ -178,13 +178,13 @@ public sealed class PersistentWatchTests : IAsyncLifetime
             .RemoveAsync(WatchRemovalMode.ServerConfirmed, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         Assert.Equal(WatchRemovalStatus.ServerConfirmed, removed.Status);
+        other ??= await Client
+            .AddWatchAsync(Root, otherMode, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
         var repeated = await second
             .RemoveAsync(WatchRemovalMode.ServerConfirmed, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
-        Assert.Equal(WatchRemovalStatus.NoWatcher, repeated.Status);
-        other ??= await Client
-            .AddWatchAsync(Root, mode, TestContext.Current.CancellationToken)
-            .ConfigureAwait(true);
+        Assert.Equal(removed.Status, repeated.Status);
         var reader = other
             .ReadEventsAsync(TestContext.Current.CancellationToken)
             .GetAsyncEnumerator(TestContext.Current.CancellationToken);

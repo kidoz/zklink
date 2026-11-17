@@ -38,6 +38,7 @@ public sealed class ZooKeeperWatch : IAsyncDisposable
     internal bool Active;
     internal bool Suppressed;
     internal bool Absent;
+    internal WatchRemovalStatus? ConfirmedRemoval;
 
     /// <summary>Gets a stable positive logical registration identity.</summary>
     public long RegistrationId { get; }

@@ -161,6 +161,29 @@ internal sealed class WatchManager(
     private static bool Shared(Bucket bucket) =>
         bucket.Handles.Any(static watch => !watch.Suppressed && (watch.Pending || watch.Active));
 
+    private bool HasRemovalOwner(Key key, Bucket? bucket)
+    {
+        SessionGate.RequireHeld(_gate);
+        if (bucket is not null && Shared(bucket))
+        {
+            return true;
+        }
+        if (RemovalCategory(key) != WatchProtocol.Any)
+        {
+            return false;
+        }
+        // On 3.8, Any also covers other modes installed since this handle was suppressed.
+        return HasOwner(WatchProtocol.Children)
+            || HasOwner(WatchProtocol.Data)
+            || HasOwner(WatchProtocol.Persistent)
+            || HasOwner(WatchProtocol.PersistentRecursive);
+
+        bool HasOwner(int category) =>
+            category != key.Category
+            && _buckets.TryGetValue(new Key(key.Path, category), out var other)
+            && Shared(other);
+    }
+
     internal void Abandon(ZooKeeperWatch watch)
     {
         lock (_gate)
@@ -332,6 +355,12 @@ internal sealed class WatchManager(
         }
         lock (_gate)
         {
+            if (mode == WatchRemovalMode.ServerConfirmed && watch.ConfirmedRemoval is { } status)
+            {
+                return Task.FromResult(
+                    new ZooKeeperWatchRemovalResult(watch.RegistrationId, status)
+                );
+            }
             var key = For(watch);
             if (
                 mode == WatchRemovalMode.ServerConfirmed
@@ -345,7 +374,8 @@ internal sealed class WatchManager(
             }
             bool active = watch.Active;
             Suppress(watch);
-            bool shared = _buckets.TryGetValue(key, out var bucket) && Shared(bucket);
+            _buckets.TryGetValue(key, out var bucket);
+            bool shared = HasRemovalOwner(key, bucket);
             if (mode == WatchRemovalMode.ServerConfirmed && !shared)
             {
                 if (bucket is null)
@@ -377,6 +407,10 @@ internal sealed class WatchManager(
             }
             if (shared)
             {
+                if (mode == WatchRemovalMode.ServerConfirmed)
+                {
+                    watch.ConfirmedRemoval = WatchRemovalStatus.SharedRegistrationRetained;
+                }
                 return Task.FromResult(
                     new ZooKeeperWatchRemovalResult(
                         watch.RegistrationId,
@@ -421,7 +455,7 @@ internal sealed class WatchManager(
                 watch.Path,
                 RemovalCategory(key)
             );
-            var observer = new CleanupObserver(this, key);
+            var observer = new CleanupObserver(this, key, watch);
             try
             {
                 return ConfirmRemovalAsync(
@@ -645,7 +679,7 @@ internal sealed class WatchManager(
             {
                 continue;
             }
-            if (Shared(bucket))
+            if (HasRemovalOwner(key, bucket))
             {
                 // A pending read may fail; retain the old cleanup intent until a live
                 // registration consumes or relinquishes this shared server category.
@@ -852,7 +886,11 @@ internal sealed class WatchManager(
         public void Abandoned(PendingRequest pending) => manager.Abandon(watch);
     }
 
-    private sealed class CleanupObserver(WatchManager manager, Key key) : IRequestObserver
+    private sealed class CleanupObserver(
+        WatchManager manager,
+        Key key,
+        ZooKeeperWatch? watch = null
+    ) : IRequestObserver
     {
         private bool _observed;
 
@@ -861,6 +899,13 @@ internal sealed class WatchManager(
             _observed = true;
             if (reply.Header.Error is WatchProtocol.Success or (int)ZooKeeperErrorCode.NoWatcher)
             {
+                if (watch is not null)
+                {
+                    watch.ConfirmedRemoval =
+                        reply.Header.Error == WatchProtocol.Success
+                            ? WatchRemovalStatus.ServerConfirmed
+                            : WatchRemovalStatus.NoWatcher;
+                }
                 Done();
             }
             else

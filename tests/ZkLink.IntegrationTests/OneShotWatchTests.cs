@@ -109,7 +109,7 @@ public sealed class OneShotWatchTests : IAsyncLifetime
 
     [Fact(Timeout = TestTimeoutMilliseconds)]
     [Trait("Acceptance", "T29")]
-    public async Task SharedRemovalRetainsOtherHandlesAndConfirmedRemovalReportsNoWatcherOnRepeat()
+    public async Task SharedRemovalRetainsOtherHandlesAndConfirmedRemovalIsIdempotent()
     {
         var first = await Client
             .ExistsAndWatchAsync(Root, TestContext.Current.CancellationToken)
@@ -137,7 +137,7 @@ public sealed class OneShotWatchTests : IAsyncLifetime
                 TestContext.Current.CancellationToken
             )
             .ConfigureAwait(true);
-        Assert.Equal(WatchRemovalStatus.NoWatcher, repeated.Status);
+        Assert.Equal(removed.Status, repeated.Status);
         var next = await Client
             .ExistsAndWatchAsync(Root, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
@@ -146,6 +146,11 @@ public sealed class OneShotWatchTests : IAsyncLifetime
             .ConfigureAwait(true);
         await ExpectAsync(next.Watch, ZooKeeperWatchEventKind.NodeDataChanged, Root)
             .ConfigureAwait(true);
+        var consumed = await next.Watch.RemoveAsync(
+            WatchRemovalMode.ServerConfirmed,
+            TestContext.Current.CancellationToken
+        );
+        Assert.Equal(WatchRemovalStatus.NoWatcher, consumed.Status);
         await ExpectClosedAsync(first.Watch).ConfigureAwait(true);
         await ExpectClosedAsync(second.Watch).ConfigureAwait(true);
     }

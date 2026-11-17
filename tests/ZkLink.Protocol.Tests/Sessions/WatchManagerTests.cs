@@ -132,6 +132,42 @@ public sealed class WatchManagerTests
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Acceptance", "T29")]
+    public async Task ConfirmAfterLocalDisposalPreservesAReplacementOfAnotherMode(bool acknowledged)
+    {
+        using var fixture = new RemovalFixture();
+        var old = fixture.Register();
+        await old.DisposeAsync();
+        lock (fixture.Gate)
+        {
+            fixture.Manager.Detached();
+        }
+        var replacement = fixture.Manager.Begin(
+            "/node",
+            ZooKeeperWatchMode.OneShotData,
+            fixture.Info
+        );
+        if (acknowledged)
+        {
+            lock (fixture.Gate)
+            {
+                replacement.Replied(fixture.Pending, fixture.Reply);
+            }
+        }
+        var result = await old.RemoveAsync(
+            WatchRemovalMode.ServerConfirmed,
+            TestContext.Current.CancellationToken
+        );
+        Assert.Equal(WatchRemovalStatus.SharedRegistrationRetained, result.Status);
+        _ = fixture
+            .Session.DidNotReceiveWithAnyArgs()
+            .SubmitWatchRemoval(default!, default!, TestContext.Current.CancellationToken);
+        Assert.False(replacement.Watch.Suppressed);
+    }
+
+    [Theory(Timeout = 10000)]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Acceptance", "T29")]
     public async Task InlineCleanupCancellationDoesNotLatchAnAbsentRequest(bool timeout)
     {
         using var fixture = new RemovalFixture();

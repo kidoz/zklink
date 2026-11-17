@@ -13,6 +13,8 @@ broader security, Native AOT or production qualification. See
 
 - Apply digest transport policy and credential size limits to a single captured
   authentication list.
+- Preserve replacement watches when an older handle requests removal. Repeating
+  a successful server-confirmed removal returns the original disposition.
 
 - Keep isolated-soak maintenance connections behind an owned loopback relay to
   the verified leader, preserving plaintext-digest restrictions and cleanup.
