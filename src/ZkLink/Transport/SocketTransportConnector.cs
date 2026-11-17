@@ -123,6 +123,15 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
                 network = null;
                 return result;
             }
+            // Native TLS validation can finish with an authentication or I/O error
+            // after the deadline. Only earlier failures count as TLS evidence.
+            catch (Exception error)
+                when (cancellationToken.IsCancellationRequested
+                    && error is OperationCanceledException or AuthenticationException or IOException
+                )
+            {
+                break;
+            }
             catch (AuthenticationException)
             {
                 tlsFailed = true;
@@ -144,11 +153,24 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
                     await network.DisposeAsync().ConfigureAwait(false);
                 }
             }
-            cancellationToken.ThrowIfCancellationRequested();
+            if (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
         }
-        throw new ZooKeeperConnectionException(
+        var failure = new ZooKeeperConnectionException(
             tlsFailed ? ZooKeeperConnectionFailure.Tls : ZooKeeperConnectionFailure.Unreachable,
             endpoint
         );
+        if (cancellationToken.IsCancellationRequested)
+        {
+            // The caller decides whether its token or the endpoint deadline ended the attempt.
+            throw new OperationCanceledException(
+                null,
+                tlsFailed ? failure : null,
+                cancellationToken
+            );
+        }
+        throw failure;
     }
 }

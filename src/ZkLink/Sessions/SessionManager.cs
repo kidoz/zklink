@@ -353,9 +353,18 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                 {
                     break;
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException error)
                 {
-                    if (lastFailure.Failure != ZooKeeperConnectionFailure.Tls)
+                    if (
+                        error.InnerException is ZooKeeperConnectionException
+                        {
+                            Failure: ZooKeeperConnectionFailure.Tls
+                        } tlsFailure
+                    )
+                    {
+                        lastFailure = tlsFailure;
+                    }
+                    else if (lastFailure.Failure != ZooKeeperConnectionFailure.Tls)
                     {
                         lastFailure = new(ZooKeeperConnectionFailure.Timeout, endpoint);
                     }

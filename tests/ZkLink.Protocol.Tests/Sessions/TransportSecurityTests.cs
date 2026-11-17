@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Security;
+using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -117,6 +118,90 @@ public sealed class TransportSecurityTests
         Assert.Equal(ZooKeeperConnectionFailure.Tls, error.Failure);
         await server.Completion.ConfigureAwait(true);
         Assert.Equal(0, applicationBytes);
+    }
+
+    [Theory(Timeout = 10000)]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Acceptance", "T20")]
+    public async Task CertificateFailureSurvivesALaterAddressDeadlineButHonorsCallerCancellation(
+        bool cancelCaller
+    )
+    {
+        var token = TestContext.Current.CancellationToken;
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(token);
+        using var certificates = new EphemeralCertificates();
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var time = new ManualTimeProvider();
+        var random = new SessionRandom(new Random(1));
+        var resolver = Substitute.For<IHostResolver>();
+        resolver
+            .ResolveAsync("zk.test", Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromResult(new[] { IPAddress.Loopback, IPAddress.Loopback }));
+        var deadline = TimeSpan.FromSeconds(5);
+        var options = new ZooKeeperClientOptions
+        {
+            ConnectionString = $"zk.test:{port}",
+            Tls = ZooKeeperTlsOptions.Required(
+                X509RevocationMode.NoCheck,
+                trustRoots: [certificates.Root],
+                serverName: "wrong.test"
+            ),
+            InitialConnectTimeout = deadline,
+            ConnectAttemptTimeout = deadline,
+        };
+        var connecting = ZooKeeperClient.ConnectCoreAsync(
+            ClientOptionsSnapshot.Capture(options),
+            time,
+            new SocketTransportConnector(resolver, random),
+            random,
+            stop.Token
+        );
+        try
+        {
+            using (var first = await listener.AcceptTcpClientAsync(token))
+            using (var tls = new SslStream(first.GetStream()))
+            {
+                try
+                {
+                    await tls.AuthenticateAsServerAsync(certificates.ServerOptions(false), token);
+                    await tls.ReadExactlyAsync(new byte[1], token);
+                }
+                catch (AuthenticationException) { }
+                catch (IOException) { }
+            }
+            using var second = await listener.AcceptTcpClientAsync(token);
+            await second.GetStream().ReadExactlyAsync(new byte[1], token);
+            if (cancelCaller)
+            {
+                await stop.CancelAsync();
+                var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                    connecting
+                );
+                Assert.Equal(stop.Token, canceled.CancellationToken);
+            }
+            else
+            {
+                time.Advance(deadline);
+                var failure = await Assert.ThrowsAsync<ZooKeeperConnectionException>(() =>
+                    connecting
+                );
+                Assert.Equal(ZooKeeperConnectionFailure.Tls, failure.Failure);
+            }
+        }
+        finally
+        {
+            await stop.CancelAsync();
+            try
+            {
+                var unexpected = await connecting.ConfigureAwait(true);
+                await unexpected.DisposeAsync().ConfigureAwait(true);
+            }
+            catch (OperationCanceledException) { }
+            catch (ZooKeeperConnectionException) { }
+        }
     }
 
     [Fact(Timeout = 10000)]
