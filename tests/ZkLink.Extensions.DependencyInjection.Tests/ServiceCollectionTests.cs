@@ -93,6 +93,10 @@ public sealed class ServiceCollectionTests
                             Tls = ZooKeeperTlsOptions.Disabled(),
                         }
                     );
+                    // Another consumer can register its own options after AddZkLink.
+                    services.AddSingleton(
+                        new ZooKeeperClientOptions { ConnectionString = "invalid:port" }
+                    );
                     services.AddHostedService(provider => new ClientConsumer(
                         provider.GetRequiredService<IZooKeeperClientAccessor>()
                     ));

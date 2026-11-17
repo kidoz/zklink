@@ -15,6 +15,8 @@ broader security, Native AOT or production qualification. See
   authentication list.
 - Preserve replacement watches when an older handle requests removal. Repeating
   a successful server-confirmed removal returns the original disposition.
+- Bind the hosted connection to the options passed to `AddZkLink` regardless of
+  later options registrations.
 
 - Keep isolated-soak maintenance connections behind an owned loopback relay to
   the verified leader, preserving plaintext-digest restrictions and cleanup.

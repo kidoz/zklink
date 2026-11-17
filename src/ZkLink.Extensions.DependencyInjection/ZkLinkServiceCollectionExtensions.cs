@@ -34,7 +34,10 @@ public static class ZkLinkServiceCollectionExtensions
         services.AddSingleton(new ZkLinkRegistration());
         services.AddSingleton(options);
         services.TryAddSingleton<IZkLinkConnectionFactory, ZkLinkConnectionFactory>();
-        services.AddSingleton<ZkLinkConnectionHost>();
+        services.AddSingleton(provider => new ZkLinkConnectionHost(
+            options,
+            provider.GetRequiredService<IZkLinkConnectionFactory>()
+        ));
         services.AddSingleton<IHostedService>(static provider =>
             provider.GetRequiredService<ZkLinkConnectionHost>()
         );
