@@ -269,7 +269,8 @@ public sealed partial class ZooKeeperClient
         internal PublicAclView(IReadOnlyList<ZooKeeperAcl> acl)
         {
             ArgumentNullException.ThrowIfNull(acl);
-            if (acl.Count == 0)
+            Count = acl.Count;
+            if (Count <= 0)
                 throw new ArgumentException(
                     "At least one explicit ACL entry is required.",
                     nameof(acl)
@@ -277,7 +278,7 @@ public sealed partial class ZooKeeperClient
             _entries = acl;
         }
 
-        public int Count => _entries.Count;
+        public int Count { get; }
         public WireAcl this[int index]
         {
             get

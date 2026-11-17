@@ -14,7 +14,7 @@ internal static class NamespaceTranslator
     {
         limits ??= DefaultLimits;
         _ = Measure(request, paths, limits);
-        return TranslateRequest(request, paths);
+        return TranslateRequest(request, paths, limits);
     }
 
     internal static int Measure(WireRequest request, ChrootPath paths, ProtocolLimits limits)
@@ -31,15 +31,27 @@ internal static class NamespaceTranslator
         return limits.MaxFrameBytes - remaining;
     }
 
-    private static WireRequest TranslateRequest(WireRequest request, ChrootPath paths) =>
+    private static WireRequest TranslateRequest(
+        WireRequest request,
+        ChrootPath paths,
+        ProtocolLimits limits
+    ) =>
         request switch
         {
             PathRequest p => p with { Path = paths.ToServer(p.Path) },
             ReadRequest p => p with { Path = paths.ToServer(p.Path) },
             VersionRequest p => p with { Path = paths.ToServer(p.Path) },
             SetDataRequest p => p with { Path = paths.ToServer(p.Path) },
-            CreateRequest p => p with { Path = paths.ToServer(p.Path, p.Flags is 2 or 3 or 6) },
-            SetAclRequest p => p with { Path = paths.ToServer(p.Path) },
+            CreateRequest p => p with
+            {
+                Path = paths.ToServer(p.Path, p.Flags is 2 or 3 or 6),
+                Acl = Snapshot.List(p.Acl, limits.MaxCollectionElements),
+            },
+            SetAclRequest p => p with
+            {
+                Path = paths.ToServer(p.Path),
+                Acl = Snapshot.List(p.Acl, limits.MaxCollectionElements),
+            },
             WatchRequest p => p with { Path = paths.ToServer(p.Path) },
             RestoreRequest r => new RestoreRequest(
                 r.Zxid,
@@ -52,7 +64,7 @@ internal static class NamespaceTranslator
             MultiRequest m => new MultiRequest(
                 m.ReadOnly,
                 Array.AsReadOnly(
-                    m.Members.Select(member => TranslateRequest(member, paths)).ToArray()
+                    m.Members.Select(member => TranslateRequest(member, paths, limits)).ToArray()
                 )
             ),
             PingRequest or EmptyRequest or AuthRequest => request,

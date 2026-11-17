@@ -22,12 +22,14 @@ Descriptors expose `Path` and `Operation`. Multi-read child names use
 `ZooKeeperOperation.GetChildrenNames` (opcode 8); the standalone children method
 uses opcode 12 and includes parent Stat.
 
-Factories retain supplied data memory. Keep that memory stable until `MultiAsync`
-returns its task. The invocation synchronously validates the full batch, measures
-its encoded size, reserves capacity, translates paths and encodes independent
-packets before returning. Afterwards, changing the input list or data cannot
+Factories retain supplied data memory. Keep the operation list and data stable
+until the submission method returns its task. The invocation synchronously
+validates the full batch, measures its encoded size, reserves capacity,
+translates paths and encodes the packet. Afterwards, changing the input list or data cannot
 alter the submitted transaction. No entire intermediate member list or payload
-copy is allocated before byte admission.
+copy is allocated before byte admission. If the encoded length differs from
+the byte reservation, the client releases the reservation and fails the call
+before assigning an xid or sending a frame.
 
 Empty lists, null members, invalid paths and oversized batches fail locally.
 Combined frame size includes every member header, data, ACL and chroot prefix.

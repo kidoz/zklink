@@ -98,7 +98,8 @@ public sealed partial class ZooKeeperClient
         internal OperationView(IReadOnlyList<T> operations, Func<T, WireRequest> request)
         {
             ArgumentNullException.ThrowIfNull(operations);
-            if (operations.Count == 0)
+            Count = operations.Count;
+            if (Count <= 0)
             {
                 throw new ArgumentException(
                     "A transaction requires at least one operation.",
@@ -109,7 +110,7 @@ public sealed partial class ZooKeeperClient
             _request = request;
         }
 
-        public int Count => _operations.Count;
+        public int Count { get; }
         public WireRequest this[int index] =>
             _request(
                 _operations[index]

@@ -1,3 +1,4 @@
+using NSubstitute;
 using ZkLink.Protocol;
 
 namespace ZkLink.Protocol.Tests.Sessions;
@@ -25,6 +26,50 @@ public sealed class MultiApiTests : IAsyncLifetime
     {
         await _fixture.DisposeAsync().ConfigureAwait(true);
         _peer.Dispose();
+    }
+
+    [Theory(Timeout = 10000)]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Acceptance", "T18")]
+    public async Task InputThatShrinksAfterMeasurementReleasesCapacityWithoutSending(bool setAcl)
+    {
+        var token = TestContext.Current.CancellationToken;
+        Task submission;
+        if (setAcl)
+        {
+            var entries = Substitute.For<IReadOnlyList<ZooKeeperAcl>>();
+            entries.Count.Returns(1);
+            entries[0]
+                .Returns(
+                    new ZooKeeperAcl(ZooKeeperPermissions.Read, "digest", "longer-identity"),
+                    new ZooKeeperAcl(ZooKeeperPermissions.Read, "digest", "short")
+                );
+            submission = Client.SetAclAsync("/a", entries, ZNodeVersion.Any, token);
+            _ = entries.Received(1).Count;
+        }
+        else
+        {
+            var operations = Substitute.For<IReadOnlyList<ZooKeeperWriteOperation>>();
+            operations.Count.Returns(1);
+            operations[0]
+                .Returns(
+                    ZooKeeperWriteOperation.Delete("/longer-path", ZNodeVersion.Any),
+                    ZooKeeperWriteOperation.Delete("/a", ZNodeVersion.Any)
+                );
+            submission = Client.MultiAsync(operations, token);
+            _ = operations.Received(1).Count;
+        }
+
+        var next = Client.ExistsAsync("/next", token);
+        var packet = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        Assert.Equal((int)ZooKeeperOperation.Exists, packet.Opcode);
+        Assert.Equal(1, packet.Xid);
+        _peer.Reply(packet, -101);
+        Assert.Null(await next.ConfigureAwait(true));
+        await Assert.ThrowsAsync<ArgumentException>(() => submission).ConfigureAwait(true);
+        Assert.Equal(0, Client.Manager.Scheduler.PendingCount);
+        Assert.Equal(0, Client.Manager.Scheduler.OwnedBytes);
     }
 
     [Fact(Timeout = 10000)]

@@ -278,7 +278,13 @@ internal sealed class RequestScheduler(
         {
             var translated = NamespaceTranslator.ToServer(request, options.Paths, options.Limits);
             packet = new byte[size];
-            RequestCodec.Encode(packet, 1, translated, options.Limits);
+            if (RequestCodec.Encode(packet, 1, translated, options.Limits) != size)
+            {
+                throw new ArgumentException(
+                    "The request size changed during submission.",
+                    nameof(request)
+                );
+            }
             shape = ReplyShape(translated);
         }
         catch (Exception error)
@@ -365,12 +371,7 @@ internal sealed class RequestScheduler(
         request switch
         {
             SetDataRequest set => set with { Data = null },
-            CreateRequest create => create with
-            {
-                Data = null,
-                Acl = Array.AsReadOnly(create.Acl.ToArray()),
-            },
-            SetAclRequest acl => acl with { Acl = Array.AsReadOnly(acl.Acl.ToArray()) },
+            CreateRequest create => create with { Data = null },
             MultiRequest multi => new MultiRequest(
                 multi.ReadOnly,
                 Array.AsReadOnly(multi.Members.Select(ReplyShape).ToArray())

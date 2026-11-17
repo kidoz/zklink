@@ -11,6 +11,9 @@ broader security, Native AOT or production qualification. See
 
 ### Fixed
 
+- Reject requests whose encoded length differs from the byte reservation before
+  assigning an xid or sending the frame. This covers transaction and ACL lists
+  that change during submission.
 - Apply digest transport policy and credential size limits to a single captured
   authentication list.
 - Preserve replacement watches when an older handle requests removal. Repeating
