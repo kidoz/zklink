@@ -13,8 +13,26 @@ internal interface ITransportConnector
     Task<TransportConnection> ConnectAsync(
         ZooKeeperEndpoint endpoint,
         ClientOptionsSnapshot options,
+        TransportDeadline deadline,
         CancellationToken cancellationToken
     );
+}
+
+internal readonly struct TransportDeadline(TimeProvider clock, TimeSpan duration)
+{
+    private readonly long _started = clock.GetTimestamp();
+
+    internal CancellationTokenSource? StartAddressTimeout(int remainingAddresses)
+    {
+        // The session already owns the deadline for the last (or only) address.
+        if (remainingAddresses == 1)
+        {
+            return null;
+        }
+        var remaining = duration - clock.GetElapsedTime(_started);
+        var slice = TimeSpan.FromTicks(Math.Max(0, remaining.Ticks) / remainingAddresses);
+        return new CancellationTokenSource(slice, clock);
+    }
 }
 
 internal interface IHostResolver
@@ -43,6 +61,7 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
     public async Task<TransportConnection> ConnectAsync(
         ZooKeeperEndpoint endpoint,
         ClientOptionsSnapshot options,
+        TransportDeadline deadline,
         CancellationToken cancellationToken
     )
     {
@@ -51,15 +70,23 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
             .ConfigureAwait(false);
         random.Shuffle(addresses);
         var tlsFailed = false;
+        var addressTimedOut = false;
+        var remainingAddresses = addresses.Count(IsUsable);
         foreach (var address in addresses)
         {
-            if (
-                address.AddressFamily
-                is not (AddressFamily.InterNetwork or AddressFamily.InterNetworkV6)
-            )
+            if (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+            if (!IsUsable(address))
             {
                 continue;
             }
+            using var timeout = deadline.StartAddressTimeout(remainingAddresses--);
+            using var linked = timeout is null
+                ? null
+                : CancellationTokenSource.CreateLinkedTokenSource(timeout.Token, cancellationToken);
+            var addressToken = linked?.Token ?? cancellationToken;
             Socket? socket = new(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp)
             {
                 NoDelay = true,
@@ -69,7 +96,7 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
             try
             {
                 await socket
-                    .ConnectAsync(new IPEndPoint(address, endpoint.Port), cancellationToken)
+                    .ConnectAsync(new IPEndPoint(address, endpoint.Port), addressToken)
                     .ConfigureAwait(false);
                 network = new NetworkStream(socket, ownsSocket: true);
                 socket = null;
@@ -110,10 +137,10 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
                             policy.CustomTrustStore.Add(root);
                         }
                     }
-                    await ssl.AuthenticateAsClientAsync(authentication, cancellationToken)
+                    await ssl.AuthenticateAsClientAsync(authentication, addressToken)
                         .ConfigureAwait(false);
                 }
-                cancellationToken.ThrowIfCancellationRequested();
+                addressToken.ThrowIfCancellationRequested();
                 var result = new TransportConnection(
                     (Stream?)ssl ?? network!,
                     endpoint,
@@ -126,11 +153,15 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
             // Native TLS validation can finish with an authentication or I/O error
             // after the deadline. Only earlier failures count as TLS evidence.
             catch (Exception error)
-                when (cancellationToken.IsCancellationRequested
-                    && error is OperationCanceledException or AuthenticationException or IOException
+                when (addressToken.IsCancellationRequested
+                    && error
+                        is OperationCanceledException
+                            or AuthenticationException
+                            or IOException
+                            or SocketException
                 )
             {
-                break;
+                addressTimedOut = true;
             }
             catch (AuthenticationException)
             {
@@ -153,13 +184,11 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
                     await network.DisposeAsync().ConfigureAwait(false);
                 }
             }
-            if (cancellationToken.IsCancellationRequested)
-            {
-                break;
-            }
         }
         var failure = new ZooKeeperConnectionException(
-            tlsFailed ? ZooKeeperConnectionFailure.Tls : ZooKeeperConnectionFailure.Unreachable,
+            tlsFailed ? ZooKeeperConnectionFailure.Tls
+                : addressTimedOut ? ZooKeeperConnectionFailure.Timeout
+                : ZooKeeperConnectionFailure.Unreachable,
             endpoint
         );
         if (cancellationToken.IsCancellationRequested)
@@ -173,4 +202,7 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
         }
         throw failure;
     }
+
+    private static bool IsUsable(IPAddress address) =>
+        address.AddressFamily is AddressFamily.InterNetwork or AddressFamily.InterNetworkV6;
 }

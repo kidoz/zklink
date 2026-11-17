@@ -296,6 +296,7 @@ internal sealed class ScriptedConnector : ITransportConnector
     public async Task<TransportConnection> ConnectAsync(
         ZooKeeperEndpoint endpoint,
         ClientOptionsSnapshot options,
+        TransportDeadline deadline,
         CancellationToken cancellationToken
     )
     {

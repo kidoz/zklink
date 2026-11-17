@@ -23,6 +23,8 @@ broader security, Native AOT or production qualification. See
 - Perform transport writes outside the session lock after the writer takes
   ownership of the encoded packet.
 - Retain an earlier TLS failure when a later resolved address times out.
+- Share the remaining endpoint deadline across resolved addresses so a stalled
+  TCP or TLS connection leaves time to try the next address.
 
 - Keep isolated-soak maintenance connections behind an owned loopback relay to
   the verified leader, preserving plaintext-digest restrictions and cleanup.

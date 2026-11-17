@@ -39,6 +39,11 @@ client, except that endpoint updates affect future connection attempts.
 | `MaxWatches` | 10,000 owned logical handles and bounded cleanup metadata; range 1–1,000,000 |
 | `MaxBufferedEvents` | 4,096 across state and watch queues after fan-out; range 1–1,000,000; also bounds subscription count |
 
+When DNS returns multiple usable addresses, each TCP/TLS attempt gets an equal
+share of the remaining endpoint time among the addresses still to try. An early
+failure leaves the unused time for later addresses. All TLS attempts validate
+the configured server identity.
+
 After the handshake is accepted, authentication and watch restoration use the
 negotiated inbound liveness timers. Valid replies refresh those timers, so a
 progressing restore can exceed `ConnectAttemptTimeout` and the negotiated session

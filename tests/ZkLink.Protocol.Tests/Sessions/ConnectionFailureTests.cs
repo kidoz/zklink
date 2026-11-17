@@ -388,13 +388,15 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
         Assert.Equal(TimeSpan.FromMilliseconds(50), client.Manager.InboundSilence);
     }
 
-    [Fact(Timeout = 10000)]
+    [Theory(Timeout = 10000)]
+    [InlineData(false)]
+    [InlineData(true)]
     [Trait("Acceptance", "T08")]
     [Trait("Acceptance", "T20")]
-    public async Task LaterSocketFailureDoesNotReplaceAnEarlierTlsClassification()
+    public async Task LaterAddressFailureDoesNotReplaceAnEarlierTlsClassification(bool timedOut)
     {
         var time = new ManualTimeProvider();
-        var connector = new TlsThenSocketConnector();
+        var connector = new TlsThenAddressFailureConnector(timedOut);
         var options = new ZooKeeperClientOptions
         {
             ConnectionString = "first:2181,second:2181",
@@ -421,7 +423,8 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
         Assert.Equal(ZooKeeperConnectionFailure.Tls, error.Failure);
     }
 
-    private sealed class TlsThenSocketConnector : ZkLink.Transport.ITransportConnector
+    private sealed class TlsThenAddressFailureConnector(bool timedOut)
+        : ZkLink.Transport.ITransportConnector
     {
         private int _attempts;
         private readonly TaskCompletionSource _secondAttempt = new(
@@ -432,6 +435,7 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
         public async Task<ZkLink.Transport.TransportConnection> ConnectAsync(
             ZooKeeperEndpoint endpoint,
             ZkLink.Configuration.ClientOptionsSnapshot options,
+            ZkLink.Transport.TransportDeadline deadline,
             CancellationToken cancellationToken
         )
         {
@@ -443,6 +447,13 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
             if (attempt == 2)
             {
                 _secondAttempt.TrySetResult();
+                if (timedOut)
+                {
+                    throw new ZooKeeperConnectionException(
+                        ZooKeeperConnectionFailure.Timeout,
+                        endpoint
+                    );
+                }
                 throw new System.Net.Sockets.SocketException(
                     (int)System.Net.Sockets.SocketError.HostNotFound
                 );

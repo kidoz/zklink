@@ -237,6 +237,7 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                     budget < _options.Settings.ConnectAttemptTimeout
                         ? budget
                         : _options.Settings.ConnectAttemptTimeout;
+                var transportDeadline = new TransportDeadline(_time, attemptBudget);
                 using var deadline = new CancellationTokenSource(attemptBudget, _time);
                 using var attempt = CancellationTokenSource.CreateLinkedTokenSource(
                     _stop.Token,
@@ -253,7 +254,12 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                     );
                     transport = await ZooKeeperTelemetry
                         .ObserveAsync(
-                            _connector.ConnectAsync(endpoint, _options, attempt.Token),
+                            _connector.ConnectAsync(
+                                endpoint,
+                                _options,
+                                transportDeadline,
+                                attempt.Token
+                            ),
                             transportSpan
                         )
                         .ConfigureAwait(false);
@@ -373,7 +379,11 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                 {
                     if (
                         lastFailure.Failure != ZooKeeperConnectionFailure.Tls
-                        || error.Failure != ZooKeeperConnectionFailure.Unreachable
+                        || error.Failure
+                            is not (
+                                ZooKeeperConnectionFailure.Unreachable
+                                or ZooKeeperConnectionFailure.Timeout
+                            )
                     )
                     {
                         lastFailure = error;

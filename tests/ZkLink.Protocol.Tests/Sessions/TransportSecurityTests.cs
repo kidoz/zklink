@@ -111,6 +111,10 @@ public sealed class TransportSecurityTests
                 connector.ConnectAsync(
                     new ZooKeeperEndpoint("zk.test", server.Port),
                     options,
+                    new TransportDeadline(
+                        TimeProvider.System,
+                        options.Settings.ConnectAttemptTimeout
+                    ),
                     TestContext.Current.CancellationToken
                 )
             )
@@ -231,6 +235,10 @@ public sealed class TransportSecurityTests
                 connector.ConnectAsync(
                     new ZooKeeperEndpoint("zk.test", server.Port),
                     options,
+                    new TransportDeadline(
+                        TimeProvider.System,
+                        options.Settings.ConnectAttemptTimeout
+                    ),
                     TestContext.Current.CancellationToken
                 )
             )
@@ -294,6 +302,65 @@ public sealed class TransportSecurityTests
 
     [Fact(Timeout = 10000)]
     [Trait("Acceptance", "T08")]
+    public async Task StalledAddressLeavesTimeForAuthenticatedFallbackAfterDns()
+    {
+        var token = TestContext.Current.CancellationToken;
+        using var certificates = new EphemeralCertificates();
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var time = new ManualTimeProvider();
+        var resolver = Substitute.For<IHostResolver>();
+        resolver
+            .ResolveAsync("zk.test", Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                time.Advance(TimeSpan.FromSeconds(2));
+                return Task.FromResult(new[] { IPAddress.Loopback, IPAddress.Loopback });
+            });
+        var random = new SessionRandom(new Random(1));
+        using var options = ClientOptionsSnapshot.Capture(
+            new ZooKeeperClientOptions
+            {
+                ConnectionString = $"zk.test:{((IPEndPoint)listener.LocalEndpoint).Port}",
+                Tls = certificates.ClientOptions(false),
+                InitialConnectTimeout = TimeSpan.FromSeconds(6),
+                ConnectAttemptTimeout = TimeSpan.FromSeconds(20),
+            }
+        );
+        async Task ConnectAndCloseAsync()
+        {
+            var client = await ZooKeeperClient
+                .ConnectCoreAsync(
+                    options,
+                    time,
+                    new SocketTransportConnector(resolver, random),
+                    random,
+                    token
+                )
+                .ConfigureAwait(true);
+            await using var lifetime = client.ConfigureAwait(true);
+            await client.CloseAsync(token).ConfigureAwait(true);
+        }
+
+        async Task ServeSecondAddressAsync()
+        {
+            using var first = await listener.AcceptTcpClientAsync(token).ConfigureAwait(true);
+            await first.GetStream().ReadExactlyAsync(new byte[1], token).ConfigureAwait(true);
+            // DNS consumed two seconds. The two addresses share the remaining four.
+            time.Advance(TimeSpan.FromSeconds(2));
+            using var second = await listener.AcceptTcpClientAsync(token).ConfigureAwait(true);
+            using var tls = new SslStream(second.GetStream());
+            await tls.AuthenticateAsServerAsync(certificates.ServerOptions(false), token)
+                .ConfigureAwait(true);
+            await ServeSessionAsync(tls, token).ConfigureAwait(true);
+        }
+
+        await Task.WhenAll(ConnectAndCloseAsync(), ServeSecondAddressAsync()).ConfigureAwait(true);
+        await resolver.Received(1).ResolveAsync("zk.test", Arg.Any<CancellationToken>());
+    }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T08")]
     public async Task DnsIsRefreshedAndEveryAddressIsTriedWithoutLeakingFailedSockets()
     {
         var server = new FakeZooKeeperServer(
@@ -313,7 +380,12 @@ public sealed class TransportSecurityTests
         using var options = ClientOptionsSnapshot.Capture(SessionFixture.Options());
         var endpoint = new ZooKeeperEndpoint("zk.test", server.Port);
         var connection = await connector
-            .ConnectAsync(endpoint, options, TestContext.Current.CancellationToken)
+            .ConnectAsync(
+                endpoint,
+                options,
+                new TransportDeadline(TimeProvider.System, options.Settings.ConnectAttemptTimeout),
+                TestContext.Current.CancellationToken
+            )
             .ConfigureAwait(true);
         await using var connectionLifetime = connection.ConfigureAwait(true);
         await connection
@@ -323,7 +395,15 @@ public sealed class TransportSecurityTests
         await server.Completion.ConfigureAwait(true);
         await Assert
             .ThrowsAsync<ZooKeeperConnectionException>(() =>
-                connector.ConnectAsync(endpoint, options, TestContext.Current.CancellationToken)
+                connector.ConnectAsync(
+                    endpoint,
+                    options,
+                    new TransportDeadline(
+                        TimeProvider.System,
+                        options.Settings.ConnectAttemptTimeout
+                    ),
+                    TestContext.Current.CancellationToken
+                )
             )
             .ConfigureAwait(true);
         await resolver

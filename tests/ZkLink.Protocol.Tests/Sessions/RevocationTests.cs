@@ -199,6 +199,10 @@ public sealed class RevocationTests
                     .ConnectAsync(
                         new ZooKeeperEndpoint("127.0.0.1", server.Port),
                         options,
+                        new TransportDeadline(
+                            TimeProvider.System,
+                            options.Settings.ConnectAttemptTimeout
+                        ),
                         guard.Token
                     )
             )
