@@ -75,6 +75,23 @@ public sealed class MultiApiTests : IAsyncLifetime
             (int)(setAcl ? ZooKeeperOperation.SetAcl : ZooKeeperOperation.Multi),
             packet.Opcode
         );
+        var reader = new JuteReader(packet.Bytes, ProtocolFixtures.Limits);
+        _ = reader.ReadRequestHeader();
+        if (setAcl)
+        {
+            Assert.Equal("/app/a", reader.ReadString());
+            Assert.Equal(1, reader.ReadInt32());
+            Assert.Equal((int)ZooKeeperPermissions.Read, reader.ReadInt32());
+            Assert.Equal("digest", reader.ReadString());
+            Assert.Equal(first, reader.ReadString());
+        }
+        else
+        {
+            Assert.Equal((int)ZooKeeperOperation.Delete, reader.ReadInt32());
+            Assert.False(reader.ReadBoolean());
+            Assert.Equal(MultiHeader.NoError, reader.ReadInt32());
+            Assert.Equal("/app" + first, reader.ReadString());
+        }
         _peer.Reply(packet, (int)ZooKeeperErrorCode.NoAuth);
         var failure = await Assert
             .ThrowsAnyAsync<ZooKeeperException>(() => submission)
