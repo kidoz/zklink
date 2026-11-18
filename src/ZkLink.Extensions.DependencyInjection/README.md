@@ -25,19 +25,42 @@ sealed class CoordinationWorker(IZooKeeperClientAccessor clients) : BackgroundSe
 }
 ```
 
-Inject the singleton `IZooKeeperClientAccessor` into constructors. Its `Client` property returns the same shared client after successful ZkLink startup and before shutdown; accessing that property earlier or later throws. The accessor can be resolved safely before startup and from synchronous or asynchronous child scopes. Resolving it does not acquire client disposal ownership.
+Inject `IZooKeeperClientAccessor` into constructors. Read its `Client` after
+successful startup to obtain the current shared client. Disposing a child scope
+or the borrowed client view preserves the host session. Explicitly calling
+`CloseAsync` on that view closes the session for every consumer.
 
-`ZooKeeperClient.ConnectAsync` runs during host startup. Keep the default sequential startup and register ZkLink before dependent hosted services. Concurrent startup requires an application-defined readiness barrier before reading `Client`. The accessor does not connect on demand or replace a lost session.
+`AddZkLink` accepts an options object or a factory that receives the root
+`IServiceProvider`. The host invokes the factory during startup. An application
+that resolves `ZooKeeperClientOptions` as a service must register its own
+instance. Keep application-owned authentication objects and certificates alive
+until startup has captured them. A factory used for session replacement must
+supply valid credentials on each invocation.
 
-The host owns shutdown: graceful shutdown uses acknowledged close, and asynchronous container disposal releases resources. The returned client is a borrowed view; its `DisposeAsync` does not dispose the host session. Explicitly calling `CloseAsync` closes the shared session for every consumer.
+Startup waits for connection readiness within `InitialConnectTimeout` and
+propagates connection failures. Register ZkLink before dependent services for
+sequential startup. Concurrent startup requires an application readiness barrier.
+During shutdown the accessor becomes unavailable, the host waits for any pending
+replacement to finish cleanup, and graceful shutdown requests acknowledged close.
 
-The unpublished direct `ZooKeeperClient` registration has been replaced: migrate constructor parameters and service resolution to `IZooKeeperClientAccessor`, and read `Client` when performing work rather than in the constructor.
+The factory overload accepts a `ZkLinkTerminalPolicy`. The default `Fail`
+keeps the terminal client available for inspection. `StopApplication` requests
+graceful host shutdown. `Recreate` invokes the options factory again to start
+a new ZooKeeper session. Read the accessor again to obtain the replacement and
+rebuild watches, ephemerals and coordination state as appropriate. A failed
+replacement requests host shutdown. Ordinary disconnections use the core
+client’s same-session recovery.
 
-Calling `AddZkLink` twice in one service collection throws. Options, credentials and certificates are captured when the host connects, so keep configuration resources alive until startup completes. Use an explicitly owned `ZooKeeperClient` for a separate security or coordination identity. The helper does not add session pooling, request replay, named registrations, health checks, or configuration binding.
+Hosts using Microsoft health checks can add
+`services.AddHealthChecks().AddCheck<ZkLinkHealthCheck>("zookeeper")`.
+The check reads the current session state locally. Connected is healthy,
+connecting or recovering is degraded, and a terminal or unavailable session
+is unhealthy.
 
-Install `ZkLink.Extensions.DependencyInjection` version `1.0.3`; it depends on the
-matching core package. The release includes portable symbols and verifies a fresh
-package consumer, assembly identity and shared accessor registration.
+Calling `AddZkLink` twice in one service collection throws. Use an explicitly
+owned client for a separate security or coordination identity. The factory,
+terminal policies and health check are available in the development source
+following the 1.0.3 release.
 
 Native AOT verification uses packed core and DI packages, a rooted analysis
 consumer and an unrooted native host. The host checks constructor injection,

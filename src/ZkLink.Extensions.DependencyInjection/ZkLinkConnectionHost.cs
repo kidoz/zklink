@@ -18,7 +18,7 @@ internal sealed class ZkLinkConnectionHost(
     private IZkLinkConnection? _connection;
     private LifetimeState _state;
     private readonly CancellationTokenSource _shutdown = new();
-    private Task _monitor = Task.CompletedTask;
+    private Task _monitorFinished = Task.CompletedTask;
 
     public ZooKeeperClient Client =>
         (
@@ -47,7 +47,11 @@ internal sealed class ZkLinkConnectionHost(
             _state = LifetimeState.Started;
             if (terminalPolicy != ZkLinkTerminalPolicy.Fail)
             {
-                _monitor = MonitorAsync(connection, _shutdown.Token);
+                var finished = new TaskCompletionSource(
+                    TaskCreationOptions.RunContinuationsAsynchronously
+                );
+                _monitorFinished = finished.Task;
+                _ = MonitorAsync(connection, finished, _shutdown.Token);
             }
         }
         finally
@@ -61,7 +65,11 @@ internal sealed class ZkLinkConnectionHost(
         "CA1031",
         Justification = "Application options factories may throw arbitrary exceptions. A failed replacement requests host shutdown without logging credentials."
     )]
-    private async Task MonitorAsync(IZkLinkConnection current, CancellationToken token)
+    private async Task MonitorAsync(
+        IZkLinkConnection current,
+        TaskCompletionSource finished,
+        CancellationToken token
+    )
     {
         try
         {
@@ -85,78 +93,92 @@ internal sealed class ZkLinkConnectionHost(
                 }
                 if (terminalPolicy == ZkLinkTerminalPolicy.StopApplication)
                 {
-                    application!.StopApplication();
-                    return;
+                    break;
                 }
                 var next = await connectionFactory
                     .ConnectAsync(optionsFactory(), token)
                     .ConfigureAwait(false);
-                Volatile.Write(ref _connection, next);
+                // Shutdown claims the published connection before it waits for this monitor.
+                if (
+                    !ReferenceEquals(
+                        Interlocked.CompareExchange(ref _connection, next, current),
+                        current
+                    )
+                )
+                {
+                    await next.DisposeAsync().ConfigureAwait(false);
+                    return;
+                }
                 await current.DisposeAsync().ConfigureAwait(false);
                 current = next;
             }
         }
-        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            return;
+        }
         catch (Exception)
         {
             // Replacement failed. Leave the terminal session visible for health reporting.
-            if (!token.IsCancellationRequested)
+        }
+        finally
+        {
+            // No connection work follows. A host stopping callback can run StopAsync
+            // or dispose the container synchronously without joining its own monitor.
+            finished.TrySetResult();
+        }
+
+        if (!token.IsCancellationRequested)
+        {
+            try
             {
                 application!.StopApplication();
+            }
+            catch (Exception)
+            {
+                System.Diagnostics.Trace.TraceError(
+                    "The application lifetime could not signal host shutdown after a terminal ZooKeeper session."
+                );
             }
         }
     }
 
-    public async Task StopAsync(CancellationToken cancellationToken)
+    public Task StopAsync(CancellationToken cancellationToken) =>
+        ShutdownAsync(graceful: true, cancellationToken);
+
+    public ValueTask DisposeAsync() => new(ShutdownAsync(graceful: false, CancellationToken.None));
+
+    private async Task ShutdownAsync(bool graceful, CancellationToken cancellationToken)
     {
         await _lifetimeGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
         {
-            if (_state is LifetimeState.Stopped or LifetimeState.Disposed)
+            if (_state == LifetimeState.Disposed || (graceful && _state == LifetimeState.Stopped))
             {
                 return;
             }
 
-            await _shutdown.CancelAsync().ConfigureAwait(false);
-            await _monitor.ConfigureAwait(false);
             var connection = Interlocked.Exchange(ref _connection, null);
-            _state = LifetimeState.Stopped;
-            if (connection is not null)
+            _state = graceful ? LifetimeState.Stopped : LifetimeState.Disposed;
+            try
             {
-                try
+                await _shutdown.CancelAsync().ConfigureAwait(false);
+                await _monitorFinished.ConfigureAwait(false);
+                if (graceful && connection is not null)
                 {
                     await connection.CloseAsync(cancellationToken).ConfigureAwait(false);
                 }
-                finally
+            }
+            finally
+            {
+                if (!graceful)
+                {
+                    _shutdown.Dispose();
+                }
+                if (connection is not null)
                 {
                     await connection.DisposeAsync().ConfigureAwait(false);
                 }
-            }
-        }
-        finally
-        {
-            _lifetimeGate.Release();
-        }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        await _lifetimeGate.WaitAsync().ConfigureAwait(false);
-        try
-        {
-            if (_state == LifetimeState.Disposed)
-            {
-                return;
-            }
-
-            await _shutdown.CancelAsync().ConfigureAwait(false);
-            await _monitor.ConfigureAwait(false);
-            var connection = Interlocked.Exchange(ref _connection, null);
-            _state = LifetimeState.Disposed;
-            _shutdown.Dispose();
-            if (connection is not null)
-            {
-                await connection.DisposeAsync().ConfigureAwait(false);
             }
         }
         finally

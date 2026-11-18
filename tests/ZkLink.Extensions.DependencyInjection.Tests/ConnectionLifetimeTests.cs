@@ -273,6 +273,157 @@ public sealed class ConnectionLifetimeTests
         Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus status
     ) => Assert.Equal(status, ZkLinkHealthCheck.ForState(state).Status);
 
+    [Theory(Timeout = 10000)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ShutdownDuringReplacementRetiresTheLateConnectionWithoutPublishingIt(
+        bool dispose
+    )
+    {
+        var token = TestContext.Current.CancellationToken;
+        var first = Substitute.For<IZkLinkConnection>();
+        var ended = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        first.Completion.Returns(ended.Task);
+        first.State.Returns(ZooKeeperSessionState.Lost);
+        var next = Substitute.For<IZkLinkConnection>();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var connect = new TaskCompletionSource<IZkLinkConnection>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        var factory = Substitute.For<IZkLinkConnectionFactory>();
+        var options = CreateOptions();
+        factory
+            .ConnectAsync(options, Arg.Any<CancellationToken>())
+            .Returns(
+                _ => Task.FromResult(first),
+                _ =>
+                {
+                    started.TrySetResult();
+                    return connect.Task;
+                }
+            );
+        var application = Substitute.For<IHostApplicationLifetime>();
+        var host = new ZkLinkConnectionHost(
+            () => options,
+            factory,
+            ZkLinkTerminalPolicy.Recreate,
+            application
+        );
+        await host.StartAsync(token);
+        ended.SetResult();
+        await started.Task.WaitAsync(token);
+
+        var shutdown = dispose ? host.DisposeAsync().AsTask() : host.StopAsync(token);
+        try
+        {
+            Assert.False(shutdown.IsCompleted);
+            Assert.Throws<InvalidOperationException>(() => host.Client);
+        }
+        finally
+        {
+            connect.SetResult(next);
+            await shutdown.ConfigureAwait(true);
+            await host.DisposeAsync();
+        }
+        await first.Received(1).DisposeAsync();
+        await next.Received(1).DisposeAsync();
+        await next.DidNotReceiveWithAnyArgs().CloseAsync(token);
+        application.DidNotReceive().StopApplication();
+        Assert.Throws<InvalidOperationException>(() => host.Client);
+    }
+
+    [Theory(Timeout = 10000)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FailedReplacementRequestsHostShutdownOnceAndRetainsTheOriginalForCleanup(
+        bool factoryThrows
+    )
+    {
+        var token = TestContext.Current.CancellationToken;
+        var first = Substitute.For<IZkLinkConnection>();
+        var ended = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        first.Completion.Returns(ended.Task);
+        first.State.Returns(ZooKeeperSessionState.AuthFailed);
+        var factory = Substitute.For<IZkLinkConnectionFactory>();
+        var options = CreateOptions();
+        factory
+            .ConnectAsync(options, Arg.Any<CancellationToken>())
+            .Returns(
+                _ => Task.FromResult(first),
+                _ => Task.FromException<IZkLinkConnection>(new IOException("Replacement failed."))
+            );
+        var stopping = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var application = Substitute.For<IHostApplicationLifetime>();
+        application.When(a => a.StopApplication()).Do(_ => stopping.TrySetResult());
+        int captures = 0;
+        var host = new ZkLinkConnectionHost(
+            () =>
+                ++captures == 2 && factoryThrows
+                    ? throw new InvalidOperationException("Options unavailable.")
+                    : options,
+            factory,
+            ZkLinkTerminalPolicy.Recreate,
+            application
+        );
+        await host.StartAsync(token);
+        ended.SetResult();
+        await stopping.Task.WaitAsync(token);
+        Assert.Equal(2, captures);
+        Assert.Same(first.Client, host.Client);
+        application.Received(1).StopApplication();
+        await host.StopAsync(token);
+        await host.DisposeAsync();
+        await first.Received(1).CloseAsync(token);
+        await first.Received(1).DisposeAsync();
+    }
+
+    [Fact(Timeout = 10000)]
+    public async Task HostStoppingCallbackCanShutDownTheSessionBeforeReturning()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var first = Substitute.For<IZkLinkConnection>();
+        var ended = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        first.Completion.Returns(ended.Task);
+        first.State.Returns(ZooKeeperSessionState.Lost);
+        var factory = Substitute.For<IZkLinkConnectionFactory>();
+        var options = CreateOptions();
+        factory.ConnectAsync(options, Arg.Any<CancellationToken>()).Returns(first);
+        var application = Substitute.For<IHostApplicationLifetime>();
+        var host = new ZkLinkConnectionHost(
+            () => options,
+            factory,
+            ZkLinkTerminalPolicy.StopApplication,
+            application
+        );
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var release = new ManualResetEventSlim();
+        var returned = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        application
+            .When(a => a.StopApplication())
+            .Do(_ =>
+            {
+                entered.TrySetResult();
+                release.Wait(token);
+                returned.TrySetResult();
+            });
+        await host.StartAsync(token);
+        ended.SetResult();
+        try
+        {
+            await entered.Task.WaitAsync(token);
+            // Generic Host can start its shutdown before all stopping callbacks finish.
+            await host.StopAsync(token).WaitAsync(token);
+            await first.Received(1).CloseAsync(token);
+            Assert.False(returned.Task.IsCompleted);
+        }
+        finally
+        {
+            release.Set();
+            await returned.Task.WaitAsync(token);
+            await host.DisposeAsync();
+        }
+    }
+
     private static (
         ZkLinkConnectionHost Host,
         IZkLinkConnection Connection,

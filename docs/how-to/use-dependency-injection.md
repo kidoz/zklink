@@ -34,19 +34,14 @@ Register ZkLink before dependent hosted services and keep sequential startup. A 
 
 `StopAsync` uses the client's acknowledged close. Disposing the container without graceful shutdown still releases local resources. A second `AddZkLink` call in the same service collection throws rather than silently selecting another connection or identity. Create and own a separate client explicitly when independent identities are required.
 
-See the [connection reference](../reference/connections.md) for lifecycle and close details.
-The [Native AOT verification guide](verify-native-aot.md) describes packed-package
-host lifecycle checks and how to verify a published package version.
-
-[How-to guides](README.md) · [Documentation home](../README.md)
-
 ### Startup, health and terminal sessions
 
 Pass a factory to resolve application services when the host starts, for example
 `services.AddZkLink(sp => sp.GetRequiredService<MySettings>().CreateClientOptions())`.
 The options belong to this registration. Applications that inject
 `ZooKeeperClientOptions` directly must register their own instance. Keep input
-credentials and certificates valid until startup captures them. Startup waits for
+credentials and certificates valid until the host captures them. A replacement
+factory must supply valid credentials each time it runs. Startup waits for
 readiness within `InitialConnectTimeout` and propagates connection failures.
 
 Applications using Microsoft health checks can register
@@ -59,3 +54,9 @@ terminal client available for inspection. `StopApplication` requests graceful
 host shutdown. `Recreate` calls the factory again to establish a new session.
 Read the accessor again to get its new client. Watches, ephemerals and locks
 belong to the previous session. A failed replacement requests host shutdown.
+
+See the [connection reference](../reference/connections.md) for lifecycle and close details.
+The [Native AOT verification guide](verify-native-aot.md) describes packed-package
+host lifecycle checks and how to verify a published package version.
+
+[How-to guides](README.md) · [Documentation home](../README.md)
