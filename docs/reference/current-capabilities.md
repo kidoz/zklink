@@ -1,7 +1,7 @@
 # Current capabilities
 
-Reviewed against repository records and the public NuGet feed on **8 November
-2026**. The documented public release is **1.0.3** for `ZkLink`,
+Reviewed against repository records and the public NuGet feed on **18 November
+2026**. The documented public release is **1.1.1** for `ZkLink`,
 `ZkLink.Extensions.DependencyInjection` and `ZkLink.Analyzers`. See the
 [changelog](../../CHANGELOG.md) for changes and [production release
 readiness](release-readiness.md) for open qualification requirements. No full
@@ -12,19 +12,23 @@ production qualification is claimed.
 | Area | Implemented and verified scope | Remaining limits |
 | --- | --- | --- |
 | Build and packages | `net10.0` package assets for .NET 10 and .NET 11 applications, C# 14, pinned SDK 11.0.100, locked dependencies, deterministic builds and API/package/source/symbol/installed-consumer checks; core has no third-party runtime dependencies | Repeat applicable checks for each candidate; package availability does not establish production qualification |
-| Sessions and operations | TCP/TLS, digest replay, one owned session, bounded requests/events, node/stat/children/ACL operations, transactions/read batches, auxiliary queries, explicit TTL opt-in, cancellation outcomes and acknowledged close | No automatic replacement of a terminal session or replay of uncertain requests; final sustained qualification remains open |
+| Sessions and operations | TCP/TLS, digest replay, one owned session, bounded requests and events, node/stat/children/ACL operations, transactions/read batches, auxiliary queries, explicit TTL opt-in, cancellation outcomes and acknowledged close | Core sessions end on terminal failure. Callers decide whether to retry uncertain requests. Final sustained qualification remains open |
 | Watches | One-shot, persistent and recursive watches, shared removal, bounded restoration and explicit reconnect gaps, with controlled-peer and two-patch live evidence | Invalidations are not change history; recursive watches exclude child-list duplicates; compatibility-profile restrictions apply |
-| Security | TLS required by default, custom roots, mTLS, digest and explicit ACLs, redaction; scoped managed/native certificate and online-revocation controls | Plaintext digest requires explicit unsafe opt-in and literal loopback endpoints only; DNS names including localhost and remote/mixed lists are rejected in this checkout. Deployment PKI, rotation and full security qualification remain separate |
-| Dependency injection | Optional AddZkLink host ownership, singleton accessor, startup/shutdown and non-owning consumer views; public 1.0.2 installed/native host checks | Arbitrary application registrations/dependencies require their own checks |
-| Analyzers | Six optional ZKL diagnostics, compilation tests and installed-package diagnostic checks | Diagnostics cover documented source patterns, not complete program analysis |
+| Security | TLS required by default, custom roots, mTLS, digest and explicit ACLs, redaction, and scoped managed/native certificate and online-revocation checks | Plaintext digest requires explicit unsafe opt-in and literal loopback endpoints. Deployment PKI, production certificate rotation, quorum TLS and full security qualification remain open |
+| Dependency injection | Optional `AddZkLink` host ownership, singleton accessor, startup/shutdown, health reporting and explicit `Recreate` policy for terminal sessions. The default policy is `Fail` | Applications must rebuild session-dependent state after replacement. Arbitrary application registrations and dependencies require their own checks |
+| Analyzers | Seven optional Roslyn diagnostics (`ZKL0001`–`ZKL0007`), with compilation and installed-package checks. `ZKL0007` reports directly discarded state subscriptions | Diagnostics cover documented source patterns |
 | Observability | BCL traces/metrics, bounded asynchronous delivery, finite tags, listener isolation and sensitive-data exclusion | Best-effort delivery; exporter integration and sustained-load qualification remain open |
 | Performance and resources | Protocol/allocation checks, bounded live CRUD, shared watch fan-out and 10,000-path recovery measurements | Controlled repeated measurements and full sustained qualification remain open; no stable throughput/latency claim |
 
 ## Native AOT and platform evidence
 
-Core enables `IsAotCompatible`; core and DI enable trim/AOT analyzers. Native AOT
-with .NET 10 has scoped packed-consumer evidence on **linux-x64, linux-arm64, win-x64 and
-osx-arm64**. This is available verification, not an unimplemented feature.
+Core enables `IsAotCompatible`, and both core and DI enable trim/AOT analyzers.
+All 36 jobs passed for the 1.1.1 candidate at source commit `b0f06d4`, including
+.NET 10 Native AOT publication, executable identity, online revocation and secure
+live checks on **linux-x64, linux-arm64, win-x64 and osx-arm64**. The release
+workflow verified public installation and symbols after publication.
+[Candidate run](https://github.com/kidoz/zklink/actions/runs/44317716440) ·
+[Release run](https://github.com/kidoz/zklink/actions/runs/44321419022)
 
 The repository records [candidate run 42406361077](https://github.com/kidoz/zklink/actions/runs/42406361077)
 passing all 36 jobs for the 1.0.2 source `45bd4a0`. The later
@@ -32,10 +36,7 @@ passing all 36 jobs for the 1.0.2 source `45bd4a0`. The later
 uses public core/DI 1.0.2 packages from that source and harness `c5f9ff5`:
 all eight jobs pass, including rooted/unrooted publication without trim/AOT
 warnings, direct executable identity and 48 secure native DI lifecycle cases
-across the four targets and both server patches. The live fixtures use private
-PKI with `NoCheck`. Dedicated core online-revocation controls are separate.
-These recorded runs cover the 1.0.2 packages and do not verify the published
-1.0.3 source.
+across the four targets and both server patches.
 
 On macOS arm64, .NET 11 Native AOT consumers of the public core and DI 1.0.3
 packages passed rooted and unrooted publication, secure TLS/mTLS cases against
@@ -52,7 +53,8 @@ Both **ZooKeeper 3.8.7 and 3.9.6** have scoped managed operation, ACL, transacti
 TTL, watch and recovery evidence. The default 3.8 compatibility profile rejects
 conflicting watch modes at one path; the 3.9 profile permits independent modes.
 TLS/mTLS and required-authentication fixtures are separate from the ordinary
-plaintext loopback fixtures. Client TLS makes no quorum-encryption claim.
+plaintext loopback fixtures. Secure live fixtures use private PKI with `NoCheck`.
+Dedicated controlled-peer tests exercise online certificate revocation.
 SASL, read-only sessions, administrative reconfiguration and coordination recipes
 remain outside the core scope.
 
