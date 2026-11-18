@@ -13,13 +13,14 @@ below provide constructor validation and XML documentation.
 ## Connection and session types
 
 `ZooKeeperClient`, `ZooKeeperClientOptions`, `ZooKeeperTlsOptions`,
-`ZooKeeperAuthentication`, `ZooKeeperCompatibilityProfile`,
+`ZooKeeperTlsCredentials`, `ZooKeeperAuthentication`, `ZooKeeperCompatibilityProfile`,
 `ZooKeeperSessionSnapshot`, `ZooKeeperSessionState`, `ZooKeeperCloseStatus` and
 `ZooKeeperStateSubscription` form the current connection API. See the
 [connection reference](connections.md) for their behavior and defaults.
 
 `ZooKeeperConnectionException` reports a safe `ZooKeeperConnectionFailure`,
-optional endpoint and server code during establishment. `ZooKeeperSessionException`
+optional endpoint and server code during establishment. Its `TlsFailureReason` and
+`SocketError` properties carry more detail when available. `ZooKeeperSessionException`
 reports session state and optional server code. `ZooKeeperEventOverflowException`
 reports a watch-budget fault, an overflowing state subscription, or a rejected
 subscription at the active-reader limit. For a state subscription, its `State`

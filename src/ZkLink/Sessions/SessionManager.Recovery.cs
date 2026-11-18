@@ -283,6 +283,13 @@ internal sealed partial class SessionManager
                 endpoint
             ),
             ZooKeeperConnectionException connection => connection,
+            SocketException socket => new ZooKeeperConnectionException(
+                ZooKeeperConnectionFailure.Unreachable,
+                endpoint,
+                null,
+                null,
+                socket.SocketErrorCode
+            ),
             _ => new ZooKeeperConnectionException(ZooKeeperConnectionFailure.Unreachable, endpoint),
         };
         if (

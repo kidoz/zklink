@@ -12,9 +12,9 @@ Session ephemerals, descendant counts and identities are described in the
 
 ## Configuration
 
-`ConnectAsync` validates and snapshots options, credentials and certificate
-handles synchronously before returning its task. Settings are fixed for that
-client, except that endpoint updates affect future connection attempts.
+`ConnectAsync` validates options and copies static credentials and certificate
+handles synchronously before returning its task. A TLS credentials provider runs
+once per endpoint attempt. Endpoint updates apply to future connection attempts.
 
 | Setting | Default and constraints |
 | --- | --- |
@@ -93,7 +93,7 @@ stores depend on the platform. Local loopback evidence currently covers macOS
 arm64 with ephemeral roots and revocation disabled for those test certificates;
 the dedicated live matrix additionally verifies client TLS/mTLS, certificate
 rejection, digest/X.509 ACL distinctions and secure reconnect on both pinned
-versions. Other client platforms, revocation services, rotation and quorum TLS
+versions. Other client platforms, deployment revocation services, production PKI rotation and quorum TLS
 remain unqualified. See [Verify secure connections](../how-to/verify-secure-connections.md).
 
 `ZooKeeperAuthentication.Digest(user, password)` owns UTF-8 `user:password` bytes,

@@ -20,11 +20,7 @@ public sealed class ZooKeeperConnectionException : IOException
         ZooKeeperTlsFailureReason? tlsFailureReason,
         SocketError? socketError
     )
-        : base(
-            FormattableString.Invariant(
-                $"ZooKeeper connection failed ({failure}, TLS {tlsFailureReason}, socket {socketError}, server code {errorCode})."
-            )
-        )
+        : base(FormatMessage(failure, errorCode, tlsFailureReason, socketError))
     {
         if (!Enum.IsDefined(failure))
         {
@@ -39,6 +35,24 @@ public sealed class ZooKeeperConnectionException : IOException
         Failure = failure;
         Endpoint = endpoint;
         ErrorCode = errorCode;
+    }
+
+    private static string FormatMessage(
+        ZooKeeperConnectionFailure failure,
+        int? errorCode,
+        ZooKeeperTlsFailureReason? tlsReason,
+        SocketError? socketError
+    )
+    {
+        string details =
+            tlsReason is { } tls ? $" ({tls})"
+            : socketError is { } socket ? $" ({socket})"
+            : string.Empty;
+        if (errorCode is { } code)
+        {
+            details += FormattableString.Invariant($" (server code {code})");
+        }
+        return $"ZooKeeper connection failed with {failure}{details}.";
     }
 
     /// <summary>Gets the platform or provider TLS failure category when available.</summary>
