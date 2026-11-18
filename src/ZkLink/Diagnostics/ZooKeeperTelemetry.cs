@@ -42,7 +42,9 @@ internal enum TelemetrySample
     Heartbeat,
     Disconnected,
     Negotiated,
+#if ZKLINK_TEST_ACCESS
     Barrier,
+#endif
 }
 
 internal readonly record struct TelemetrySpan(
@@ -117,9 +119,13 @@ internal static class ZooKeeperTelemetry
         Stamp Span = default,
         double Seconds = 0,
         TelemetryOutcome Outcome = default,
-        TelemetryError Error = default,
-        TaskCompletionSource? Barrier = null
-    );
+        TelemetryError Error = default
+    )
+    {
+#if ZKLINK_TEST_ACCESS
+        internal TaskCompletionSource? Barrier { get; init; }
+#endif
+    }
 
     static ZooKeeperTelemetry()
     {
@@ -425,6 +431,7 @@ internal static class ZooKeeperTelemetry
                 );
     }
 
+#if ZKLINK_TEST_ACCESS
     // A test-only barrier; normal driver completion never waits for listener work.
     internal static async Task FlushAsync(CancellationToken token)
     {
@@ -432,10 +439,11 @@ internal static class ZooKeeperTelemetry
             TaskCreationOptions.RunContinuationsAsynchronously
         );
         await Queue
-            .Writer.WriteAsync(new(TelemetrySample.Barrier, Barrier: completion), token)
+            .Writer.WriteAsync(new(TelemetrySample.Barrier) { Barrier = completion }, token)
             .ConfigureAwait(false);
         await completion.Task.WaitAsync(token).ConfigureAwait(false);
     }
+#endif
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Design",
@@ -451,9 +459,11 @@ internal static class ZooKeeperTelemetry
             {
                 switch (value.Sample)
                 {
+#if ZKLINK_TEST_ACCESS
                     case TelemetrySample.Barrier:
                         value.Barrier!.SetResult();
                         break;
+#endif
                     case TelemetrySample.Heartbeat:
                         Heartbeat?.Record(value.Seconds);
                         break;

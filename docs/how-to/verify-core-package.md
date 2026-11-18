@@ -1,5 +1,10 @@
 # Verify a local core package
 
+Package inspection checks the compiled assembly for test hooks and assembly-level
+internal access. The dependency-injection package uses core internals and requires
+the exact matching core package version. Test and benchmark projects use separate
+build outputs under `bin/test-access` and `obj/test-access`.
+
 Run package inspection from the repository root with .NET SDK **11.0.100**, the **.NET 10 runtime**, and
 Python 3.12 or newer. Docker, Bash and OpenSSL are unnecessary for this command:
 

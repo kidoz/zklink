@@ -4,7 +4,10 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" />
-    <ProjectReference Include="../../src/ZkLink/ZkLink.csproj" />
+    <ProjectReference
+      Include="../../src/ZkLink/ZkLink.csproj"
+      AdditionalProperties="ZkLinkTestAccess=true"
+    />
     <None Include="allocation-budgets.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

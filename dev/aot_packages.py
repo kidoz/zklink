@@ -24,9 +24,9 @@ def assembly_hash(package, package_id):
         return hashlib.sha256(archive.read(f"lib/net10.0/{package_id}.dll")).hexdigest().upper()
 
 
-def inspect_di(feed, version, revision, *, symbols=True):
+def inspect_di(feed, version, revision, *, symbols=True, published_legacy_di=False):
     package = feed / f"{DI_ID}.{version}.nupkg"
-    _packages.inspect_package(package, DI_ID, version, revision)
+    _packages.inspect_package(package, DI_ID, version, revision, published_legacy_di=published_legacy_di)
     symbol_package = package.with_suffix(".snupkg")
     if symbols:
         _packages.inspect_package(symbol_package, DI_ID, version, revision, symbols=True)
@@ -55,4 +55,5 @@ def public_packages(feed, version):
     report = {"packageId": "ZkLink", "version": version, "revision": revision,
               "origin": PUBLIC_FEED, "packageSha256": sha256(core),
               "assemblySha256": assembly_hash(core, "ZkLink")}
-    return report, inspect_di(feed, version, revision, symbols=False)
+    return report, inspect_di(feed, version, revision, symbols=False,
+                              published_legacy_di=version in {"1.0.1", "1.0.2", "1.0.3"})

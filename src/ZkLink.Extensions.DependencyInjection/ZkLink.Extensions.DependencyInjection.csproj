@@ -4,7 +4,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <EnableAotAnalyzer>true</EnableAotAnalyzer>
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
-    <IsPackable>true</IsPackable>
+    <IsPackable Condition="'$(ZkLinkTestAccess)' != 'true'">true</IsPackable>
     <VersionPrefix>1.0.3</VersionPrefix>
     <PackageId>ZkLink.Extensions.DependencyInjection</PackageId>
     <PackageTags>zookeeper;dependency-injection;hosting;dotnet</PackageTags>
@@ -30,10 +30,26 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
-    <ProjectReference Include="../ZkLink/ZkLink.csproj" />
+    <ProjectReference
+      Include="../ZkLink/ZkLink.csproj"
+      GlobalPropertiesToRemove="ZkLinkTestAccess"
+    />
     <AdditionalFiles Include="PublicAPI.Shipped.txt" />
     <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(ZkLinkTestAccess)' == 'true'">
     <InternalsVisibleTo Include="ZkLink.Extensions.DependencyInjection.Tests" />
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
+  <!-- DI uses the core's internal session view and must resolve the matching build. -->
+  <Target Name="PinCoreDependency" AfterTargets="_GetProjectReferenceVersions">
+    <ItemGroup>
+      <_ProjectReferencesWithVersions
+        Update="@(_ProjectReferencesWithVersions)"
+        Condition="'%(Filename)' == 'ZkLink'"
+      >
+        <ProjectVersion>[%(_ProjectReferencesWithVersions.ProjectVersion)]</ProjectVersion>
+      </_ProjectReferencesWithVersions>
+    </ItemGroup>
+  </Target>
 </Project>

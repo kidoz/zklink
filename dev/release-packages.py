@@ -32,7 +32,7 @@ def filenames(version):
             for suffix in ([".nupkg", ".snupkg"] if symbols else [".nupkg"])]
 
 
-def inspect_package(path, package_id, version, revision, *, symbols=False):
+def inspect_package(path, package_id, version, revision, *, symbols=False, published_legacy_di=False):
     with zipfile.ZipFile(path) as archive:
         names = archive.namelist()
         require(len(names) == len(set(names)), "Duplicate package member")
@@ -50,10 +50,16 @@ def inspect_package(path, package_id, version, revision, *, symbols=False):
         require({"README.md", "LICENSE", "THIRD-PARTY-NOTICES.md"}.issubset(names), "Missing package documentation/notices")
         dependencies = {item.get("id"): item.get("version") for item in metadata.findall(".//{*}dependency")}
         if package_id == "ZkLink.Extensions.DependencyInjection":
-            require(set(dependencies) == {"ZkLink", "Microsoft.Extensions.DependencyInjection.Abstractions",
-                                          "Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions", "Microsoft.Extensions.Hosting.Abstractions"}, "Unexpected DI dependencies")
-            require(dependencies["ZkLink"].strip("[](), ").split(",")[0].strip() == version,
-                    "DI package requires a different core version")
+            expected = {"ZkLink", "Microsoft.Extensions.DependencyInjection.Abstractions",
+                        "Microsoft.Extensions.Hosting.Abstractions"}
+            if published_legacy_di:
+                require(version in {"1.0.1", "1.0.2", "1.0.3"}, "Unknown legacy DI package version")
+                core_range = version
+            else:
+                expected.add("Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions")
+                core_range = f"[{version}]"
+            require(set(dependencies) == expected, "Unexpected DI dependencies")
+            require(dependencies["ZkLink"] == core_range, "DI package requires a different core version range")
         else:
             require(not dependencies, "Core and analyzers must have no runtime package dependencies")
         if package_id == "ZkLink.Analyzers":

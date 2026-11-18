@@ -4,7 +4,7 @@
     <EnableAotAnalyzer>true</EnableAotAnalyzer>
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     <IsAotCompatible>true</IsAotCompatible>
-    <IsPackable>true</IsPackable>
+    <IsPackable Condition="'$(ZkLinkTestAccess)' != 'true'">true</IsPackable>
     <VersionPrefix>1.0.3</VersionPrefix>
     <PackageId>ZkLink</PackageId>
     <Description>A managed asynchronous .NET client for Apache ZooKeeper with explicit session ownership, bounded requests and watch recovery.</Description>
@@ -35,8 +35,10 @@
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
     <AdditionalFiles Include="PublicAPI.Shipped.txt" />
     <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
-    <InternalsVisibleTo Include="ZkLink.Protocol.Tests" />
     <InternalsVisibleTo Include="ZkLink.Extensions.DependencyInjection" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(ZkLinkTestAccess)' == 'true'">
+    <InternalsVisibleTo Include="ZkLink.Protocol.Tests" />
     <InternalsVisibleTo Include="ZkLink.Benchmarks" />
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>

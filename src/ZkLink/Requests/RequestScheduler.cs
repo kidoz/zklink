@@ -129,6 +129,7 @@ internal sealed class RequestScheduler(
         }
     }
 
+#if ZKLINK_TEST_ACCESS
     internal void SetNextXidForTesting(int value)
     {
         lock (gate)
@@ -136,6 +137,7 @@ internal sealed class RequestScheduler(
             _nextXid = value > 0 ? value : throw new ArgumentOutOfRangeException(nameof(value));
         }
     }
+#endif
 
     internal void Attach(long value, ZooKeeperEndpoint target)
     {

@@ -29,7 +29,7 @@ class ReleasePackageTests(unittest.TestCase):
                 self.package(package_id, symbols=True)
         release_candidate.write_candidate(self.feed, "1.0.0", self.fixture.REVISION)
 
-    def package(self, package_id, *, symbols=False, version="1.0.0", core_dependency="1.0.0", extra=None):
+    def package(self, package_id, *, symbols=False, version="1.0.0", core_dependency="[1.0.0]", extra=None):
         dependencies = ""
         if package_id == "ZkLink.Extensions.DependencyInjection":
             dependencies = (f'<dependency id="ZkLink" version="{core_dependency}"/>'
@@ -79,6 +79,13 @@ class ReleasePackageTests(unittest.TestCase):
         self.package("ZkLink.Extensions.DependencyInjection", core_dependency="0.1.0")
         with self.assertRaisesRegex(ValueError, "different core version"):
             release.check_packages(self.feed, "1.0.0")
+
+    def test_di_cannot_accept_a_newer_core(self):
+        for core_range in ("1.0.0", "[1.0.0,)", "[1.0.0, 2.0.0)"):
+            with self.subTest(core_range=core_range):
+                self.package("ZkLink.Extensions.DependencyInjection", core_dependency=core_range)
+                with self.assertRaisesRegex(ValueError, "different core version range"):
+                    release.check_packages(self.feed, "1.0.0")
 
     def test_analyzers_cannot_ship_as_a_runtime_library(self):
         self.package("ZkLink.Analyzers", extra="lib/net10.0/ZkLink.Analyzers.dll")

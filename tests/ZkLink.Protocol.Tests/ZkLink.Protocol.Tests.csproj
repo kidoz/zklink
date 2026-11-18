@@ -9,7 +9,10 @@
     <Compile Include="../Shared/SecurityHandshakeTrace.cs" Link="SecurityHandshakeTrace.cs" />
     <PackageReference Include="xunit.v3.mtp-v2" />
     <PackageReference Include="NSubstitute" />
-    <ProjectReference Include="../../src/ZkLink/ZkLink.csproj" />
+    <ProjectReference
+      Include="../../src/ZkLink/ZkLink.csproj"
+      AdditionalProperties="ZkLinkTestAccess=true"
+    />
     <None Include="Fixtures/**/*.hex" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Fixtures/**/*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

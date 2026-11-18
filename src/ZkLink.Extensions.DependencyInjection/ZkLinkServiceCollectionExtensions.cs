@@ -49,7 +49,9 @@ public static class ZkLinkServiceCollectionExtensions
 
         services.AddSingleton(new ZkLinkRegistration());
         services.TryAddSingleton<ZkLinkHealthCheck>();
-        services.TryAddSingleton<IZkLinkConnectionFactory, ZkLinkConnectionFactory>();
+        services.TryAddSingleton<IZkLinkConnectionFactory>(
+            static _ => new ZkLinkConnectionFactory()
+        );
         services.AddSingleton(provider => new ZkLinkConnectionHost(
             () =>
                 optionsFactory(provider)
@@ -63,7 +65,9 @@ public static class ZkLinkServiceCollectionExtensions
         services.AddSingleton<IHostedService>(static provider =>
             provider.GetRequiredService<ZkLinkConnectionHost>()
         );
-        services.AddSingleton<IZooKeeperClientAccessor, ZkLinkClientAccessor>();
+        services.AddSingleton<IZooKeeperClientAccessor>(static provider => new ZkLinkClientAccessor(
+            provider.GetRequiredService<ZkLinkConnectionHost>()
+        ));
         return services;
     }
 }

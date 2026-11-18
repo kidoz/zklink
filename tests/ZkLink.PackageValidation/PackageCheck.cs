@@ -44,6 +44,7 @@ internal static class PackageCheck
         using var pe = new PEReader(assembly);
         var metadata = pe.GetMetadataReader();
         Require(metadata.GetString(metadata.GetAssemblyDefinition().Name) == "ZkLink");
+        CheckShippedInternals(metadata, "ZkLink");
         var frameworkAssemblies = Directory
             .GetFiles(RuntimeEnvironment.GetRuntimeDirectory(), "*.dll")
             .Select(Path.GetFileNameWithoutExtension)
@@ -126,12 +127,64 @@ internal static class PackageCheck
         using var pe = new PEReader(assembly);
         var metadata = pe.GetMetadataReader();
         Require(metadata.GetString(metadata.GetAssemblyDefinition().Name) == packageId);
+        CheckShippedInternals(metadata, packageId);
         var result = SymbolCheck.Run(
             pe,
             Read(symbolArchive, $"lib/net10.0/{packageId}.pdb"),
             revision
         );
         File.WriteAllText(report, result.ToJsonString(ReportOptions) + Environment.NewLine);
+    }
+
+    private static void CheckShippedInternals(MetadataReader metadata, string packageId)
+    {
+        var friends = new List<string?>();
+        foreach (var handle in metadata.GetAssemblyDefinition().GetCustomAttributes())
+        {
+            var attribute = metadata.GetCustomAttribute(handle);
+            if (attribute.Constructor.Kind != HandleKind.MemberReference)
+            {
+                continue;
+            }
+            var parent = metadata
+                .GetMemberReference((MemberReferenceHandle)attribute.Constructor)
+                .Parent;
+            if (parent.Kind != HandleKind.TypeReference)
+            {
+                continue;
+            }
+            var type = metadata.GetTypeReference((TypeReferenceHandle)parent);
+            if (
+                metadata.StringComparer.Equals(type.Namespace, "System.Runtime.CompilerServices")
+                && metadata.StringComparer.Equals(type.Name, "InternalsVisibleToAttribute")
+            )
+            {
+                var blob = metadata.GetBlobReader(attribute.Value);
+                Require(blob.ReadUInt16() == 1);
+                friends.Add(blob.ReadSerializedString());
+            }
+        }
+        Require(
+            packageId == "ZkLink"
+                ? friends is ["ZkLink.Extensions.DependencyInjection"]
+                : friends.Count == 0
+        );
+        foreach (var handle in metadata.TypeDefinitions)
+        {
+            var type = metadata.GetTypeDefinition(handle);
+            var typeName = metadata.GetString(type.Name);
+            foreach (var method in type.GetMethods())
+            {
+                var name = metadata.GetString(metadata.GetMethodDefinition(method).Name);
+                Require(
+                    (typeName, name)
+                        is not
+                            ("ZooKeeperTelemetry", "FlushAsync")
+                            and not
+                            ("RequestScheduler", "SetNextXidForTesting")
+                );
+            }
+        }
     }
 
     internal static void Require(bool condition)

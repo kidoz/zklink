@@ -16,4 +16,11 @@
     <Copyright>Copyright (c) 2026 Aleksandr Pavlov</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
+  <!-- Instrumented project references use distinct binaries in both Debug and Release. -->
+  <PropertyGroup Condition="'$(ZkLinkTestAccess)' == 'true'">
+    <BaseOutputPath>bin/test-access/</BaseOutputPath>
+    <IntermediateOutputPath>obj/test-access/$(Configuration)/</IntermediateOutputPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);bin/**;obj/**</DefaultItemExcludes>
+    <DefineConstants>$(DefineConstants);ZKLINK_TEST_ACCESS</DefineConstants>
+  </PropertyGroup>
 </Project>
