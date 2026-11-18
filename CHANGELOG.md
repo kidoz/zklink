@@ -19,9 +19,10 @@ broader security, Native AOT or production qualification. See
 - Keep watches active and the session connected when the server sends a valid
   watch notification for a path outside the client's chroot.
 
-- Keep the session connected when an unwatched `GetChildrenAsync`,
-  `GetEphemeralsAsync`, `GetAllChildrenNumberAsync`, or `WhoAmIAsync` call
-  receives a matched success reply with an invalid body. The call fails with
+- Keep the session connected when an unwatched node read (`ExistsAsync`,
+  `GetDataAsync`, `GetChildrenAsync`, `GetAclAsync`) or an auxiliary query
+  (`GetEphemeralsAsync`, `GetAllChildrenNumberAsync`, `WhoAmIAsync`) receives
+  a matched success reply with an invalid body. The call fails with
   `ZooKeeperProtocolException` and outcome `Unknown`.
 
 - Accept server-negotiated session timeouts from 100 milliseconds through one

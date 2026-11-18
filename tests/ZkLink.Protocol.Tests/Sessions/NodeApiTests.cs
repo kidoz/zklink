@@ -85,6 +85,57 @@ public sealed class NodeApiTests : IAsyncLifetime
         Assert.Equal(0, Client.Manager.Scheduler.PendingCount);
     }
 
+    [Theory(Timeout = TestTimeoutMilliseconds)]
+    [InlineData(ZooKeeperOperation.Exists)]
+    [InlineData(ZooKeeperOperation.GetData)]
+    [InlineData(ZooKeeperOperation.GetAcl)]
+    [Trait("Acceptance", "T14")]
+    public async Task MalformedNodeReplyFailsOnlyTheMatchedRead(ZooKeeperOperation operation)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var generation = Client.Session.ConnectionGeneration;
+        Task read = operation switch
+        {
+            ZooKeeperOperation.Exists => Client.ExistsAsync("/node", token),
+            ZooKeeperOperation.GetData => Client.GetDataAsync("/node", token),
+            ZooKeeperOperation.GetAcl => Client.GetAclAsync("/node", token),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation)),
+        };
+        var packet = await NextPathAsync((int)operation, "/app/node").ConfigureAwait(true);
+        var sync = Client.SyncAsync("/next", token);
+
+        var bytes = new byte[128];
+        var writer = new JuteWriter(bytes, ProtocolFixtures.Limits);
+        writer.WriteReplyHeader(new ReplyHeader(packet.Xid, 12, 0));
+        if (operation == ZooKeeperOperation.Exists)
+        {
+            writer.WriteInt64(Stat.Czxid); // Only the first field of the stat.
+        }
+        else
+        {
+            writer.WriteInt32(operation == ZooKeeperOperation.GetData ? -2 : -1);
+            writer.WriteStat(Stat);
+        }
+        _peer.Inject(bytes[..writer.WrittenCount]);
+
+        var failure = await Assert
+            .ThrowsAsync<ZooKeeperProtocolException>(() => read)
+            .ConfigureAwait(true);
+        Assert.Equal(RequestOutcome.Unknown, failure.Outcome);
+        Assert.Null(failure.ErrorCode);
+        Assert.Equal(packet.Xid, failure.Request.RequestId);
+        Assert.Equal(operation, failure.Request.Operation);
+
+        _peer.Reply(
+            await NextPathAsync((int)ZooKeeperOperation.Sync, "/app/next").ConfigureAwait(true)
+        );
+        await sync.ConfigureAwait(true);
+        Assert.Equal(ZooKeeperSessionState.Connected, Client.Session.State);
+        Assert.Equal(generation, Client.Session.ConnectionGeneration);
+        await SessionTestSupport.WaitForBytesReleasedAsync(Client).ConfigureAwait(true);
+        Assert.Equal(0, Client.Manager.Scheduler.PendingCount);
+    }
+
     [Fact(Timeout = 10000)]
     public async Task OnlyExistsConvertsNoNodeToNullAndOtherErrorsPreserveMetadata()
     {

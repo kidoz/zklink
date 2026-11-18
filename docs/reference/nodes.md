@@ -63,6 +63,11 @@ client-relative path. Common definitive rejections include `NoNode`, `NodeExists
 Cancellation, deadlines and disconnects preserve the existing
 [request outcomes](connections.md#state-recovery-and-request-outcomes).
 
+For `ExistsAsync`, `GetDataAsync`, `GetChildrenAsync`, and `GetAclAsync`, a
+matched success reply with an invalid body fails only that read with
+`ZooKeeperProtocolException` and outcome `Unknown`. For example, an incomplete
+stat in an `ExistsAsync` reply raises the exception. The session stays connected.
+
 ACLs do not inherit. Create/delete permission is checked on the parent; read/write
 permission applies to the node; admin permission controls ACL replacement.
 An `auth` ACL is expanded by the server to authenticated identities. Digest

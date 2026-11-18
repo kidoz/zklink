@@ -152,10 +152,17 @@ internal sealed class ConnectionRuntime(
         catch (InvalidDataException)
             when (header.Error == 0
                 && shape
-                    is ReadRequest { Type: ZooKeeperOperation.GetChildren, Watch: false }
+                    is ReadRequest
+                        {
+                            Watch: false,
+                            Type: ZooKeeperOperation.Exists
+                                or ZooKeeperOperation.GetData
+                                or ZooKeeperOperation.GetChildren
+                        }
                         or PathRequest
                         {
-                            Type: ZooKeeperOperation.GetEphemerals
+                            Type: ZooKeeperOperation.GetAcl
+                                or ZooKeeperOperation.GetEphemerals
                                 or ZooKeeperOperation.GetAllChildrenNumber
                         }
                         or EmptyRequest { Type: ZooKeeperOperation.WhoAmI }
