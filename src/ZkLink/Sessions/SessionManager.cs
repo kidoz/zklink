@@ -565,11 +565,11 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                 return;
             }
             _lastInbound = _time.GetTimestamp();
-            if (reply is { Zxid: > 0 } header)
+            if (reply is { Zxid: > 0 } header && header.Zxid != _lastZxid)
             {
                 _lastZxid = header.Zxid;
+                _states.Publish(BuildSnapshot(Session.State), notify: false);
             }
-            _states.Publish(BuildSnapshot(Session.State), false);
         }
     }
 

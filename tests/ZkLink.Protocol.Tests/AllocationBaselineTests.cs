@@ -2,12 +2,54 @@ using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using ZkLink.Protocol;
+using ZkLink.Protocol.Tests.Sessions;
 
 namespace ZkLink.Protocol.Tests;
 
 public sealed class AllocationBaselineTests(ITestOutputHelper output)
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T09")]
+    [Trait("Acceptance", "T35")]
+    public async Task InboundActivityReusesTheSnapshotWhenTheReplyZxidIsUnchanged()
+    {
+        using var peer = new SessionPeer();
+        var fixture = new SessionFixture();
+        await using var lifetime = fixture.ConfigureAwait(true);
+        var client = await fixture
+            .ConnectAsync(peer, cancellationToken: TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        var generation = client.Session.ConnectionGeneration;
+        var manager = client.Manager;
+        manager.Inbound(generation, new ReplyHeader(1, 12, 0));
+        var snapshot = client.Session;
+        Assert.Equal(12, snapshot.LastReplyZxid);
+
+        ReplyHeader?[] packets = [null, new(2, -1, 0), new(3, 0, 0), new(4, 12, 0)];
+        const int iterations = 256;
+        fixture.Time.Advance(TimeSpan.FromMilliseconds(1));
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < iterations; i++)
+        {
+            foreach (var packet in packets)
+            {
+                manager.Inbound(generation, packet);
+            }
+        }
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        output.WriteLine(
+            $"Unchanged session snapshot: {allocated / (double)(iterations * packets.Length)} bytes/packet"
+        );
+        Assert.Equal(0, allocated);
+        Assert.Same(snapshot, client.Session);
+        Assert.Equal(TimeSpan.Zero, manager.InboundSilence);
+
+        manager.Inbound(generation, new ReplyHeader(5, 13, 0));
+        Assert.Equal(13, client.Session.LastReplyZxid);
+        Assert.Equal(12, snapshot.LastReplyZxid);
+    }
 
     [Theory]
     [InlineData(false)]
