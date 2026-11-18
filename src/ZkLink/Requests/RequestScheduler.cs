@@ -680,7 +680,11 @@ internal sealed class RequestScheduler(
             pending.Completed = true;
             pending.Cancellation.Unregister();
             pending.Timer?.Dispose();
-            if (reply.Header.Error != 0)
+            if (reply.Result is InvalidReplyBodyResult)
+            {
+                pending.Completion.TrySetException(new ZooKeeperProtocolException(pending.Info));
+            }
+            else if (reply.Header.Error != 0)
             {
                 var outcome = reply.Header.Error
                     is (int)ZooKeeperErrorCode.Unimplemented

@@ -31,12 +31,22 @@ internal static class ReplyCodec
         {
             throw new InvalidDataException("Reply xid does not match the expected request.");
         }
+        return new WireReply(header, ReadReplyBody(ref reader, header, request, limits));
+    }
+
+    internal static WireResult ReadReplyBody(
+        ref JuteReader reader,
+        ReplyHeader header,
+        WireRequest request,
+        ProtocolLimits limits
+    )
+    {
         var result =
             header.Error != 0 ? new ErrorResult(header.Error)
             : request is MultiRequest multi ? ReadMulti(ref reader, multi, limits)
             : ReadBody(ref reader, request.Opcode, limits);
         reader.EnsureEnd();
-        return new WireReply(header, result);
+        return result;
     }
 
     internal static WireNotification DecodeNotification(

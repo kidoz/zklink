@@ -49,8 +49,8 @@ transport and tries another endpoint within the current connection or recovery
 deadline. During recovery, each attempt resumes the existing session. If every
 endpoint returns an invalid handshake until the initial deadline expires,
 `ConnectAsync` reports `ZooKeeperConnectionFailure.Protocol`. An explicit
-session rejection, an authentication failure, or a protocol error after handshake
-acceptance remains terminal.
+session rejection or authentication failure is terminal. Protocol errors during
+authentication and watch restoration are also terminal.
 
 The client accepts server-negotiated session timeouts from **100 milliseconds
 through 1 hour**, inclusive. A positive timeout outside this range triggers
@@ -150,6 +150,12 @@ a globally fresh snapshot or expose node data.
 | Queue/byte limit, queued cancellation/timeout, unsent disconnect | `NotSent` |
 | Definitive server rejection | `Rejected` |
 | Transmission started and result is missing, or server error is ambiguous | `Unknown` |
+
+If an ordinary `GetChildrenAsync` reply matches the next request ID and reports
+success, an invalid body (such as an invalid child name) fails that call with
+`ZooKeeperProtocolException` and outcome `Unknown`. Queued requests continue on
+the same connection. An invalid frame length, an incomplete reply header, or a
+request ID out of order still faults the session.
 
 Cancellation throws `ZooKeeperOperationCanceledException`, remains ordinary task
 cancellation and preserves the outcome. Deadlines throw `ZooKeeperTimeoutException`.

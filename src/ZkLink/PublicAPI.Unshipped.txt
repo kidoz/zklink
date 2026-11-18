@@ -4,3 +4,5 @@ static ZkLink.ZooKeeperWriteOperation.SetData(string! path, byte[]? data, ZkLink
 ZkLink.ZNodeData.ZNodeData(byte[]? data, ZkLink.ZNodeStat stat) -> void
 ZkLink.ZooKeeperClient.CreateAsync(string! path, byte[]? data, ZkLink.CreateOptions! options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<ZkLink.CreateResult!>!
 ZkLink.ZooKeeperClient.SetDataAsync(string! path, byte[]? data, ZkLink.ZNodeVersion version, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<ZkLink.ZNodeStat>!
+ZkLink.ZooKeeperProtocolException
+ZkLink.ZooKeeperProtocolException.ZooKeeperProtocolException(ZkLink.ZooKeeperRequestInfo! request) -> void

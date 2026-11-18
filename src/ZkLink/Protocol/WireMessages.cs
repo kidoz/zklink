@@ -64,6 +64,8 @@ internal abstract record WireResult
     public sealed override string ToString() => "ZooKeeper wire result";
 }
 
+internal sealed record InvalidReplyBodyResult : WireResult;
+
 internal sealed record EmptyResult : WireResult;
 
 internal sealed record StatResult(WireStat Stat) : WireResult;

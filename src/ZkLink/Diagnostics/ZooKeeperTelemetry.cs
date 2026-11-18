@@ -332,7 +332,7 @@ internal static class ZooKeeperTelemetry
                 TelemetryError.Tls,
             ZooKeeperConnectionException { Failure: ZooKeeperConnectionFailure.Protocol } =>
                 TelemetryError.Protocol,
-            InvalidDataException => TelemetryError.Protocol,
+            InvalidDataException or ZooKeeperProtocolException => TelemetryError.Protocol,
             ZooKeeperConnectionException or IOException => TelemetryError.Connection,
             ZooKeeperSessionException => TelemetryError.Session,
             _ => TelemetryError.Other,

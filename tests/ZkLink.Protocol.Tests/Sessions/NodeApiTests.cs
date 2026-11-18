@@ -58,6 +58,34 @@ public sealed class NodeApiTests : IAsyncLifetime
     }
 
     [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T14")]
+    public async Task InvalidChildNameFailsOnlyTheMatchedRead()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var generation = Client.Session.ConnectionGeneration;
+        var children = Client.GetChildrenAsync("/parent", token);
+        var next = Client.ExistsAsync("/next", token);
+        var packet = await NextPathAsync(12, "/app/parent").ConfigureAwait(true);
+        Reply(packet, new StringsResult(["invalid/name"], Stat));
+
+        var failure = await Assert
+            .ThrowsAsync<ZooKeeperProtocolException>(() => children)
+            .ConfigureAwait(true);
+        Assert.Equal(RequestOutcome.Unknown, failure.Outcome);
+        Assert.Null(failure.ErrorCode);
+        Assert.Equal(packet.Xid, failure.Request.RequestId);
+        Assert.Equal(ZooKeeperOperation.GetChildren, failure.Request.Operation);
+
+        var following = await NextPathAsync(3, "/app/next").ConfigureAwait(true);
+        Reply(following, new StatResult(Stat));
+        Assert.Equal(PublicStat, await next.ConfigureAwait(true));
+        Assert.Equal(ZooKeeperSessionState.Connected, Client.Session.State);
+        Assert.Equal(generation, Client.Session.ConnectionGeneration);
+        await SessionTestSupport.WaitForBytesReleasedAsync(Client).ConfigureAwait(true);
+        Assert.Equal(0, Client.Manager.Scheduler.PendingCount);
+    }
+
+    [Fact(Timeout = 10000)]
     public async Task OnlyExistsConvertsNoNodeToNullAndOtherErrorsPreserveMetadata()
     {
         var exists = Client.ExistsAsync("/missing", TestContext.Current.CancellationToken);

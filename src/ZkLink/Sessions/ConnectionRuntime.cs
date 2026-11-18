@@ -105,24 +105,7 @@ internal sealed class ConnectionRuntime(
                     {
                         return new(RuntimeStop.Stopped);
                     }
-                    var shape = expectedShape!;
-                    var reply = ReplyCodec.DecodeForValidatedRequest(
-                        packet,
-                        header.Xid,
-                        shape,
-                        options.Limits
-                    );
-                    if (reply.Header.Error == 0)
-                    {
-                        reply = reply with
-                        {
-                            Result = NamespaceTranslator.ToClient(
-                                reply.Result,
-                                shape.Opcode,
-                                options.Paths
-                            ),
-                        };
-                    }
+                    var reply = DecodeMatchedReply(ref input, header, expectedShape!);
                     var stop = owner.Reply(Generation, pending, reply);
                     if (stop is { } value)
                     {
@@ -152,6 +135,33 @@ internal sealed class ConnectionRuntime(
         {
             return Stop(new(RuntimeStop.Disconnected));
         }
+    }
+
+    private WireReply DecodeMatchedReply(
+        ref JuteReader input,
+        ReplyHeader header,
+        WireRequest shape
+    )
+    {
+        RequestCodec.ValidateXid(header.Xid, shape.Opcode);
+        WireResult result;
+        try
+        {
+            result = ReplyCodec.ReadReplyBody(ref input, header, shape, options.Limits);
+        }
+        catch (InvalidDataException)
+            when (header.Error == 0
+                && shape is ReadRequest { Type: ZooKeeperOperation.GetChildren, Watch: false }
+            )
+        {
+            // The complete frame matched the FIFO head. This read has no watch to reconcile.
+            return new WireReply(header, new InvalidReplyBodyResult());
+        }
+        if (header.Error == 0)
+        {
+            result = NamespaceTranslator.ToClient(result, shape.Opcode, options.Paths);
+        }
+        return new WireReply(header, result);
     }
 
     private async Task<RuntimeFailure> WriteAsync(CancellationToken cancellationToken)
