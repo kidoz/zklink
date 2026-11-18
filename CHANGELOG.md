@@ -11,6 +11,9 @@ broader security, Native AOT or production qualification. See
 
 ### Added
 
+- Expose `zklink.protocol.rejected_replies` to count matched replies rejected
+  for an invalid body, including late replies drained after caller cancellation.
+
 - Verify installed packages in .NET 11 applications alongside .NET 10.
   Development builds now use SDK 11.0.100.
 

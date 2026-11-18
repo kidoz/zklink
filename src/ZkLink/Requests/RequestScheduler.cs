@@ -682,6 +682,7 @@ internal sealed class RequestScheduler(
             pending.Timer?.Dispose();
             if (reply.Result is InvalidReplyBodyResult)
             {
+                ZooKeeperTelemetry.RejectReply();
                 pending.Completion.TrySetException(new ZooKeeperProtocolException(pending.Info));
             }
             else if (reply.Header.Error != 0)

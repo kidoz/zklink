@@ -50,6 +50,7 @@ in seconds. Current values aggregate clients without a client or session label.
 | `zklink.operation.count` | Observable counter | Caller completions by operation and outcome |
 | `zklink.operation.duration` | Histogram | Caller duration by operation, outcome and error |
 | `zklink.operation.unknown` | Observable counter | Operations completed with an unknown outcome |
+| `zklink.protocol.rejected_replies` | Observable counter | Matched replies whose invalid bodies the scheduler rejects. Counts once per reply, including a whole read batch or a late reply drained after cancellation or timeout. Untagged. |
 | `zklink.lifecycle.duration` | Histogram | Connection/authentication/restoration/close durations by lifecycle, outcome and error |
 | `zklink.requests.outstanding` | Observable up/down counter | Queued and sent owned requests, including sent tombstones and control requests |
 | `zklink.requests.bytes` | Observable up/down counter | Bytes charged to the scheduler's request budget, including buffers still being written |

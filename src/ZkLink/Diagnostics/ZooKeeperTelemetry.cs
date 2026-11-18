@@ -98,6 +98,7 @@ internal static class ZooKeeperTelemetry
         Backlog,
         DisconnectedSessions;
     private static long _unknown,
+        _rejectedReplies,
         _reconnects,
         _overflows,
         _rejectedWatchNotifications,
@@ -160,6 +161,13 @@ internal static class ZooKeeperTelemetry
                 "zklink.operation.unknown",
                 () => Interlocked.Read(ref _unknown),
                 "{operation}"
+            )
+        );
+        Publish(() =>
+            meter.CreateObservableCounter(
+                "zklink.protocol.rejected_replies",
+                () => Interlocked.Read(ref _rejectedReplies),
+                "{reply}"
             )
         );
         Publish(() =>
@@ -372,6 +380,8 @@ internal static class ZooKeeperTelemetry
                 )
             );
     }
+
+    internal static void RejectReply() => Interlocked.Increment(ref _rejectedReplies);
 
     internal static void Reconnect() => Interlocked.Increment(ref _reconnects);
 

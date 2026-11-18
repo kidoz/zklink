@@ -297,6 +297,94 @@ public sealed class TelemetryTests
         capture.AssertRedacted(SecretPath, SecretData, "private-endpoint-marker");
     }
 
+    [Theory(Timeout = TestTimeoutMilliseconds)]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Acceptance", "T34")]
+    public async Task MalformedBatchReplyIsCountedOnceEvenAfterCallerCancellation(
+        bool cancelAfterSend
+    )
+    {
+        const string counter = "zklink.protocol.rejected_replies";
+        var token = TestContext.Current.CancellationToken;
+        using var capture = new TelemetryCapture();
+        using var peer = new SessionPeer { ReplyApplications = false };
+        var fixture = new SessionFixture();
+        await using var lifetime = fixture.ConfigureAwait(true);
+        var client = await fixture
+            .ConnectAsync(peer, SessionFixture.Options(inFlight: 1), token)
+            .ConfigureAwait(true);
+        await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
+        await ZooKeeperTelemetry.FlushAsync(token).ConfigureAwait(true);
+        capture.Reset();
+        capture.Collect();
+        double before = capture.Value(counter);
+
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(token);
+        var batch = client.MultiReadAsync(
+            [
+                ZooKeeperReadOperation.GetData(SecretPath),
+                ZooKeeperReadOperation.GetChildren("/other"),
+            ],
+            stop.Token
+        );
+        var request = await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
+        Assert.Equal((int)ZooKeeperOperation.MultiRead, request.Opcode);
+        var sync = client.SyncAsync("/next", token);
+        if (cancelAfterSend)
+        {
+            await stop.CancelAsync().ConfigureAwait(true);
+            var canceled = await Assert
+                .ThrowsAsync<ZooKeeperOperationCanceledException>(() => batch)
+                .ConfigureAwait(true);
+            Assert.Equal(stop.Token, canceled.CancellationToken);
+            Assert.Equal(RequestOutcome.Unknown, canceled.Outcome);
+            capture.Collect();
+            Assert.Equal(before, capture.Value(counter));
+        }
+
+        // A complete success frame with the batch xid, but no member records.
+        peer.Inject(SessionPeer.Packet(request.Xid));
+        if (!cancelAfterSend)
+        {
+            var failure = await Assert
+                .ThrowsAsync<ZooKeeperProtocolException>(() => batch)
+                .ConfigureAwait(true);
+            Assert.Equal(RequestOutcome.Unknown, failure.Outcome);
+        }
+        var following = await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
+        Assert.Equal((int)ZooKeeperOperation.Sync, following.Opcode);
+        capture.Collect();
+        Assert.Equal(before + 1, capture.Value(counter));
+        peer.Reply(following);
+        await sync.ConfigureAwait(true);
+
+        var denied = client.GetDataAsync(SecretPath, token);
+        peer.Reply(
+            await SessionTestSupport.NextAsync(peer).ConfigureAwait(true),
+            (int)ZooKeeperErrorCode.NoAuth
+        );
+        var rejection = await Assert
+            .ThrowsAsync<ZooKeeperException>(() => denied)
+            .ConfigureAwait(true);
+        Assert.Equal(RequestOutcome.Rejected, rejection.Outcome);
+        await ZooKeeperTelemetry.FlushAsync(token).ConfigureAwait(true);
+        capture.Collect();
+        Assert.Equal(before + 1, capture.Value(counter));
+        Assert.Equal(cancelAfterSend, batch.IsCanceled);
+        var completion = Assert.Single(
+            capture.Activities,
+            activity =>
+                activity.Tags.Any(tag => tag.Key == "operation" && Equals(tag.Value, "MultiRead"))
+        );
+        Assert.Contains(
+            completion.Tags,
+            tag =>
+                tag.Key == "error" && Equals(tag.Value, cancelAfterSend ? "Cancelled" : "Protocol")
+        );
+        capture.AssertRedacted(SecretPath);
+    }
+
     [Fact(Timeout = TestTimeoutMilliseconds)]
     [Trait("Acceptance", "T34")]
     public async Task LifecycleHeartbeatRecoveryAndCloseUseOriginalDurationsAndSafeParentContext()
