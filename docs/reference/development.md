@@ -13,6 +13,15 @@
 | Test stack | xUnit v3 and NSubstitute | [Directory.Packages.props](../../Directory.Packages.props) |
 | Packaging | `IsPackable=false`; no released package | [Directory.Build.props](../../Directory.Build.props) |
 
+### Dependency updates
+
+Enable the Renovate GitHub App for this repository to receive weekly pull requests
+for NuGet packages, pinned GitHub Actions and fixture image digests. The image
+rule reads both versioned ZooKeeper environment files, the Compose fallback and
+the .NET soak runtime pin. Digest updates preserve the selected version tags.
+Validate configuration changes with `renovate-config-validator --strict .github/renovate.json`.
+[Update configuration](../../.github/renovate.json)
+
 ## Commands
 
 Commands run from the repository root. Optional arguments below use brackets as

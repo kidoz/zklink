@@ -1,0 +1,25 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "enabledManagers": ["nuget", "github-actions", "custom.regex"],
+  "schedule": ["* 0-5 * * 1"],
+  "ignoreDeps": ["ZkLink", "ZkLink.Extensions.DependencyInjection", "ZkLink.Analyzers"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^dev\\/(zookeeper-[0-9.]+|dotnet-soak-runtime)\\.env$/", "/^compose\\.yaml$/"],
+      "matchStrings": ["(?<depName>zookeeper|mcr\\.microsoft\\.com/dotnet/runtime):(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)@(?<currentDigest>sha256:[a-f0-9]{64})"],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {"matchManagers": ["nuget"], "groupName": "NuGet packages"},
+    {"matchManagers": ["github-actions"], "groupName": "GitHub Actions", "pinDigests": true},
+    {"matchManagers": ["custom.regex"], "groupName": "fixture image digests"},
+    {
+      "matchManagers": ["custom.regex"],
+      "matchUpdateTypes": ["major", "minor", "patch", "bump", "replacement", "rollback"],
+      "enabled": false
+    }
+  ]
+}
