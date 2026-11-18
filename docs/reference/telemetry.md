@@ -60,6 +60,7 @@ in seconds. Current values aggregate clients without a client or session label.
 | `zklink.session.negotiated_timeout` | Histogram | Server-negotiated session timeout on each accepted handshake |
 | `zklink.heartbeat.roundtrip` | Histogram | Writer selection through a valid ping acknowledgment |
 | `zklink.watches.active` | Observable up/down counter | Acknowledged, active logical watch registrations |
+| `zklink.watches.rejected_notifications` | Observable counter | Valid node notifications discarded because their paths fall outside the client's chroot. Counted once per notification, without tags. |
 | `zklink.events.backlog` | Observable up/down counter | Buffered watch and state events, including initial state snapshots |
 | `zklink.event.overflows` | Observable counter | Client event-budget faults |
 | `zklink.telemetry.dropped` | Observable counter | Diagnostic records rejected by the bounded dispatcher |

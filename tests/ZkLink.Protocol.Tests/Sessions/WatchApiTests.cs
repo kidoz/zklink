@@ -1,9 +1,12 @@
 using System.Globalization;
+using ZkLink.Diagnostics;
 using ZkLink.Protocol;
+using ZkLink.Testing;
 using ZkLink.Watches;
 
 namespace ZkLink.Protocol.Tests.Sessions;
 
+[Collection("Telemetry")]
 public sealed class WatchApiTests : IAsyncLifetime
 {
     private const int TestTimeoutMilliseconds = 10_000;
@@ -174,6 +177,41 @@ public sealed class WatchApiTests : IAsyncLifetime
         Assert.Equal(expected, events.Current.Kind);
         Assert.False(await events.MoveNextAsync().ConfigureAwait(true));
         Assert.Equal(0, Client.Manager.WatchCount);
+    }
+
+    [Fact(Timeout = TestTimeoutMilliseconds)]
+    [Trait("Acceptance", "T23")]
+    [Trait("Acceptance", "T34")]
+    public async Task NotificationOutsideChrootIsCountedAndLeavesTheWatchActive()
+    {
+        const string counter = "zklink.watches.rejected_notifications";
+        var token = TestContext.Current.CancellationToken;
+        using var capture = new TelemetryCapture();
+        var watch = await RegisterAsync(ZooKeeperWatchMode.OneShotData).ConfigureAwait(true);
+        var generation = Client.Session.ConnectionGeneration;
+        await ZooKeeperTelemetry.FlushAsync(token).ConfigureAwait(true);
+        capture.Collect();
+        double before = capture.Value(counter);
+
+        Notify(_peer, ZooKeeperWatchEventKind.NodeDataChanged, "/app-other/node");
+        await BarrierAsync().ConfigureAwait(true);
+        Assert.True(watch.Active);
+        Assert.False(watch.Queue.Reader.TryPeek(out _));
+        capture.Collect();
+        Assert.Equal(before + 1, capture.Value(counter));
+
+        Notify(_peer, ZooKeeperWatchEventKind.NodeDataChanged, "/app/node");
+        await BarrierAsync().ConfigureAwait(true);
+        await using var events = watch.ReadEventsAsync(token).GetAsyncEnumerator(token);
+        Assert.True(await events.MoveNextAsync().ConfigureAwait(true));
+        Assert.Equal("/node", events.Current.Path);
+        Assert.Equal(ZooKeeperWatchEventKind.NodeDataChanged, events.Current.Kind);
+        Assert.False(await events.MoveNextAsync().ConfigureAwait(true));
+        Assert.Equal(ZooKeeperSessionState.Connected, Client.Session.State);
+        Assert.Equal(generation, Client.Session.ConnectionGeneration);
+        capture.Collect();
+        Assert.Equal(before + 1, capture.Value(counter));
+        capture.AssertRedacted("/app-other/node", "/app/node");
     }
 
     [Fact(Timeout = TestTimeoutMilliseconds)]

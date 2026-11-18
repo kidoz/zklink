@@ -100,6 +100,7 @@ internal static class ZooKeeperTelemetry
     private static long _unknown,
         _reconnects,
         _overflows,
+        _rejectedWatchNotifications,
         _dropped,
         _listenerErrors;
 
@@ -173,6 +174,13 @@ internal static class ZooKeeperTelemetry
                 "zklink.event.overflows",
                 () => Interlocked.Read(ref _overflows),
                 "{overflow}"
+            )
+        );
+        Publish(() =>
+            meter.CreateObservableCounter(
+                "zklink.watches.rejected_notifications",
+                () => Interlocked.Read(ref _rejectedWatchNotifications),
+                "{notification}"
             )
         );
         Publish(() =>
@@ -368,6 +376,9 @@ internal static class ZooKeeperTelemetry
     internal static void Reconnect() => Interlocked.Increment(ref _reconnects);
 
     internal static void Overflow() => Interlocked.Increment(ref _overflows);
+
+    internal static void RejectWatchNotification() =>
+        Interlocked.Increment(ref _rejectedWatchNotifications);
 
     internal static void RecordHeartbeat(TimeSpan elapsed)
     {

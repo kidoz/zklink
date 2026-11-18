@@ -1,5 +1,6 @@
 using System.Text;
 using ZkLink.Configuration;
+using ZkLink.Diagnostics;
 using ZkLink.Protocol;
 using ZkLink.Requests;
 using ZkLink.Sessions;
@@ -503,7 +504,12 @@ internal sealed class WatchManager(
         {
             return true;
         }
-        string path = options.Paths.ToClient(notification.Path!);
+        string? path = options.Paths.ToClientIfContained(notification.Path!);
+        if (path is null)
+        {
+            ZooKeeperTelemetry.RejectWatchNotification();
+            return true;
+        }
         var kind = (ZooKeeperWatchEventKind)notification.Type;
         int targets = ProcessTargets(path, kind, notification.Zxid, publish: false);
         if (!budget.Reserve(targets))

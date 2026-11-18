@@ -40,12 +40,16 @@ internal sealed class ChrootPath
         || string.Equals(serverPath, _root, StringComparison.Ordinal)
         || serverPath.StartsWith(_descendantPrefix!, StringComparison.Ordinal);
 
-    internal string ToClient(string serverPath)
+    internal string ToClient(string serverPath) =>
+        ToClientIfContained(serverPath)
+        ?? throw new InvalidDataException("Server path is outside the configured namespace.");
+
+    internal string? ToClientIfContained(string serverPath)
     {
         ZNodePath.Validate(serverPath);
         if (!Contains(serverPath))
         {
-            throw new InvalidDataException("Server path is outside the configured namespace.");
+            return null;
         }
         return _root is null ? serverPath
             : serverPath.Length == _root.Length ? "/"

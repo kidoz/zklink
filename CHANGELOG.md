@@ -16,6 +16,9 @@ broader security, Native AOT or production qualification. See
 
 ### Fixed
 
+- Keep watches active and the session connected when the server sends a valid
+  watch notification for a path outside the client's chroot.
+
 - Keep the session connected when an ordinary `GetChildrenAsync` call receives
   a matched success reply with an invalid body. The call fails with
   `ZooKeeperProtocolException` and outcome `Unknown`.
