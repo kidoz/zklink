@@ -179,10 +179,13 @@ public sealed class WatchApiTests : IAsyncLifetime
         Assert.Equal(0, Client.Manager.WatchCount);
     }
 
-    [Fact(Timeout = TestTimeoutMilliseconds)]
+    [Theory(Timeout = TestTimeoutMilliseconds)]
+    [InlineData("/app-other/node")]
+    [InlineData("relative-node")]
+    [InlineData(null)]
     [Trait("Acceptance", "T23")]
     [Trait("Acceptance", "T34")]
-    public async Task NotificationOutsideChrootIsCountedAndLeavesTheWatchActive()
+    public async Task UnroutableNotificationIsCountedAndLeavesTheWatchActive(string? path)
     {
         const string counter = "zklink.watches.rejected_notifications";
         var token = TestContext.Current.CancellationToken;
@@ -193,8 +196,12 @@ public sealed class WatchApiTests : IAsyncLifetime
         capture.Collect();
         double before = capture.Value(counter);
 
-        Notify(_peer, ZooKeeperWatchEventKind.NodeDataChanged, "/app-other/node");
-        await BarrierAsync().ConfigureAwait(true);
+        var next = Client.SyncAsync("/barrier", token);
+        var sync = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        Assert.Equal((int)ZooKeeperOperation.Sync, sync.Opcode);
+        Notify(_peer, ZooKeeperWatchEventKind.NodeDataChanged, path);
+        _peer.Reply(sync);
+        await next.ConfigureAwait(true);
         Assert.True(watch.Active);
         Assert.False(watch.Queue.Reader.TryPeek(out _));
         capture.Collect();
@@ -211,7 +218,7 @@ public sealed class WatchApiTests : IAsyncLifetime
         Assert.Equal(generation, Client.Session.ConnectionGeneration);
         capture.Collect();
         Assert.Equal(before + 1, capture.Value(counter));
-        capture.AssertRedacted("/app-other/node", "/app/node");
+        capture.AssertRedacted("relative-node", "/app-other/node", "/app/node");
     }
 
     [Fact(Timeout = TestTimeoutMilliseconds)]
@@ -462,9 +469,13 @@ public sealed class WatchApiTests : IAsyncLifetime
         Assert.Equal(0, Client.Manager.WatchCount);
     }
 
-    [Fact(Timeout = TestTimeoutMilliseconds)]
+    [Theory(Timeout = TestTimeoutMilliseconds)]
+    [InlineData("relative-node")]
+    [InlineData(null)]
     [Trait("Acceptance", "T26")]
-    public async Task RestoreUsesAcknowledgedCategoriesAndWatermarkBeforeReadinessAndDispatchesEarlyEvents()
+    public async Task RestoreUsesAcknowledgedCategoriesAndWatermarkBeforeReadinessAndDispatchesEarlyEvents(
+        string? invalidPath
+    )
     {
         var exists = await RegisterAsync(ZooKeeperWatchMode.OneShotExists, "/absent", true)
             .ConfigureAwait(true);
@@ -490,11 +501,25 @@ public sealed class WatchApiTests : IAsyncLifetime
         Assert.Equal(ZooKeeperSessionState.Restoring, Client.Session.State);
         var ready = Client.WaitForConnectionAsync(TestContext.Current.CancellationToken);
         Assert.False(ready.IsCompleted);
+        const string counter = "zklink.watches.rejected_notifications";
+        using var capture = new TelemetryCapture();
+        await ZooKeeperTelemetry
+            .FlushAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        capture.Collect();
+        double before = capture.Value(counter);
+        Notify(second, ZooKeeperWatchEventKind.NodeDataChanged, invalidPath);
         Notify(second, ZooKeeperWatchEventKind.NodeDataChanged, "/app/data");
         var events = data.ReadEventsAsync(TestContext.Current.CancellationToken)
             .GetAsyncEnumerator(TestContext.Current.CancellationToken);
         await using var eventsLifetime = events.ConfigureAwait(true);
         Assert.True(await events.MoveNextAsync().ConfigureAwait(true));
+        Assert.Equal("/data", events.Current.Path);
+        Assert.Equal(data.RegistrationId, events.Current.RegistrationId);
+        Assert.False(await events.MoveNextAsync().ConfigureAwait(true));
+        capture.Collect();
+        Assert.Equal(before + 1, capture.Value(counter));
+        Assert.False(ready.IsCompleted);
         Assert.Equal(Watermark, Client.Session.LastReplyZxid);
         await child.DisposeAsync().ConfigureAwait(true); // A captured restore must never revive it.
         second.Reply(reset);
@@ -1033,7 +1058,7 @@ public sealed class WatchApiTests : IAsyncLifetime
     private static void Notify(
         SessionPeer peer,
         ZooKeeperWatchEventKind kind,
-        string path,
+        string? path,
         long zxid = NotificationZxid
     ) => NotifyRaw(peer, (int)kind, path, WatchProtocol.ServerConnected, zxid);
 

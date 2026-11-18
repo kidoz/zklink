@@ -508,7 +508,17 @@ internal sealed class WatchManager(
         {
             return true;
         }
-        string? path = options.Paths.ToClientIfContained(notification.Path!);
+        string? path;
+        try
+        {
+            path = notification.Path is null
+                ? null
+                : options.Paths.ToClientIfContained(notification.Path);
+        }
+        catch (ArgumentException)
+        {
+            path = null;
+        }
         if (path is null)
         {
             ZooKeeperTelemetry.RejectWatchNotification();

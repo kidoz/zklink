@@ -122,6 +122,24 @@ public sealed class ProtocolValidationTests
     }
 
     [Fact]
+    public void NotificationWithMissingNodePathStillRejectsTrailingData()
+    {
+        var bytes = new byte[64];
+        var writer = new JuteWriter(bytes, ProtocolFixtures.Limits);
+        writer.WriteReplyHeader(new ReplyHeader(-1, 12, 0));
+        writer.WriteInt32((int)ZooKeeperWatchEventKind.NodeDataChanged);
+        writer.WriteInt32(ZkLink.Watches.WatchProtocol.ServerConnected);
+        writer.WriteString(null);
+        var lengthWithTrailingByte = writer.WrittenCount + 1;
+        Assert.Throws<InvalidDataException>(() =>
+            ReplyCodec.DecodeNotification(
+                bytes.AsSpan(0, lengthWithTrailingByte),
+                ProtocolFixtures.Limits
+            )
+        );
+    }
+
+    [Fact]
     public void UnknownNotificationValuesRemainExplicitAndUnavailableZxidStaysNull()
     {
         var bytes = ProtocolFixtures.Bytes("notification");

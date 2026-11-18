@@ -41,8 +41,9 @@ broader security, Native AOT or production qualification. See
   never replays it. Queued requests can continue on the same connection. An
   explicit session-expiry error still ends the session.
 
-- Keep watches active and the session connected when the server sends a valid
-  watch notification for a path outside the client's chroot.
+- Keep watches active when a node notification carries a missing, invalid, or
+  out-of-chroot path. The driver counts the rejected notification and continues
+  processing events, including during watch restoration.
 
 - Keep the session connected when `SyncAsync`, an unwatched node read (`ExistsAsync`,
   `GetDataAsync`, `GetChildrenAsync`, `GetAclAsync`) or an auxiliary query

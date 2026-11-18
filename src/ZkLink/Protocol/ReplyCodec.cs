@@ -66,13 +66,10 @@ internal static class ReplyCodec
         var type = reader.ReadInt32();
         var state = reader.ReadInt32();
         var path = reader.ReadString();
-        if (path is not null)
+        // The watch dispatcher validates node paths in the client's namespace.
+        if (type == ZkLink.Watches.WatchProtocol.SessionEvent && path is not null)
         {
             ValidateServerPath(path);
-        }
-        if (type != -1 && path is null)
-        {
-            throw new InvalidDataException("Node notification requires a path.");
         }
         reader.EnsureEnd();
         return new WireNotification(type, state, path, header.Zxid < 0 ? null : header.Zxid);

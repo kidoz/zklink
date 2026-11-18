@@ -91,9 +91,11 @@ Null zxid means no server zxid is available, including for a local gap. Notifica
 the session's ordinary-reply watermark. Default handle/event formatting omits
 path values. Chroot is applied to registration, removal and restoration, then
 stripped from event paths at component boundaries. With chroot `/app`, a watch
-on `/node` can receive events for `/app/node`. The driver discards a valid
-notification for `/app-other/node` before matching watches. The registration
-stays active and the session continues on the same connection.
+on `/node` can receive events for `/app/node`. The driver discards a node
+notification with a missing or invalid path, or a path outside the chroot such
+as `/app-other/node`. Each discard increments `zklink.watches.rejected_notifications`
+once. The watch stays active for its next matching event. The same rule applies
+while the driver is restoring watches.
 
 Watch events are invalidations, not a complete history. Multiple changes before
 rearming may be missed; reread application state after an event.
