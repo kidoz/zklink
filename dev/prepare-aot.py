@@ -44,6 +44,8 @@ def main():
     run = pathlib.Path(tempfile.mkdtemp(prefix="run.", dir=artifacts))
     print(f"Native AOT artifacts: {run}", flush=True)
     initial_inputs = input_hashes()
+    # Keep deterministic Source Link inputs and binaries separate from ordinary local builds.
+    package_build = f"-p:ZkLinkPackageBuildRoot={run / 'package-build'}"
     feed = run / "feed"
     feed.mkdir()
     environment = os.environ.copy()
@@ -71,12 +73,12 @@ def main():
         package_report, di_report = public_packages(feed, version)
         (run / "package.json").write_text(json.dumps(package_report, indent=2) + "\n", encoding="utf-8")
     else:
-        command("core-restore", ["dotnet", "restore", "src/ZkLink", "--locked-mode"])
+        command("core-restore", ["dotnet", "restore", "src/ZkLink", "--locked-mode", package_build])
         if candidate:
             for name in [*candidate[1]["files"], "candidate.json"]:
                 shutil.copy2(candidate[0] / name, feed / name)
         else:
-            command("pack", ["dotnet", "pack", "src/ZkLink", "-c", "Release", "--no-restore", f"-p:Version={version}", "-p:ContinuousIntegrationBuild=true", "-o", str(feed)])
+            command("pack", ["dotnet", "pack", "src/ZkLink", "-c", "Release", package_build, "--no-restore", f"-p:Version={version}", "-p:ContinuousIntegrationBuild=true", "-o", str(feed)])
         command("inspector-restore", ["dotnet", "restore", "tests/ZkLink.PackageValidation", "--locked-mode"])
         command("inspector-build", ["dotnet", "build", "tests/ZkLink.PackageValidation", "-c", "Release", "--no-restore"])
         inspector = ROOT / "tests/ZkLink.PackageValidation/bin/Release/net10.0/ZkLink.PackageValidation.dll"
@@ -86,8 +88,8 @@ def main():
         if not candidate:
             write_candidate(feed, version, revision)
         # Freeze the separately qualified DI package from the same source/version.
-        command("di-restore", ["dotnet", "restore", "src/ZkLink.Extensions.DependencyInjection", "--locked-mode"])
-        command("di-pack", ["dotnet", "pack", "src/ZkLink.Extensions.DependencyInjection", "-c", "Release",
+        command("di-restore", ["dotnet", "restore", "src/ZkLink.Extensions.DependencyInjection", "--locked-mode", package_build])
+        command("di-pack", ["dotnet", "pack", "src/ZkLink.Extensions.DependencyInjection", "-c", "Release", package_build,
                            "--no-restore", f"-p:Version={version}", "-p:ContinuousIntegrationBuild=true", "-o", str(feed)])
         di_report = inspect_di(feed, version, revision)
     di_id = DI_ID

@@ -49,14 +49,16 @@ def main():
     command("dotnet-info", ["dotnet", "--info"])
     for path in (ROOT / "src/ZkLink").glob("PublicAPI.*.txt"):
         shutil.copy2(path, run / path.name)
+    # Keep deterministic Source Link inputs and binaries separate from ordinary local builds.
+    package_build = f"-p:ZkLinkPackageBuildRoot={run / 'package-build'}"
     feed = run / "feed"
     feed.mkdir()
-    command("restore", ["dotnet", "restore", "src/ZkLink", "--locked-mode"])
+    command("restore", ["dotnet", "restore", "src/ZkLink", "--locked-mode", package_build])
     if candidate:
         for name in [*candidate[1]["files"], "candidate.json"]:
             shutil.copy2(candidate[0] / name, feed / name)
     else:
-        command("pack", ["dotnet", "pack", "src/ZkLink", "-c", "Release", "--no-restore",
+        command("pack", ["dotnet", "pack", "src/ZkLink", "-c", "Release", package_build, "--no-restore",
                          f"-p:Version={version}", "-p:ContinuousIntegrationBuild=true", "-o", str(feed)])
     command("inspector-restore", ["dotnet", "restore", "tests/ZkLink.PackageValidation", "--locked-mode"])
     command("inspector-build", ["dotnet", "build", "tests/ZkLink.PackageValidation", "-c", "Release", "--no-restore"])

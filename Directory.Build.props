@@ -16,6 +16,13 @@
     <Copyright>Copyright (c) 2026 Aleksandr Pavlov</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
+  <!-- Give each package verification run its own restore, compiler and pack inputs.
+       Keep one repository Source Link root for both handwritten and generated sources. -->
+  <PropertyGroup Condition="'$(ZkLinkPackageBuildRoot)' != ''">
+    <BaseOutputPath>$(ZkLinkPackageBuildRoot)/bin/$(MSBuildProjectName)/</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(ZkLinkPackageBuildRoot)/obj/$(MSBuildProjectName)/</BaseIntermediateOutputPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);bin/**;obj/**</DefaultItemExcludes>
+  </PropertyGroup>
   <!-- Instrumented project references use distinct binaries in both Debug and Release. -->
   <PropertyGroup Condition="'$(ZkLinkTestAccess)' == 'true'">
     <BaseOutputPath>bin/test-access/</BaseOutputPath>
