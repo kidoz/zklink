@@ -23,10 +23,12 @@ def main():
     run = pathlib.Path(sys.argv[1]).resolve()
     artifacts = run / "compatibility"
     artifacts.mkdir()
+    build_root = run / "package-build"
     properties = ["DotNetApiCompatTaskAssembly", "MSBuildToolsPath", "NuGetPackageRoot", "PackageId",
                   "PackageValidationBaselineVersion", "EnablePackageValidation",
                   "ApiCompatEnableRuleCannotChangeParameterName", "ApiCompatEnableRuleAttributesMustMatch"]
     result = subprocess.run(["dotnet", "msbuild", str(ROOT / "src/ZkLink"), "-nologo", "-p:Configuration=Release",
+                             f"-p:ZkLinkPackageBuildRoot={build_root}",
                              "-getProperty:" + ",".join(properties), "-getItem:ApiCompatExcludeAttributesFile"],
                             cwd=ROOT, capture_output=True,
                             text=True, timeout=COMMAND_GUARD_SECONDS, check=True)
@@ -80,6 +82,7 @@ def main():
 
     def check(name, package, expected_code=None):
         result = subprocess.run(["dotnet", "msbuild", str(harness), "-nologo", "-t:CheckCompatibility",
+                                 f"-p:ZkLinkPackageBuildRoot={build_root}",
                                  f"-p:CandidatePackage={package}"], cwd=ROOT, capture_output=True,
                                 text=True, timeout=COMMAND_GUARD_SECONDS, check=False)
         output = result.stdout + result.stderr
