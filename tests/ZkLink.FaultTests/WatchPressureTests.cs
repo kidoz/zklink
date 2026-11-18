@@ -24,7 +24,8 @@ public sealed class WatchPressureTests : IAsyncLifetime
     private const int SlowCapacity = 12;
     private const int RetainedStateCount = 1;
     private const int BurstEventCount = 3;
-    private const int OverflowCapacity = RetainedStateCount + HandleCount * BurstEventCount;
+    private const int OverflowCapacity = HandleCount * BurstEventCount;
+    private const int FullBacklog = RetainedStateCount + OverflowCapacity;
     private const int RequiredHeartbeatCount = 2;
     private const string HeartbeatMetric = "zklink.heartbeat.roundtrip";
     private static readonly TimeSpan Guard = TimeSpan.FromSeconds(10);
@@ -218,7 +219,7 @@ public sealed class WatchPressureTests : IAsyncLifetime
     [Trait("Acceptance", "T30")]
     [Trait("Acceptance", "T33")]
     [Trait("Acceptance", "T34")]
-    public async Task StateAndWatchBudgetOverflowRetainsBufferedOrderAndFaultsExplicitly()
+    public async Task WatchBudgetOverflowRetainsBufferedOrderWithIndependentStateQueue()
     {
         var token = TestContext.Current.CancellationToken;
         using var capture = new TelemetryCapture();
@@ -241,15 +242,14 @@ public sealed class WatchPressureTests : IAsyncLifetime
         {
             await RegisterAsync(owner, parent, path, watches, token).ConfigureAwait(true);
             await BurstAsync(owner, path, capture, RetainedStateCount, token).ConfigureAwait(true);
-            await CountersAsync(capture, token, HandleCount, OverflowCapacity).ConfigureAwait(true);
+            await CountersAsync(capture, token, HandleCount, FullBacklog).ConfigureAwait(true);
             Assert.Equal(ZooKeeperSessionState.Connected, owner.Session.State);
             var fullRead = await owner.GetDataAsync(path, token).ConfigureAwait(true);
             Assert.Equal((byte)2, Assert.Single(fullRead.Data!.Value.ToArray()));
-            await CountersAsync(capture, token, HandleCount, OverflowCapacity).ConfigureAwait(true);
-            Step("shared-state-watch-budget-full");
+            await CountersAsync(capture, token, HandleCount, FullBacklog).ConfigureAwait(true);
+            Step("watch-budget-full-with-unread-state");
             Step("full-counts " + Snapshot(capture));
-            // Only the recursive handle matches this sibling. The unread state
-            // entry must participate in the budget for this single entry to overflow.
+            // Only the recursive handle matches this sibling; its event exceeds the watch limit by one.
             await _fixture
                 .Client.CreateAsync(
                     parent + "/trigger",
@@ -273,7 +273,7 @@ public sealed class WatchPressureTests : IAsyncLifetime
                 .ThrowsAsync<ZooKeeperException>(() => owner.GetDataAsync(path, token))
                 .ConfigureAwait(true);
             Assert.Equal(RequestOutcome.NotSent, denied.Outcome);
-            await CountersAsync(capture, token, backlog: OverflowCapacity).ConfigureAwait(true);
+            await CountersAsync(capture, token, backlog: FullBacklog).ConfigureAwait(true);
             foreach (var watch in watches)
             {
                 var reader = new EventProbe<ZooKeeperWatchEvent>(

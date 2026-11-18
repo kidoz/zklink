@@ -12,6 +12,7 @@ Roslyn diagnostics for secure and asynchronous ZkLink usage. The analyzer target
 | ZKL0004 | Usage | Warning | A client or watch `Task`/`ValueTask` call is not awaited or otherwise observed. |
 | ZKL0005 | Usage | Warning | An async call omits a `CancellationToken` available in the enclosing scope. Passing `default` explicitly is allowed. |
 | ZKL0006 | Usage | Warning | A direct ZkLink async call is blocked with `.Result`, `.Wait()`, or `.GetAwaiter().GetResult()`. Await it instead. |
+| ZKL0007 | Usage | Warning | A `SubscribeStateChanges()` result is directly discarded. Retain and dispose the state subscription. |
 
 Diagnostics use ZkLink symbol matching and skip generated code. They intentionally check direct source patterns rather than interprocedural flow. Runtime validation remains authoritative.
 
@@ -36,7 +37,7 @@ Reference the analyzer without loading it as a runtime library:
 </ItemGroup>
 ```
 
-The local package smoke test packs `0.0.0-local`, restores a consumer from that package, compiles clean code, and verifies an intentional unobserved call reports ZKL0004:
+The local package smoke test packs `0.0.0-local`, restores a consumer from that package, compiles clean code, and verifies an unobserved async call and a discarded state subscription report ZKL0004 and ZKL0007 respectively:
 
 ```sh
 bash dev/test-analyzers-package.sh

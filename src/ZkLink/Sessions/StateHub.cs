@@ -1,8 +1,13 @@
-using System.Threading.Channels;
+using ZkLink.Diagnostics;
 
 namespace ZkLink.Sessions;
 
-internal sealed class StateHub(object gate, EventBudget budget, ZooKeeperSessionSnapshot initial)
+internal sealed class StateHub(
+    object gate,
+    int limit,
+    ZooKeeperSessionSnapshot initial,
+    TelemetryState telemetry
+)
 {
     private readonly HashSet<ZooKeeperStateSubscription> _subscriptions = [];
     private ZooKeeperSessionSnapshot _current = initial;
@@ -10,18 +15,22 @@ internal sealed class StateHub(object gate, EventBudget budget, ZooKeeperSession
     private Exception? _completionError;
     internal ZooKeeperSessionSnapshot Current => Volatile.Read(ref _current);
 
-    // All mutation, including dequeue accounting, is linearized by the session gate.
-    internal ZooKeeperStateSubscription? Subscribe()
+    internal ZooKeeperStateSubscription Subscribe()
     {
         lock (gate)
         {
-            if (_subscriptions.Count >= budget.Limit || !budget.Reserve(1))
+            if (_subscriptions.Count >= limit)
             {
-                return null;
+                if (_completed)
+                {
+                    throw new ZooKeeperSessionException(_current.State, _current.ErrorCode);
+                }
+                throw new ZooKeeperEventOverflowException(_current.State);
             }
-            var subscription = new ZooKeeperStateSubscription(this, budget.Limit);
+            var subscription = new ZooKeeperStateSubscription(this, limit);
             _subscriptions.Add(subscription);
             subscription.Queue.Writer.TryWrite(_current);
+            telemetry.BacklogDelta(1);
             if (_completed)
             {
                 subscription.Queue.Writer.TryComplete(_completionError);
@@ -30,26 +39,37 @@ internal sealed class StateHub(object gate, EventBudget budget, ZooKeeperSession
         }
     }
 
-    internal bool Publish(ZooKeeperSessionSnapshot value, bool notify = true)
+    internal void Publish(ZooKeeperSessionSnapshot value, bool notify = true)
     {
         lock (gate)
         {
-            if (notify && !_completed && !budget.Reserve(_subscriptions.Count))
-            {
-                return false;
-            }
             Volatile.Write(ref _current, value);
-            if (notify && !_completed)
+            if (!notify || _completed)
             {
-                foreach (var subscription in _subscriptions)
+                return;
+            }
+            List<ZooKeeperStateSubscription>? overflowed = null;
+            foreach (var subscription in _subscriptions)
+            {
+                if (!subscription.Queue.Writer.TryWrite(value))
                 {
-                    if (!subscription.Queue.Writer.TryWrite(value))
-                    {
-                        throw new InvalidOperationException("State budget invariant violated.");
-                    }
+                    subscription.Queue.Writer.TryComplete(
+                        new ZooKeeperEventOverflowException(value.State)
+                    );
+                    (overflowed ??= []).Add(subscription);
+                    ZooKeeperTelemetry.Overflow();
                 }
             }
-            return true;
+            if (overflowed is not null)
+            {
+                foreach (var subscription in overflowed)
+                {
+                    // Release the client's ownership. The caller may still drain the buffered prefix.
+                    _subscriptions.Remove(subscription);
+                    telemetry.BacklogDelta(-subscription.Queue.Reader.Count);
+                }
+            }
+            telemetry.BacklogDelta(_subscriptions.Count);
         }
     }
 
@@ -74,12 +94,15 @@ internal sealed class StateHub(object gate, EventBudget budget, ZooKeeperSession
     {
         lock (gate)
         {
-            if (subscription.Queue.Reader.TryRead(out value))
+            if (!subscription.Queue.Reader.TryRead(out value))
             {
-                budget.Release(1);
-                return true;
+                return false;
             }
-            return false;
+            if (_subscriptions.Contains(subscription))
+            {
+                telemetry.BacklogDelta(-1);
+            }
+            return true;
         }
     }
 
@@ -87,14 +110,11 @@ internal sealed class StateHub(object gate, EventBudget budget, ZooKeeperSession
     {
         lock (gate)
         {
-            if (!_subscriptions.Remove(subscription))
+            if (_subscriptions.Remove(subscription))
             {
-                return;
+                telemetry.BacklogDelta(-subscription.Queue.Reader.Count);
             }
-            while (subscription.Queue.Reader.TryRead(out _))
-            {
-                budget.Release(1);
-            }
+            while (subscription.Queue.Reader.TryRead(out _)) { }
             subscription.Queue.Writer.TryComplete();
         }
     }

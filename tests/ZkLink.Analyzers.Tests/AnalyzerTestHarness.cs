@@ -106,8 +106,15 @@ internal static class AnalyzerTestHarness
                 public System.Threading.Tasks.ValueTask DisposeAsync() => default;
             }
 
+            public sealed class ZooKeeperStateSubscription : System.IAsyncDisposable
+            {
+                public System.Threading.Tasks.ValueTask DisposeAsync() => default;
+            }
+
             public sealed class ZooKeeperClient : System.IAsyncDisposable
             {
+                public ZooKeeperStateSubscription SubscribeStateChanges() => new();
+
                 public static System.Threading.Tasks.Task<ZooKeeperClient> ConnectAsync(
                     ZooKeeperClientOptions options,
                     System.Threading.CancellationToken cancellationToken = default) =>

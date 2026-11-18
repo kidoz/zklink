@@ -196,11 +196,11 @@ is also bounded by this limit, so a new path can encounter local backpressure
 while cleanup is outstanding. A watched path must fit a one-path restoration
 frame after chroot expansion.
 
-`MaxBufferedEvents` is shared across state and watch queues and counts every
-logical recipient after fan-out, including reconnect gaps. Persistent streams
+Watch queues share `MaxBufferedEvents` and count every logical recipient after
+fan-out, including reconnect gaps. State subscriptions have independent queues. Persistent streams
 can buffer repeated events, with all their queues sharing this same budget. Consumers never run on the socket reader or
 under the session lock. A slow consumer cannot block decoding or heartbeats.
-Exhaustion faults the client with `ZooKeeperEventOverflowException`; events are
+Exhausting the watch budget faults the client with `ZooKeeperEventOverflowException`; events are
 never silently dropped, overwritten or coalesced. Session state and terminal
 stream completion remain observable. Recovery requires a fresh client and a
 new application snapshot.

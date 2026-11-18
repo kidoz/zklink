@@ -69,6 +69,6 @@ public sealed class ZooKeeperClientOptions
     /// <summary>Gets the bound for owned watch handles and cleanup metadata, including pending reads and unread completed streams.</summary>
     public int MaxWatches { get; init; } = 10_000;
 
-    /// <summary>Gets the global buffered state/watch-event budget and maximum state-subscription count.</summary>
+    /// <summary>Gets the shared watch-event capacity, the capacity of each state subscription, and the maximum number of active state subscriptions.</summary>
     public int MaxBufferedEvents { get; init; } = 4096;
 }

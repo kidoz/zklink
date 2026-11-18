@@ -8,8 +8,11 @@ public static class AnalyzerPackageSmoke
     {
         ArgumentNullException.ThrowIfNull(client);
 #if EXPECT_ANALYZER_DIAGNOSTIC
+        client.SubscribeStateChanges();
         client.SyncAsync("/node", cancellationToken);
 #else
+        var states = client.SubscribeStateChanges();
+        await using var lifetime = states.ConfigureAwait(false);
         await client.SyncAsync("/node", cancellationToken).ConfigureAwait(false);
 #endif
     }

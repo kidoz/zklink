@@ -37,7 +37,7 @@ client, except that endpoint updates affect future connection attempts.
 | `MaxDataBytes` | 1,000,000; range 0–64 MiB, additionally constrained by frame size |
 | `MaxCollectionElements` | 100,000; range 1–1,000,000, additionally constrained by frame size |
 | `MaxWatches` | 10,000 owned logical handles and bounded cleanup metadata; range 1–1,000,000 |
-| `MaxBufferedEvents` | 4,096 across state and watch queues after fan-out; range 1–1,000,000; also bounds subscription count |
+| `MaxBufferedEvents` | 4,096 by default, range 1–1,000,000. Bounds all buffered watch events after fan-out, each state queue, and the number of active state subscriptions. |
 
 When DNS returns multiple usable addresses, each TCP/TLS attempt gets an equal
 share of the remaining endpoint time among the addresses still to try. An early
@@ -170,9 +170,14 @@ late reply; it still counts toward limits. Positive request IDs wrap without
 colliding with pending IDs, and an old connection cannot complete new work.
 
 Each state subscription has one consumer, starts with an atomic snapshot and
-then yields ordered transitions. Disposing/canceling it is local. Exhausting the
-shared event budget faults the client explicitly with
-`ZooKeeperEventOverflowException`; transitions are not silently dropped.
+then yields ordered transitions. If the next transition would exceed
+`MaxBufferedEvents`, the client detaches that subscription and releases its
+slot immediately. The detached reader can drain its queued snapshots in order
+and then receives `ZooKeeperEventOverflowException`. Other subscriptions and
+watches continue running. Total state buffering grows with the number of slow
+readers because each active subscription has its own capacity. Subscribe again to get a fresh atomic snapshot.
+At the active subscription limit, `SubscribeStateChanges()` throws without
+disturbing existing readers. Disposing or cancelling a reader is local.
 
 Restoration failures follow the same session lifecycle. Retryable reset errors
 and attempt timeouts keep admission closed while retrying the existing session.

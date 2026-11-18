@@ -11,6 +11,9 @@ broader security, Native AOT or production qualification. See
 
 ### Added
 
+- Warn when a caller directly discards the result of `SubscribeStateChanges()`
+  (analyzer rule ZKL0007).
+
 - Expose `zklink.protocol.rejected_replies` to count matched replies rejected
   for an invalid body, including late replies drained after caller cancellation.
 
@@ -18,6 +21,11 @@ broader security, Native AOT or production qualification. See
   Development builds now use SDK 11.0.100.
 
 ### Fixed
+
+- Isolate slow state subscribers. When a subscription fills its queue, its
+  reader receives the buffered transitions followed by
+  `ZooKeeperEventOverflowException`. The session, watches, and other state
+  subscribers continue running.
 
 - Keep the session connected when a watch removal acknowledgment contains
   trailing data. Explicit removal reports `ZooKeeperProtocolException` with

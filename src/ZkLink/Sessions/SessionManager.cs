@@ -58,7 +58,12 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
         _endpoints = new EndpointProvider(_options.Endpoints, _random);
         var events = new EventBudget(_gate, _options.Settings.MaxBufferedEvents, Telemetry);
         _watches = new WatchManager(_gate, _options, events, this);
-        _states = new StateHub(_gate, events, BuildSnapshot(ZooKeeperSessionState.Connecting));
+        _states = new StateHub(
+            _gate,
+            events.Limit,
+            BuildSnapshot(ZooKeeperSessionState.Connecting),
+            Telemetry
+        );
         Scheduler = new RequestScheduler(_gate, _options, _time, _work, Telemetry);
     }
 
@@ -123,27 +128,7 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
         }
     }
 
-    internal ZooKeeperStateSubscription Subscribe()
-    {
-        ZooKeeperStateSubscription? result;
-        lock (_gate)
-        {
-            result = _states.Subscribe();
-            if (result is null)
-            {
-                if (IsTerminal(Session.State))
-                {
-                    throw new ZooKeeperSessionException(Session.State, _terminalCode);
-                }
-                FaultOverflow();
-            }
-        }
-        if (result is not null)
-        {
-            return result;
-        }
-        throw new ZooKeeperEventOverflowException();
-    }
+    internal ZooKeeperStateSubscription Subscribe() => _states.Subscribe();
 
     internal void UpdateEndpoints(
         IReadOnlyList<ZooKeeperEndpoint> values,
@@ -330,10 +315,7 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                         _lastZxid = restoredZxid;
                         _watches.Restored();
                         _active = runtime;
-                        if (!PublishState(ZooKeeperSessionState.Connected))
-                        {
-                            break;
-                        }
+                        PublishState(ZooKeeperSessionState.Connected);
                         if (!_watches.Reconnected())
                         {
                             FaultOverflow();
@@ -970,18 +952,13 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
         }
     }
 
-    private bool PublishState(ZooKeeperSessionState state, bool detachOnOverflow = true)
+    private void PublishState(ZooKeeperSessionState state)
     {
         Telemetry.State(state, _time);
-        if (_states.Publish(BuildSnapshot(state), Session.State != state))
-        {
-            return true;
-        }
-        FaultOverflow(detachOnOverflow);
-        return false;
+        _states.Publish(BuildSnapshot(state), Session.State != state);
     }
 
-    private void FaultOverflow(bool detach = true)
+    private void FaultOverflow()
     {
         if (_terminalCause is not ZooKeeperEventOverflowException)
             ZooKeeperTelemetry.Overflow();
@@ -989,10 +966,7 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
         _terminalCause = new ZooKeeperEventOverflowException();
         _watches.Finish(_terminalCause);
         Scheduler.StopAdmission();
-        if (detach)
-        {
-            DetachRequests();
-        }
+        DetachRequests();
         _states.Finish(BuildSnapshot(ZooKeeperSessionState.Faulted), _terminalCause);
         _cancelCompletion = _stop.CancelAsync();
         _connectionReady.TrySetException(_terminalCause);
@@ -1003,7 +977,7 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
     {
         _watches.Finish(_terminalCause ?? new ZooKeeperSessionException(state, _terminalCode));
         Scheduler.StopAdmission();
-        PublishState(state, detach);
+        PublishState(state);
         if (detach)
         {
             DetachRequests();

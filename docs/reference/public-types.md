@@ -21,8 +21,9 @@ below provide constructor validation and XML documentation.
 `ZooKeeperConnectionException` reports a safe `ZooKeeperConnectionFailure`,
 optional endpoint and server code during establishment. `ZooKeeperSessionException`
 reports session state and optional server code. `ZooKeeperEventOverflowException`
-identifies a terminal state-event gap. These describe connection/session failures
-without inventing an application request.
+reports a watch-budget fault, an overflowing state subscription, or a rejected
+subscription at the active-reader limit. For a state subscription, its `State`
+property records the session state when the limit was reached.
 
 ## Transaction types
 

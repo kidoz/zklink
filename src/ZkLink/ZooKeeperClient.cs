@@ -101,7 +101,7 @@ public sealed partial class ZooKeeperClient : IAsyncDisposable
     /// <summary>Gets current immutable state without session credentials.</summary>
     public ZooKeeperSessionSnapshot Session => _session.Session;
 
-    /// <summary>Atomically subscribes to an initial snapshot and ordered state transitions.</summary>
+    /// <summary>Atomically subscribes to an initial snapshot and ordered transitions. A full subscription queue completes with ZooKeeperEventOverflowException.</summary>
     public ZooKeeperStateSubscription SubscribeStateChanges() => _session.Subscribe();
 
     /// <summary>Waits explicitly for readiness or fails on terminal loss; it never creates a replacement session.</summary>

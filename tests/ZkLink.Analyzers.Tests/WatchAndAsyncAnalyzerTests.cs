@@ -4,6 +4,38 @@ public sealed class WatchAndAsyncAnalyzerTests
 {
     [Fact]
     [Trait("Acceptance", "T41")]
+    public async Task DiscardedStateSubscriptionsWarnOnlyForUnownedClientResults()
+    {
+        var diagnostics = await AnalyzerTestHarness.AnalyzeAsync(
+            """
+            using System.Threading.Tasks;
+            using ZkLink;
+            public static class Example
+            {
+                public static async Task Run(ZooKeeperClient client)
+                {
+                    client.SubscribeStateChanges();
+                    _ = client.SubscribeStateChanges();
+                    await using var owned = client.SubscribeStateChanges();
+                    SubscribeStateChanges();
+                }
+                public static int SubscribeStateChanges() => 0;
+                public static ZooKeeperStateSubscription Retain(ZooKeeperClient client)
+                {
+                    ZooKeeperStateSubscription _;
+                    _ = client.SubscribeStateChanges();
+                    return _;
+                }
+            }
+            """,
+            new DiscardedWatchAnalyzer()
+        );
+        Assert.Equal(2, diagnostics.Length);
+        Assert.All(diagnostics, diagnostic => Assert.Equal("ZKL0007", diagnostic.Id));
+    }
+
+    [Fact]
+    [Trait("Acceptance", "T41")]
     public async Task DiscardedWatchCoversDirectAwaitedAndDiscardAssignmentPatterns()
     {
         var diagnostics = await AnalyzerTestHarness.AnalyzeAsync(

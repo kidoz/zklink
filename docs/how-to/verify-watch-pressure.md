@@ -48,12 +48,11 @@ events still require rereading application state.
 
 ## Explicit overflow
 
-A separate owner uses `MaxBufferedEvents=10`. An unread initial state snapshot
-and nine watch entries fill this shared budget exactly. Ordinary work must still
-succeed at that boundary. Creating a sibling then matches only the recursive
-handle and requires one additional entry. That single entry must fault the owner
-with `ZooKeeperEventOverflowException`, proving that the unread state snapshot
-participates in the same limit as watch entries.
+A separate owner uses `MaxBufferedEvents=9`. Nine watch entries fill the watch
+budget while an initial state snapshot stays unread in its own queue. The
+backlog gauge reads ten and ordinary work still succeeds. Creating a sibling
+matches only the recursive handle. This tenth watch entry exceeds the watch
+budget and faults the owner with `ZooKeeperEventOverflowException`.
 
 The test requires:
 

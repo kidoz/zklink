@@ -8,7 +8,7 @@ Look up the repository's current code, tooling, and verification scope.
   blockers and the requirements for qualifying the final core package.
 - [Development reference](development.md) — SDK, commands, test projects, fixture
   settings, and repository layout.
-- [Analyzer rules](../../src/ZkLink.Analyzers/README.md) — ZKL0001–ZKL0006,
+- [Analyzer rules](../../src/ZkLink.Analyzers/README.md) — ZKL0001–ZKL0007,
   security/async usage checks, consumption and verification scope.
 - [Dependency injection](../../src/ZkLink.Extensions.DependencyInjection/README.md) —
   constructor injection, host ownership, readiness and shutdown.

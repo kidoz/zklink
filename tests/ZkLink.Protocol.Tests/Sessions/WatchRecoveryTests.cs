@@ -53,6 +53,69 @@ public sealed class WatchRecoveryTests : IAsyncLifetime
             peer.Dispose();
     }
 
+    [Fact(Timeout = 60_000)]
+    [Trait("Acceptance", "T31")]
+    public async Task UnreadSubscriptionDoesNotInterruptTenThousandTransitionsOrWatchDelivery()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var read = Client.ExistsAndWatchAsync("/node", token);
+        First.Reply(
+            await SessionTestSupport.NextAsync(First).ConfigureAwait(true),
+            (int)ZooKeeperErrorCode.NoNode
+        );
+        var watch = (await read.ConfigureAwait(true)).Watch;
+        var initial = Client.Session;
+        var stalled = Client.SubscribeStateChanges();
+        await using var stalledLifetime = stalled.ConfigureAwait(true);
+        var healthy = Client.SubscribeStateChanges();
+        await using var reader = healthy.ReadStatesAsync(token).GetAsyncEnumerator(token);
+        Assert.True(await reader.MoveNextAsync().ConfigureAwait(true));
+        Assert.Same(initial, reader.Current);
+
+        ZooKeeperSessionState[] recovery =
+        [
+            ZooKeeperSessionState.Disconnected,
+            ZooKeeperSessionState.Connecting,
+            ZooKeeperSessionState.Authenticating,
+            ZooKeeperSessionState.Restoring,
+            ZooKeeperSessionState.Connected,
+        ];
+        ZooKeeperEndpoint[] endpoints = [new("first", 2181), new("second", 2181)];
+        var peer = First;
+        for (int cycle = 0; cycle < 10_000 / recovery.Length; cycle++)
+        {
+            // Start a fresh endpoint cycle so the virtual clock never waits for a retry delay.
+            await Client.UpdateEndpointsAsync(endpoints, token).ConfigureAwait(true);
+            var next = Peer(restores: true);
+            Assert.True(_fixture.Connector.Attempts.Reader.TryRead(out _));
+            _fixture.Connector.Add(next);
+            peer.Drop();
+            foreach (var state in recovery)
+            {
+                Assert.True(await reader.MoveNextAsync().ConfigureAwait(true));
+                Assert.Equal(state, reader.Current.State);
+            }
+            peer = next;
+        }
+        Assert.Equal(initial.SessionId, Client.Session.SessionId);
+        Assert.Equal(initial.ConnectionGeneration + 2000, Client.Session.ConnectionGeneration);
+        var bytes = new byte[PacketBytes];
+        var writer = new JuteWriter(bytes, ProtocolFixtures.Limits);
+        writer.WriteReplyHeader(
+            new ReplyHeader(WatchProtocol.NotificationXid, Watermark, WatchProtocol.Success)
+        );
+        writer.WriteInt32((int)ZooKeeperWatchEventKind.NodeCreated);
+        writer.WriteInt32(WatchProtocol.ServerConnected);
+        writer.WriteString("/node");
+        peer.Inject(bytes[..writer.WrittenCount]);
+        await using var events = watch.ReadEventsAsync(token).GetAsyncEnumerator(token);
+        Assert.True(await events.MoveNextAsync().ConfigureAwait(true));
+        Assert.Equal(watch.RegistrationId, events.Current.RegistrationId);
+        Assert.False(await events.MoveNextAsync().ConfigureAwait(true));
+        peer.ReplyApplications = true;
+        await Client.SyncAsync("/barrier", token).ConfigureAwait(true);
+    }
+
     [Fact(Timeout = TestTimeoutMilliseconds)]
     [Trait("Acceptance", "T26")]
     [Trait("Acceptance", "T27")]

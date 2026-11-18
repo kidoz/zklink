@@ -23,14 +23,16 @@ fi
 
 if dotnet build "$task_consumer" -c Release --no-restore -p:DefineConstants=EXPECT_ANALYZER_DIAGNOSTIC > "$task_output/diagnostic-consumer.log" 2>&1; then
     cat "$task_output/diagnostic-consumer.log"
-    echo "The analyzer package consumer unexpectedly compiled an unobserved call." >&2
+    echo "The analyzer package consumer unexpectedly compiled discarded results." >&2
     exit 1
 fi
 
-if ! grep -q "error ZKL0004" "$task_output/diagnostic-consumer.log"; then
-    cat "$task_output/diagnostic-consumer.log"
-    echo "The analyzer package consumer failed without the expected ZKL0004 diagnostic." >&2
-    exit 1
-fi
+for diagnostic in ZKL0004 ZKL0007; do
+    if ! grep -q "error ${diagnostic}" "$task_output/diagnostic-consumer.log"; then
+        cat "$task_output/diagnostic-consumer.log"
+        echo "The analyzer package consumer failed without the expected ${diagnostic} diagnostic." >&2
+        exit 1
+    fi
+done
 
-echo "Analyzer package consumer passed clean and ZKL0004 diagnostic checks. Artifacts: $task_output"
+echo "Analyzer package consumer passed clean and ZKL0004/ZKL0007 diagnostic checks. Artifacts: $task_output"

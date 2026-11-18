@@ -63,4 +63,13 @@ internal static class ZkLinkDiagnosticDescriptors
         isEnabledByDefault: true,
         description: "Blocking on network operations can exhaust threads and deadlock. Await the operation instead."
     );
+
+    internal static readonly DiagnosticDescriptor DiscardedStateSubscription = new(
+        "ZKL0007",
+        "Retain the ZooKeeper state subscription",
+        "Retain and dispose the subscription returned by SubscribeStateChanges",
+        "Usage",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true
+    );
 }

@@ -679,7 +679,7 @@ public sealed class WatchApiTests : IAsyncLifetime
     }
 
     [Fact(Timeout = TestTimeoutMilliseconds)]
-    public async Task WatchAndStateQueuesUseTheSameGlobalEventBudget()
+    public async Task UnreadInitialStateDoesNotUseWatchCapacity()
     {
         var fixture = new SessionFixture();
         await using var fixtureLifetime = fixture.ConfigureAwait(true);
@@ -703,15 +703,14 @@ public sealed class WatchApiTests : IAsyncLifetime
         );
         var watched = await pending.ConfigureAwait(true);
         Notify(peer, ZooKeeperWatchEventKind.NodeCreated, "/node");
-        await SessionTestSupport.Bounded(client.Manager.Completion).ConfigureAwait(true);
-        Assert.Equal(ZooKeeperSessionState.Faulted, client.Session.State);
         var events = watched
             .Watch.ReadEventsAsync(TestContext.Current.CancellationToken)
             .GetAsyncEnumerator(TestContext.Current.CancellationToken);
         await using var lifetime = events.ConfigureAwait(true);
-        await Assert
-            .ThrowsAsync<ZooKeeperEventOverflowException>(() => events.MoveNextAsync().AsTask())
-            .ConfigureAwait(true);
+        Assert.True(await events.MoveNextAsync().ConfigureAwait(true));
+        Assert.Equal("/node", events.Current.Path);
+        Assert.False(await events.MoveNextAsync().ConfigureAwait(true));
+        Assert.Equal(ZooKeeperSessionState.Connected, client.Session.State);
     }
 
     [Fact(Timeout = TestTimeoutMilliseconds)]

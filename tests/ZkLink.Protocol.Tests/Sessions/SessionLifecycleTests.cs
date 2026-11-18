@@ -421,38 +421,42 @@ public sealed class SessionLifecycleTests : IAsyncLifetime
 
     [Fact(Timeout = 10000)]
     [Trait("Acceptance", "T31")]
-    public async Task StateOverflowIsExplicitTerminalAndIndependentOfAStalledConsumer()
+    public async Task FullStateSubscriptionDrainsBeforeItsOwnOverflowAndReleasesAdmission()
     {
+        var token = TestContext.Current.CancellationToken;
         var peer = Peer();
-        var client = await SessionTestSupport
-            .Bounded(
-                _fixture.ConnectAsync(
-                    peer,
-                    SessionFixture.Options(events: 1),
-                    TestContext.Current.CancellationToken
-                )
+        var client = await _fixture
+            .ConnectAsync(
+                peer,
+                SessionFixture.Options(events: 1, connection: "first:2181,second:2181"),
+                token
             )
             .ConfigureAwait(true);
         var subscription = client.SubscribeStateChanges();
-        peer.Drop();
-        await SessionTestSupport.Bounded(client.Manager.Completion).ConfigureAwait(true);
-        // A reader waking after terminal cleanup observes the stored initial state then the explicit gap/fault.
         await using var lifetime = subscription.ConfigureAwait(true);
-        await Assert
-            .ThrowsAsync<ZooKeeperEventOverflowException>(async () =>
-            {
-                await foreach (
-                    var _ in subscription
-                        .ReadStatesAsync(TestContext.Current.CancellationToken)
-                        .ConfigureAwait(true)
-                ) { }
-            })
+        Assert.Throws<ZooKeeperEventOverflowException>(() => client.SubscribeStateChanges());
+        Assert.Equal(ZooKeeperSessionState.Connected, client.Session.State);
+        var next = Peer();
+        next.ReplyHandshake = false;
+        _fixture.Connector.Add(next);
+        peer.Drop();
+        Assert.True((await SessionTestSupport.NextAsync(next).ConfigureAwait(true)).Handshake);
+
+        next.HandshakeReply();
+        await client.WaitForConnectionAsync(token).ConfigureAwait(true);
+        var replacement = client.SubscribeStateChanges();
+        await using var replacementReader = replacement
+            .ReadStatesAsync(token)
+            .GetAsyncEnumerator(token);
+        Assert.True(await replacementReader.MoveNextAsync().ConfigureAwait(true));
+        Assert.Equal(ZooKeeperSessionState.Connected, replacementReader.Current.State);
+
+        await using var reader = subscription.ReadStatesAsync(token).GetAsyncEnumerator(token);
+        Assert.True(await reader.MoveNextAsync().ConfigureAwait(true));
+        Assert.Equal(ZooKeeperSessionState.Connected, reader.Current.State);
+        var failure = await Assert
+            .ThrowsAsync<ZooKeeperEventOverflowException>(() => reader.MoveNextAsync().AsTask())
             .ConfigureAwait(true);
-        Assert.Equal(ZooKeeperSessionState.Faulted, client.Session.State);
-        await Assert
-            .ThrowsAsync<ZooKeeperEventOverflowException>(() =>
-                client.WaitForConnectionAsync(TestContext.Current.CancellationToken)
-            )
-            .ConfigureAwait(true);
+        Assert.Equal(ZooKeeperSessionState.Disconnected, failure.State);
     }
 }

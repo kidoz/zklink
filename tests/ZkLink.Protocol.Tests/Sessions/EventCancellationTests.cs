@@ -16,8 +16,8 @@ public sealed class EventCancellationTests
     {
         var gate = new object();
         var initial = Snapshot();
-        var hub = new StateHub(gate, new EventBudget(gate, 4), initial);
-        await using var subscription = hub.Subscribe()!;
+        var hub = new StateHub(gate, 4, initial, new TelemetryState());
+        await using var subscription = hub.Subscribe();
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(
             TestContext.Current.CancellationToken
         );

@@ -511,7 +511,7 @@ public sealed class TelemetryTests
 
     [Fact(Timeout = TestTimeoutMilliseconds)]
     [Trait("Acceptance", "T34")]
-    public async Task EventOverflowAndDisposalBalanceTheSharedBacklog()
+    public async Task DetachedStateSubscriptionReleasesItsBacklogAndCountsOneOverflow()
     {
         using var capture = new TelemetryCapture();
         await ZooKeeperTelemetry
@@ -532,11 +532,11 @@ public sealed class TelemetryTests
         capture.Collect();
         double overflows = capture.Value("zklink.event.overflows");
         Assert.True(capture.Value("zklink.events.backlog") >= 1);
-        peer.Drop();
-        await SessionTestSupport.Bounded(client.Manager.Completion).ConfigureAwait(true);
+        await client.CloseAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
         capture.Collect();
         Assert.Equal(overflows + 1, capture.Value("zklink.event.overflows"));
-        Assert.Equal(ZooKeeperSessionState.Faulted, client.Session.State);
+        Assert.Equal(0, capture.Value("zklink.events.backlog"));
+        Assert.Equal(ZooKeeperSessionState.Closed, client.Session.State);
         await client.DisposeAsync().ConfigureAwait(true);
         capture.Collect();
         Assert.Equal(0, capture.Value("zklink.events.backlog"));

@@ -62,8 +62,8 @@ in seconds. Current values aggregate clients without a client or session label.
 | `zklink.heartbeat.roundtrip` | Histogram | Writer selection through a valid ping acknowledgment |
 | `zklink.watches.active` | Observable up/down counter | Acknowledged, active logical watch registrations |
 | `zklink.watches.rejected_notifications` | Observable counter | Node notifications discarded because the path is missing, invalid, or outside the client's chroot. Includes notifications received during watch restoration. Counted once per notification, without tags. |
-| `zklink.events.backlog` | Observable up/down counter | Buffered watch and state events, including initial state snapshots |
-| `zklink.event.overflows` | Observable counter | Client event-budget faults |
+| `zklink.events.backlog` | Observable up/down counter | Client-owned buffered watch events and state snapshots, including initial snapshots. Detaching an overflowing state subscription removes its buffered prefix from this gauge. |
+| `zklink.event.overflows` | Observable counter | Watch-budget faults and state subscriptions detached due to queue overflow |
 | `zklink.telemetry.dropped` | Observable counter | Diagnostic records rejected by the bounded dispatcher |
 | `zklink.telemetry.listener_errors` | Observable counter | Diagnostic deliveries interrupted by a listener exception |
 

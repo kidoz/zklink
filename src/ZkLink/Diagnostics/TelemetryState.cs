@@ -26,10 +26,10 @@ internal sealed class TelemetryState
             Update(ref _watches, _watches + delta, ref ZooKeeperTelemetry.Watches);
     }
 
-    internal void Backlog(int count)
+    internal void BacklogDelta(long delta)
     {
         if (!_disposed)
-            Update(ref _backlog, count, ref ZooKeeperTelemetry.Backlog);
+            Update(ref _backlog, _backlog + delta, ref ZooKeeperTelemetry.Backlog);
     }
 
     internal void State(ZooKeeperSessionState state, TimeProvider time)
@@ -65,7 +65,7 @@ internal sealed class TelemetryState
         State(ZooKeeperSessionState.Closed, time);
         Requests(0, 0, 0);
         Update(ref _watches, 0, ref ZooKeeperTelemetry.Watches);
-        Backlog(0);
+        BacklogDelta(-_backlog);
         _disposed = true;
     }
 

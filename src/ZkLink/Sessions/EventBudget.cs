@@ -2,7 +2,7 @@ using ZkLink.Diagnostics;
 
 namespace ZkLink.Sessions;
 
-// Shared by state and watch queues; all access is serialized by the session gate.
+// Shared by watch queues; all access is serialized by the session gate.
 internal sealed class EventBudget(object gate, int limit, TelemetryState? telemetry = null)
 {
     private int _used;
@@ -14,7 +14,7 @@ internal sealed class EventBudget(object gate, int limit, TelemetryState? teleme
         if (count > Limit - _used)
             return false;
         _used += count;
-        telemetry?.Backlog(_used);
+        telemetry?.BacklogDelta(count);
         return true;
     }
 
@@ -22,6 +22,6 @@ internal sealed class EventBudget(object gate, int limit, TelemetryState? teleme
     {
         SessionGate.RequireHeld(gate);
         _used -= count;
-        telemetry?.Backlog(_used);
+        telemetry?.BacklogDelta(-count);
     }
 }

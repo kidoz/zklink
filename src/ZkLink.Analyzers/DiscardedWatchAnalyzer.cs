@@ -3,16 +3,20 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace ZkLink.Analyzers;
 
-/// <summary>Reports directly discarded watch-producing calls.</summary>
+/// <summary>Reports directly discarded watches and state subscriptions.</summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class DiscardedWatchAnalyzer : DiagnosticAnalyzer
 {
     /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
-    [ZkLinkDiagnosticDescriptors.DiscardedWatch];
+    [
+        ZkLinkDiagnosticDescriptors.DiscardedWatch,
+        ZkLinkDiagnosticDescriptors.DiscardedStateSubscription,
+    ];
 
     /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
@@ -36,7 +40,7 @@ public sealed class DiscardedWatchAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeExpressionStatement(SyntaxNodeAnalysisContext context)
     {
         var statement = (ExpressionStatementSyntax)context.Node;
-        ReportIfWatch(context, statement.Expression);
+        ReportDiscard(context, statement.Expression);
     }
 
     private static void AnalyzeDiscardAssignment(SyntaxNodeAnalysisContext context)
@@ -45,13 +49,15 @@ public sealed class DiscardedWatchAnalyzer : DiagnosticAnalyzer
         if (
             assignment.Left is IdentifierNameSyntax identifier
             && identifier.Identifier.ValueText == "_"
+            && context.SemanticModel.GetOperation(identifier, context.CancellationToken)
+                is IDiscardOperation
         )
         {
-            ReportIfWatch(context, assignment.Right);
+            ReportDiscard(context, assignment.Right);
         }
     }
 
-    private static void ReportIfWatch(
+    private static void ReportDiscard(
         SyntaxNodeAnalysisContext context,
         ExpressionSyntax expression
     )
@@ -60,18 +66,35 @@ public sealed class DiscardedWatchAnalyzer : DiagnosticAnalyzer
         if (
             invocation is null
             || context.SemanticModel.GetSymbolInfo(invocation).Symbol is not IMethodSymbol method
-            || !ZkLinkAnalyzerHelpers.IsWatchFactory(method)
         )
         {
             return;
         }
 
-        context.ReportDiagnostic(
-            Diagnostic.Create(
-                ZkLinkDiagnosticDescriptors.DiscardedWatch,
-                expression.GetLocation(),
-                method.Name
+        if (ZkLinkAnalyzerHelpers.IsWatchFactory(method))
+        {
+            context.ReportDiagnostic(
+                Diagnostic.Create(
+                    ZkLinkDiagnosticDescriptors.DiscardedWatch,
+                    expression.GetLocation(),
+                    method.Name
+                )
+            );
+        }
+        else if (
+            ZkLinkAnalyzerHelpers.IsMethod(
+                method,
+                ZkLinkAnalyzerHelpers.ClientType,
+                "SubscribeStateChanges"
             )
-        );
+        )
+        {
+            context.ReportDiagnostic(
+                Diagnostic.Create(
+                    ZkLinkDiagnosticDescriptors.DiscardedStateSubscription,
+                    expression.GetLocation()
+                )
+            );
+        }
     }
 }
