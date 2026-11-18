@@ -126,10 +126,7 @@ internal static class ReplyCodec
         memberSessionError = 0;
         const int multiHeaderBytes = sizeof(int) + sizeof(byte) + sizeof(int);
         int availableHeaders = reader.Remaining / multiHeaderBytes;
-        if (
-            count > limits.MaxCollectionElements
-            || (!request.ReadOnly && availableHeaders <= count)
-        )
+        if (count > limits.MaxCollectionElements)
         {
             throw new InvalidDataException("Invalid or excessive expected multi count.");
         }
@@ -152,11 +149,7 @@ internal static class ReplyCodec
                 {
                     throw new InvalidDataException("Inconsistent multi error fields.");
                 }
-                memberSessionError = SelectMemberSessionError(
-                    memberSessionError,
-                    bodyError,
-                    request.ReadOnly
-                );
+                memberSessionError = SelectMemberSessionError(memberSessionError, bodyError);
                 results[i] = new WireMultiMember(type, bodyError, new ErrorResult(bodyError));
                 continue;
             }
@@ -196,17 +189,16 @@ internal static class ReplyCodec
         return new MultiResult(results, memberSessionError);
     }
 
-    private static int SelectMemberSessionError(int current, int error, bool readOnly) =>
+    private static int SelectMemberSessionError(int current, int error) =>
         (ZooKeeperErrorCode)error switch
         {
             ZooKeeperErrorCode.SessionExpired
             or ZooKeeperErrorCode.AuthFailed
             or ZooKeeperErrorCode.SessionClosedRequiresSaslAuth
                 when current == 0
-                    || readOnly
-                        && (ZooKeeperErrorCode)current
-                            is ZooKeeperErrorCode.SessionMoved
-                                or ZooKeeperErrorCode.UnknownSession => error,
+                    || (ZooKeeperErrorCode)current
+                        is ZooKeeperErrorCode.SessionMoved
+                            or ZooKeeperErrorCode.UnknownSession => error,
             ZooKeeperErrorCode.SessionMoved
             or ZooKeeperErrorCode.UnknownSession when current == 0 => error,
             _ => current,

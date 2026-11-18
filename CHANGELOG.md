@@ -24,9 +24,11 @@ broader security, Native AOT or production qualification. See
   reply. The call reports `RequestOutcome.Unknown` because the server may already
   have applied the write. The driver never replays it.
 
-- Fail a read batch with `ZooKeeperProtocolException` when its matched success
-  reply contains an invalid member or terminator. Queued requests can continue
-  on the same connection. An explicit session-expiry error still ends the session.
+- Fail `MultiAsync` and `MultiReadAsync` with `ZooKeeperProtocolException` when
+  a matched success reply contains an invalid member or terminator. A write
+  transaction may have committed, so its outcome is `Unknown` and the driver
+  never replays it. Queued requests can continue on the same connection. An
+  explicit session-expiry error still ends the session.
 
 - Keep watches active and the session connected when the server sends a valid
   watch notification for a path outside the client's chroot.

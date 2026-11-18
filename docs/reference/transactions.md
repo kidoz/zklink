@@ -79,9 +79,15 @@ results. Later members may report `RuntimeInconsistency` after the actual failur
 Unknown numeric codes remain inspectable.
 
 An error in the outer reply can lack member diagnostics and uses the ordinary
-request exception. A malformed write transaction reply faults the connection.
-Session-ending member errors revoke readiness
-before the observed result completes; `NoAuth` alone does not end the session.
+request exception. Session-ending member errors revoke readiness before the
+observed result completes. A `NoAuth` error alone leaves the session connected.
+
+If a complete success reply matches the transaction ID but its body is malformed,
+`MultiAsync` throws `ZooKeeperProtocolException` with the original request ID
+and outcome `Unknown`. The transaction may have committed. The driver returns
+no partial results or member diagnostics and never replays the transaction.
+Queued requests continue on the same connection unless a fully decoded member
+reported a session or connection failure.
 
 Cancellation before send reports `NotSent`. Cancellation or missing reply after
 transmission begins reports `Unknown`, because the transaction may have committed.

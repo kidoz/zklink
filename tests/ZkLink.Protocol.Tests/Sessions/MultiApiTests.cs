@@ -1,8 +1,11 @@
 using NSubstitute;
+using ZkLink.Diagnostics;
 using ZkLink.Protocol;
+using ZkLink.Testing;
 
 namespace ZkLink.Protocol.Tests.Sessions;
 
+[Collection("Telemetry")]
 public sealed class MultiApiTests : IAsyncLifetime
 {
     private readonly SessionFixture _fixture = new();
@@ -396,38 +399,96 @@ public sealed class MultiApiTests : IAsyncLifetime
         Assert.Equal(0, Client.Manager.Scheduler.PendingCount);
     }
 
-    [Fact(Timeout = 10000)]
-    public async Task ZeroErrorPlaceholderWithoutAWriteResultFaultsTheProtocol()
-    {
-        var pending = Client.MultiAsync(
-            [ZooKeeperWriteOperation.Check("/node", ZNodeVersion.Any)],
-            TestContext.Current.CancellationToken
-        );
-        var packet = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
-        Inject(packet, [new(-1, 0, new ErrorResult(0))]);
-        await SessionTestSupport.Bounded(Client.Manager.Completion).ConfigureAwait(true);
-        await Assert.ThrowsAsync<ZooKeeperException>(() => pending).ConfigureAwait(true);
-        Assert.Equal(ZooKeeperSessionState.Faulted, Client.Session.State);
-    }
-
     [Theory(Timeout = 10000)]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task ExpiryMemberBeforePrematureReadTerminatorStillEndsSession(bool movedFirst)
+    [Trait("Acceptance", "T18")]
+    public async Task MalformedWriteReplyFailsOnlyTheTransactionWithoutReplay(bool earlyTerminator)
     {
-        var operations = new List<ZooKeeperReadOperation>();
+        const string counter = "zklink.protocol.rejected_replies";
+        var token = TestContext.Current.CancellationToken;
+        var generation = Client.Session.ConnectionGeneration;
+        using var capture = new TelemetryCapture();
+        await ZooKeeperTelemetry.FlushAsync(token).ConfigureAwait(true);
+        capture.Collect();
+        double before = capture.Value(counter);
+
+        var pending = Client.MultiAsync(
+            [
+                ZooKeeperWriteOperation.Create(
+                    "/seq-",
+                    null,
+                    new CreateOptions(Create.Acl, CreateMode.PersistentSequential)
+                ),
+                ZooKeeperWriteOperation.Check("/node", ZNodeVersion.Any),
+            ],
+            token
+        );
+        var packet = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        Assert.Equal((int)ZooKeeperOperation.Multi, packet.Opcode);
+        var next = Client.SyncAsync("/next", token);
+        var first = new WireMultiMember(
+            (int)ZooKeeperOperation.CreateWithStat,
+            0,
+            new PathResult("/app/seq-0000000001", ProtocolFixtures.Stat)
+        );
+        Inject(packet, earlyTerminator ? [first] : [first, new(-1, 0, new ErrorResult(0))]);
+
+        var failure = await Assert
+            .ThrowsAsync<ZooKeeperProtocolException>(() => pending)
+            .ConfigureAwait(true);
+        Assert.Equal(RequestOutcome.Unknown, failure.Outcome);
+        Assert.Equal(packet.Xid, failure.Request.RequestId);
+        Assert.Equal(ZooKeeperOperation.Multi, failure.Request.Operation);
+        Assert.Null(failure.ErrorCode);
+
+        var following = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        Assert.Equal((int)ZooKeeperOperation.Sync, following.Opcode);
+        _peer.Reply(following);
+        await next.ConfigureAwait(true);
+        Assert.Equal(ZooKeeperSessionState.Connected, Client.Session.State);
+        Assert.Equal(generation, Client.Session.ConnectionGeneration);
+        capture.Collect();
+        Assert.Equal(before + 1, capture.Value(counter));
+
+        await Client.CloseAsync(token).ConfigureAwait(true);
+        var close = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        Assert.Equal((int)ZooKeeperOperation.CloseSession, close.Opcode);
+        Assert.Equal(0, _peer.Requests.Count);
+    }
+
+    [Theory(Timeout = 10000)]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    [Trait("Acceptance", "T18")]
+    public async Task ExpiryMemberBeforePrematureTerminatorStillEndsSession(
+        bool readOnly,
+        bool movedFirst
+    )
+    {
+        var paths = new List<string>();
         var members = new List<WireMultiMember>();
         if (movedFirst)
         {
-            operations.Add(ZooKeeperReadOperation.GetData("/moved"));
+            paths.Add("/moved");
             int moved = (int)ZooKeeperErrorCode.SessionMoved;
             members.Add(new(-1, moved, new ErrorResult(moved)));
         }
-        operations.Add(ZooKeeperReadOperation.GetData("/expired"));
-        operations.Add(ZooKeeperReadOperation.GetData("/missing-result"));
+        paths.Add("/expired");
+        paths.Add("/missing-result");
         int expired = (int)ZooKeeperErrorCode.SessionExpired;
         members.Add(new(-1, expired, new ErrorResult(expired)));
-        var pending = Client.MultiReadAsync(operations, TestContext.Current.CancellationToken);
+        var token = TestContext.Current.CancellationToken;
+        Task pending = readOnly
+            ? Client.MultiReadAsync(paths.Select(ZooKeeperReadOperation.GetData).ToArray(), token)
+            : Client.MultiAsync(
+                paths
+                    .Select(static path => ZooKeeperWriteOperation.Check(path, ZNodeVersion.Any))
+                    .ToArray(),
+                token
+            );
         var packet = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
         Inject(packet, members);
         await Assert.ThrowsAsync<ZooKeeperProtocolException>(() => pending).ConfigureAwait(true);

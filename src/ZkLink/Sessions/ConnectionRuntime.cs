@@ -182,7 +182,7 @@ internal sealed class ConnectionRuntime(
                         or SetDataRequest
                         or SetAclRequest
                         or VersionRequest { Type: ZooKeeperOperation.Delete }
-                        or MultiRequest { ReadOnly: true }
+                        or MultiRequest
             )
         {
             // The complete frame matched the FIFO head. These calls have no watch to reconcile.
