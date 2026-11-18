@@ -144,10 +144,14 @@ internal sealed class ConnectionRuntime(
     )
     {
         RequestCodec.ValidateXid(header.Xid, shape.Opcode);
-        WireResult result;
         try
         {
-            result = ReplyCodec.ReadReplyBody(ref input, header, shape, options.Limits);
+            var result = ReplyCodec.ReadReplyBody(ref input, header, shape, options.Limits);
+            if (header.Error == 0)
+            {
+                result = NamespaceTranslator.ToClient(result, shape.Opcode, options.Paths);
+            }
+            return new WireReply(header, result);
         }
         catch (InvalidDataException)
             when (header.Error == 0
@@ -162,20 +166,16 @@ internal sealed class ConnectionRuntime(
                         or PathRequest
                         {
                             Type: ZooKeeperOperation.GetAcl
+                                or ZooKeeperOperation.Sync
                                 or ZooKeeperOperation.GetEphemerals
                                 or ZooKeeperOperation.GetAllChildrenNumber
                         }
                         or EmptyRequest { Type: ZooKeeperOperation.WhoAmI }
             )
         {
-            // The complete frame matched the FIFO head. This read has no watch to reconcile.
+            // The complete frame matched the FIFO head. These calls have no watch to reconcile.
             return new WireReply(header, new InvalidReplyBodyResult());
         }
-        if (header.Error == 0)
-        {
-            result = NamespaceTranslator.ToClient(result, shape.Opcode, options.Paths);
-        }
-        return new WireReply(header, result);
     }
 
     private async Task<RuntimeFailure> WriteAsync(CancellationToken cancellationToken)

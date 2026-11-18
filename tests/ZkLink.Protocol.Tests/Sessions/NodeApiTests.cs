@@ -136,6 +136,39 @@ public sealed class NodeApiTests : IAsyncLifetime
         Assert.Equal(0, Client.Manager.Scheduler.PendingCount);
     }
 
+    [Theory(Timeout = TestTimeoutMilliseconds)]
+    [InlineData("relative")]
+    [InlineData("/app-other/node")]
+    [Trait("Acceptance", "T14")]
+    public async Task InvalidSyncReplyPathFailsOnlyTheMatchedCall(string replyPath)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var generation = Client.Session.ConnectionGeneration;
+        var sync = Client.SyncAsync("/node", token);
+        var packet = await NextPathAsync((int)ZooKeeperOperation.Sync, "/app/node")
+            .ConfigureAwait(true);
+        var next = Client.ExistsAsync("/next", token);
+        _peer.Inject(SessionPeer.Packet(packet.Xid, path: replyPath));
+
+        var failure = await Assert
+            .ThrowsAsync<ZooKeeperProtocolException>(() => sync)
+            .ConfigureAwait(true);
+        Assert.Equal(RequestOutcome.Unknown, failure.Outcome);
+        Assert.Null(failure.ErrorCode);
+        Assert.Equal(packet.Xid, failure.Request.RequestId);
+        Assert.Equal(ZooKeeperOperation.Sync, failure.Request.Operation);
+        Assert.Equal("/node", failure.Request.Path);
+
+        var following = await NextPathAsync((int)ZooKeeperOperation.Exists, "/app/next")
+            .ConfigureAwait(true);
+        Reply(following, new StatResult(Stat));
+        Assert.Equal(PublicStat, await next.ConfigureAwait(true));
+        Assert.Equal(ZooKeeperSessionState.Connected, Client.Session.State);
+        Assert.Equal(generation, Client.Session.ConnectionGeneration);
+        await SessionTestSupport.WaitForBytesReleasedAsync(Client).ConfigureAwait(true);
+        Assert.Equal(0, Client.Manager.Scheduler.PendingCount);
+    }
+
     [Fact(Timeout = 10000)]
     public async Task OnlyExistsConvertsNoNodeToNullAndOtherErrorsPreserveMetadata()
     {
