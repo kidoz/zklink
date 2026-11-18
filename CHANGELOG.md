@@ -9,6 +9,24 @@ broader security, Native AOT or production qualification. See
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-18
+
+### Fixed
+
+- Recognize declared `_` variables through the operation model, so the
+  unobserved-call analyzer no longer treats a real variable named `_` as a
+  discard.
+
+- Resolve cancellation-token availability through enclosing methods. `ZKL0005`
+  respects lambda and local-function parameters and does not inherit a token
+  across a `static` lambda boundary.
+
+- Retry the same session when the connection is interrupted during
+  authentication replay instead of failing it as an unexpected notification.
+
+- Keep close continuations off the caller's synchronization context so
+  `CloseAsync` completes when the caller blocks on that context.
+
 ## [1.1.0] - 2026-11-18
 
 ### Added
