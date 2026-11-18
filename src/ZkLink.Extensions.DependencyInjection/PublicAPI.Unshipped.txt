@@ -3,3 +3,11 @@ ZkLink.Extensions.DependencyInjection.IZooKeeperClientAccessor
 ZkLink.Extensions.DependencyInjection.IZooKeeperClientAccessor.Client.get -> ZkLink.ZooKeeperClient!
 Microsoft.Extensions.DependencyInjection.ZkLinkServiceCollectionExtensions
 static Microsoft.Extensions.DependencyInjection.ZkLinkServiceCollectionExtensions.AddZkLink(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, ZkLink.ZooKeeperClientOptions! options) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+ZkLink.Extensions.DependencyInjection.ZkLinkTerminalPolicy.Recreate = 2 -> ZkLink.Extensions.DependencyInjection.ZkLinkTerminalPolicy
+ZkLink.Extensions.DependencyInjection.ZkLinkTerminalPolicy.StopApplication = 1 -> ZkLink.Extensions.DependencyInjection.ZkLinkTerminalPolicy
+ZkLink.Extensions.DependencyInjection.ZkLinkTerminalPolicy.Fail = 0 -> ZkLink.Extensions.DependencyInjection.ZkLinkTerminalPolicy
+ZkLink.Extensions.DependencyInjection.ZkLinkTerminalPolicy
+ZkLink.Extensions.DependencyInjection.ZkLinkHealthCheck
+ZkLink.Extensions.DependencyInjection.ZkLinkHealthCheck.ZkLinkHealthCheck(ZkLink.Extensions.DependencyInjection.IZooKeeperClientAccessor! accessor) -> void
+ZkLink.Extensions.DependencyInjection.ZkLinkHealthCheck.CheckHealthAsync(Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult>!
+static Microsoft.Extensions.DependencyInjection.ZkLinkServiceCollectionExtensions.AddZkLink(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Func<System.IServiceProvider!, ZkLink.ZooKeeperClientOptions!>! optionsFactory, ZkLink.Extensions.DependencyInjection.ZkLinkTerminalPolicy terminalPolicy = ZkLink.Extensions.DependencyInjection.ZkLinkTerminalPolicy.Fail) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

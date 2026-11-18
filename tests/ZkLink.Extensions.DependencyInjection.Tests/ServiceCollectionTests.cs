@@ -17,7 +17,9 @@ public sealed class ServiceCollectionTests
         );
 
         var services = new ServiceCollection();
-        Assert.Throws<ArgumentNullException>(() => services.AddZkLink(null!));
+        Assert.Throws<ArgumentNullException>(() =>
+            services.AddZkLink((ZooKeeperClientOptions)null!)
+        );
     }
 
     [Fact]
@@ -47,10 +49,16 @@ public sealed class ServiceCollectionTests
         var options = CreateOptions();
         var connectionFactory = Substitute.For<IZkLinkConnectionFactory>();
         services.AddSingleton(connectionFactory);
-        services.AddZkLink(options);
+        var calls = 0;
+        services.AddZkLink(sp =>
+        {
+            Assert.Same(connectionFactory, sp.GetRequiredService<IZkLinkConnectionFactory>());
+            calls++;
+            return options;
+        });
         await using var provider = services.BuildServiceProvider();
 
-        Assert.Same(options, provider.GetRequiredService<ZooKeeperClientOptions>());
+        Assert.Null(provider.GetService<ZooKeeperClientOptions>());
         Assert.Same(connectionFactory, provider.GetRequiredService<IZkLinkConnectionFactory>());
         Assert.Same(
             provider.GetRequiredService<ZkLinkConnectionHost>(),
@@ -63,6 +71,11 @@ public sealed class ServiceCollectionTests
         Assert.Null(provider.GetService<ZooKeeperClient>());
         var error = Assert.Throws<InvalidOperationException>(() => accessor.Client);
         Assert.Contains("after host startup", error.Message, StringComparison.Ordinal);
+        Assert.Equal(0, calls);
+        await provider
+            .GetRequiredService<ZkLinkConnectionHost>()
+            .StartAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(1, calls);
     }
 
     [Fact(Timeout = 10000)]

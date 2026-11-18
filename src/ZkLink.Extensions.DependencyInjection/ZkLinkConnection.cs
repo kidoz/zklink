@@ -4,6 +4,9 @@ internal interface IZkLinkConnection : IAsyncDisposable
 {
     ZooKeeperClient Client { get; }
 
+    Task Completion { get; }
+    ZooKeeperSessionState State { get; }
+
     Task CloseAsync(CancellationToken cancellationToken);
 }
 
@@ -18,6 +21,9 @@ internal sealed class ZkLinkConnection : IZkLinkConnection
     }
 
     public ZooKeeperClient Client { get; }
+
+    public Task Completion => _ownedClient.Manager.Completion;
+    public ZooKeeperSessionState State => _ownedClient.Session.State;
 
     public Task CloseAsync(CancellationToken cancellationToken) =>
         _ownedClient.CloseAsync(cancellationToken);

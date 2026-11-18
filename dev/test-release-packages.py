@@ -34,6 +34,7 @@ class ReleasePackageTests(unittest.TestCase):
         if package_id == "ZkLink.Extensions.DependencyInjection":
             dependencies = (f'<dependency id="ZkLink" version="{core_dependency}"/>'
                             '<dependency id="Microsoft.Extensions.DependencyInjection.Abstractions" version="10.0.14"/>'
+                            '<dependency id="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" version="10.0.14"/>'
                             '<dependency id="Microsoft.Extensions.Hosting.Abstractions" version="10.0.14"/>')
         metadata = (f'<package><metadata><id>{package_id}</id><version>{version}</version><license>MIT</license>'
                     f'<repository url="{release.REPOSITORY}" commit="{self.fixture.REVISION}"/>'

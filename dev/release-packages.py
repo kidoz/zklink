@@ -51,7 +51,7 @@ def inspect_package(path, package_id, version, revision, *, symbols=False):
         dependencies = {item.get("id"): item.get("version") for item in metadata.findall(".//{*}dependency")}
         if package_id == "ZkLink.Extensions.DependencyInjection":
             require(set(dependencies) == {"ZkLink", "Microsoft.Extensions.DependencyInjection.Abstractions",
-                                          "Microsoft.Extensions.Hosting.Abstractions"}, "Unexpected DI dependencies")
+                                          "Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions", "Microsoft.Extensions.Hosting.Abstractions"}, "Unexpected DI dependencies")
             require(dependencies["ZkLink"].strip("[](), ").split(",")[0].strip() == version,
                     "DI package requires a different core version")
         else:

@@ -3,8 +3,10 @@ using Microsoft.Extensions.Hosting;
 namespace ZkLink.Extensions.DependencyInjection;
 
 internal sealed class ZkLinkConnectionHost(
-    ZooKeeperClientOptions options,
-    IZkLinkConnectionFactory connectionFactory
+    Func<ZooKeeperClientOptions> optionsFactory,
+    IZkLinkConnectionFactory connectionFactory,
+    ZkLinkTerminalPolicy terminalPolicy = ZkLinkTerminalPolicy.Fail,
+    IHostApplicationLifetime? application = null
 ) : IHostedService, IAsyncDisposable
 {
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -15,6 +17,8 @@ internal sealed class ZkLinkConnectionHost(
     private readonly SemaphoreSlim _lifetimeGate = new(1, 1);
     private IZkLinkConnection? _connection;
     private LifetimeState _state;
+    private readonly CancellationTokenSource _shutdown = new();
+    private Task _monitor = Task.CompletedTask;
 
     public ZooKeeperClient Client =>
         (
@@ -37,14 +41,69 @@ internal sealed class ZkLinkConnectionHost(
             }
 
             var connection = await connectionFactory
-                .ConnectAsync(options, cancellationToken)
+                .ConnectAsync(optionsFactory(), cancellationToken)
                 .ConfigureAwait(false);
             Volatile.Write(ref _connection, connection);
             _state = LifetimeState.Started;
+            if (terminalPolicy != ZkLinkTerminalPolicy.Fail)
+            {
+                _monitor = MonitorAsync(connection, _shutdown.Token);
+            }
         }
         finally
         {
             _lifetimeGate.Release();
+        }
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "Application options factories may throw arbitrary exceptions. A failed replacement requests host shutdown without logging credentials."
+    )]
+    private async Task MonitorAsync(IZkLinkConnection current, CancellationToken token)
+    {
+        try
+        {
+            while (true)
+            {
+                await current
+                    .Completion.WaitAsync(token)
+                    .ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
+                token.ThrowIfCancellationRequested();
+                if (
+                    current.State
+                    is not (
+                        ZooKeeperSessionState.Expired
+                        or ZooKeeperSessionState.Lost
+                        or ZooKeeperSessionState.AuthFailed
+                        or ZooKeeperSessionState.Faulted
+                    )
+                )
+                {
+                    return;
+                }
+                if (terminalPolicy == ZkLinkTerminalPolicy.StopApplication)
+                {
+                    application!.StopApplication();
+                    return;
+                }
+                var next = await connectionFactory
+                    .ConnectAsync(optionsFactory(), token)
+                    .ConfigureAwait(false);
+                Volatile.Write(ref _connection, next);
+                await current.DisposeAsync().ConfigureAwait(false);
+                current = next;
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception)
+        {
+            // Replacement failed. Leave the terminal session visible for health reporting.
+            if (!token.IsCancellationRequested)
+            {
+                application!.StopApplication();
+            }
         }
     }
 
@@ -58,6 +117,8 @@ internal sealed class ZkLinkConnectionHost(
                 return;
             }
 
+            await _shutdown.CancelAsync().ConfigureAwait(false);
+            await _monitor.ConfigureAwait(false);
             var connection = Interlocked.Exchange(ref _connection, null);
             _state = LifetimeState.Stopped;
             if (connection is not null)
@@ -88,8 +149,11 @@ internal sealed class ZkLinkConnectionHost(
                 return;
             }
 
+            await _shutdown.CancelAsync().ConfigureAwait(false);
+            await _monitor.ConfigureAwait(false);
             var connection = Interlocked.Exchange(ref _connection, null);
             _state = LifetimeState.Disposed;
+            _shutdown.Dispose();
             if (connection is not null)
             {
                 await connection.DisposeAsync().ConfigureAwait(false);

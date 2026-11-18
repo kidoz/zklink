@@ -24,6 +24,22 @@ public static class ZkLinkServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(options);
 
+        return services.AddZkLink(_ => options);
+    }
+
+    /// <summary>Creates private client options at host startup and for each explicitly requested replacement.</summary>
+    public static IServiceCollection AddZkLink(
+        this IServiceCollection services,
+        Func<IServiceProvider, ZooKeeperClientOptions> optionsFactory,
+        ZkLinkTerminalPolicy terminalPolicy = ZkLinkTerminalPolicy.Fail
+    )
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(optionsFactory);
+        if (!Enum.IsDefined(terminalPolicy))
+        {
+            throw new ArgumentOutOfRangeException(nameof(terminalPolicy));
+        }
         if (services.Any(static descriptor => descriptor.ServiceType == typeof(ZkLinkRegistration)))
         {
             throw new InvalidOperationException(
@@ -32,11 +48,17 @@ public static class ZkLinkServiceCollectionExtensions
         }
 
         services.AddSingleton(new ZkLinkRegistration());
-        services.AddSingleton(options);
+        services.TryAddSingleton<ZkLinkHealthCheck>();
         services.TryAddSingleton<IZkLinkConnectionFactory, ZkLinkConnectionFactory>();
         services.AddSingleton(provider => new ZkLinkConnectionHost(
-            options,
-            provider.GetRequiredService<IZkLinkConnectionFactory>()
+            () =>
+                optionsFactory(provider)
+                ?? throw new InvalidOperationException("The ZkLink options factory returned null."),
+            provider.GetRequiredService<IZkLinkConnectionFactory>(),
+            terminalPolicy,
+            terminalPolicy == ZkLinkTerminalPolicy.Fail
+                ? null
+                : provider.GetRequiredService<IHostApplicationLifetime>()
         ));
         services.AddSingleton<IHostedService>(static provider =>
             provider.GetRequiredService<ZkLinkConnectionHost>()

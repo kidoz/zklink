@@ -14,7 +14,7 @@ public sealed class ConnectionLifetimeTests
         var connection = Substitute.For<IZkLinkConnection>();
         var factory = Substitute.For<IZkLinkConnectionFactory>();
         factory.ConnectAsync(options, Arg.Any<CancellationToken>()).Returns(connection);
-        var host = new ZkLinkConnectionHost(options, factory);
+        var host = new ZkLinkConnectionHost(() => options, factory);
         using var cancellation = new CancellationTokenSource();
 
         await host.StartAsync(cancellation.Token);
@@ -96,7 +96,7 @@ public sealed class ConnectionLifetimeTests
         var connection = Substitute.For<IZkLinkConnection>();
         var factory = Substitute.For<IZkLinkConnectionFactory>();
         factory.ConnectAsync(options, Arg.Any<CancellationToken>()).Returns(connection);
-        var host = new ZkLinkConnectionHost(options, factory);
+        var host = new ZkLinkConnectionHost(() => options, factory);
         await host.StartAsync(TestContext.Current.CancellationToken);
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -123,7 +123,7 @@ public sealed class ConnectionLifetimeTests
             TaskCreationOptions.RunContinuationsAsynchronously
         );
         factory.ConnectAsync(options, Arg.Any<CancellationToken>()).Returns(pendingConnection.Task);
-        var host = new ZkLinkConnectionHost(options, factory);
+        var host = new ZkLinkConnectionHost(() => options, factory);
         var start = host.StartAsync(TestContext.Current.CancellationToken);
 
         var shutdown = dispose
@@ -150,7 +150,7 @@ public sealed class ConnectionLifetimeTests
         factory
             .ConnectAsync(options, Arg.Any<CancellationToken>())
             .Returns(Task.FromException<IZkLinkConnection>(new IOException("connect failed")));
-        var host = new ZkLinkConnectionHost(options, factory);
+        var host = new ZkLinkConnectionHost(() => options, factory);
 
         await Assert.ThrowsAsync<IOException>(() =>
             host.StartAsync(TestContext.Current.CancellationToken)
@@ -202,6 +202,77 @@ public sealed class ConnectionLifetimeTests
             .ConnectAsync(null!, TestContext.Current.CancellationToken);
     }
 
+    [Theory(Timeout = 10000)]
+    [InlineData(ZkLinkTerminalPolicy.StopApplication)]
+    [InlineData(ZkLinkTerminalPolicy.Recreate)]
+    public async Task TerminalPolicyObservesOnlyCompletedSessions(ZkLinkTerminalPolicy policy)
+    {
+        var ended = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var observed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var replacementEnd = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        var first = Substitute.For<IZkLinkConnection>();
+        first.Completion.Returns(ended.Task);
+        first.State.Returns(ZooKeeperSessionState.Expired);
+        var replacement = Substitute.For<IZkLinkConnection>();
+        replacement.Completion.Returns(_ =>
+        {
+            observed.TrySetResult();
+            return replacementEnd.Task;
+        });
+        var application = Substitute.For<IHostApplicationLifetime>();
+        application.When(a => a.StopApplication()).Do(_ => observed.TrySetResult());
+        var factory = Substitute.For<IZkLinkConnectionFactory>();
+        var options = CreateOptions();
+        factory.ConnectAsync(options, Arg.Any<CancellationToken>()).Returns(first, replacement);
+        int captures = 0;
+        var host = new ZkLinkConnectionHost(
+            () =>
+            {
+                captures++;
+                return options;
+            },
+            factory,
+            policy,
+            application
+        );
+        await host.StartAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(1, captures);
+        ended.SetResult();
+        await observed.Task.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(policy == ZkLinkTerminalPolicy.Recreate ? 2 : 1, captures);
+        await host.StopAsync(TestContext.Current.CancellationToken);
+        await host.DisposeAsync();
+        if (policy == ZkLinkTerminalPolicy.Recreate)
+        {
+            await replacement.Received(1).DisposeAsync();
+            application.DidNotReceive().StopApplication();
+        }
+        else
+        {
+            application.Received(1).StopApplication();
+        }
+    }
+
+    [Theory]
+    [InlineData(
+        ZooKeeperSessionState.Connected,
+        Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Healthy
+    )]
+    [InlineData(
+        ZooKeeperSessionState.Disconnected,
+        Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded
+    )]
+    [InlineData(
+        ZooKeeperSessionState.Expired,
+        Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy
+    )]
+    public void HealthReflectsSessionState(
+        ZooKeeperSessionState state,
+        Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus status
+    ) => Assert.Equal(status, ZkLinkHealthCheck.ForState(state).Status);
+
     private static (
         ZkLinkConnectionHost Host,
         IZkLinkConnection Connection,
@@ -212,7 +283,7 @@ public sealed class ConnectionLifetimeTests
         var connection = Substitute.For<IZkLinkConnection>();
         var factory = Substitute.For<IZkLinkConnectionFactory>();
         factory.ConnectAsync(options, Arg.Any<CancellationToken>()).Returns(connection);
-        var host = new ZkLinkConnectionHost(options, factory);
+        var host = new ZkLinkConnectionHost(() => options, factory);
         startTask = host.StartAsync(TestContext.Current.CancellationToken);
         return (host, connection, factory);
     }
