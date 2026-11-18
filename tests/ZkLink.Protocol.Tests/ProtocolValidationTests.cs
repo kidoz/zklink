@@ -35,6 +35,28 @@ public sealed class ProtocolValidationTests
     public static IEnumerable<object[]> Names => ProtocolGoldenTests.Names;
 
     [Theory]
+    [InlineData("get-data", -4)]
+    [InlineData("auth", 1)]
+    [Trait("Acceptance", "T04")]
+    public void ValidatedRequestRejectsAnErrorReplyWithAnXidReservedForAnotherOpcode(
+        string name,
+        int wrongXid
+    )
+    {
+        var fixture = ProtocolFixtures.All.Single(item => item.Name == name);
+        var error = ProtocolFixtures.Bytes(name + "-error");
+        BinaryPrimitives.WriteInt32BigEndian(error, wrongXid);
+        Assert.Throws<InvalidDataException>(() =>
+            ReplyCodec.DecodeForValidatedRequest(
+                error,
+                wrongXid,
+                fixture.Request,
+                ProtocolFixtures.Limits
+            )
+        );
+    }
+
+    [Theory]
     [MemberData(nameof(Names))]
     [Trait("Acceptance", "T03")]
     public void AllTruncationsAndUnexpectedTailsAreRejected(string name)

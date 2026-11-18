@@ -11,6 +11,8 @@ broader security, Native AOT or production qualification. See
 
 ### Fixed
 
+- Decode replies to previously encoded requests without measuring their request
+  bodies again. This also applies to authentication and watch restoration replies.
 - Send each ZooKeeper frame in one stream write, including handshakes, requests,
   heartbeats, authentication, watch restoration and close.
 - Reject requests whose encoded length differs from the byte reservation before

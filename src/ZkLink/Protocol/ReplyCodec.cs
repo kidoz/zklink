@@ -12,6 +12,19 @@ internal static class ReplyCodec
     )
     {
         _ = RequestCodec.Measure(expectedXid, request, limits);
+        return DecodeForValidatedRequest(payload, expectedXid, request, limits);
+    }
+
+    // Encoding already checked the request body. The transmitted xid and incoming reply
+    // still need to be checked, including when the server returns an error.
+    internal static WireReply DecodeForValidatedRequest(
+        ReadOnlySpan<byte> payload,
+        int expectedXid,
+        WireRequest request,
+        ProtocolLimits limits
+    )
+    {
+        RequestCodec.ValidateXid(expectedXid, request.Opcode);
         var reader = new JuteReader(payload, limits);
         var header = reader.ReadReplyHeader();
         if (header.Xid != expectedXid)

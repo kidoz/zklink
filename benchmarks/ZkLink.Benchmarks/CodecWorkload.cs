@@ -1,5 +1,6 @@
 using System.Globalization;
 using ZkLink.Protocol;
+using ZkLink.Requests;
 
 namespace ZkLink.Benchmarks;
 
@@ -35,6 +36,7 @@ internal sealed class CodecWorkload
     private const string NodePath = "/benchmark/node";
     private static readonly ProtocolLimits Limits = new();
     private readonly WireRequest _request;
+    private readonly WireRequest _replyShape;
     private readonly byte[] _reply;
     private readonly byte[] _destination;
     private readonly byte[] _data;
@@ -83,6 +85,7 @@ internal sealed class CodecWorkload
             _ => throw new ArgumentOutOfRangeException(nameof(workload)),
         };
         _destination = new byte[RequestCodec.Measure(Xid, _request, Limits)];
+        _replyShape = RequestScheduler.CaptureReplyShape(_request);
         var buffer = new byte[Limits.MaxFrameBytes];
         var writer = new JuteWriter(buffer, Limits);
         writer.WriteInt32(Xid);
@@ -123,7 +126,8 @@ internal sealed class CodecWorkload
 
     internal int Encode() => RequestCodec.Encode(_destination, Xid, _request, Limits);
 
-    internal object Decode() => ReplyCodec.Decode(_reply, Xid, _request, Limits);
+    internal object Decode() =>
+        ReplyCodec.DecodeForValidatedRequest(_reply, Xid, _replyShape, Limits);
 
     private void Validate()
     {

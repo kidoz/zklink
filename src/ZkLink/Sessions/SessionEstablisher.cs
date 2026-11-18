@@ -168,7 +168,12 @@ internal sealed class SessionEstablisher(
                         owner.EstablishmentInbound();
                         continue;
                     }
-                    var acknowledgment = ReplyCodec.Decode(reply, -4, request, options.Limits);
+                    var acknowledgment = ReplyCodec.DecodeForValidatedRequest(
+                        reply,
+                        -4,
+                        request,
+                        options.Limits
+                    );
                     owner.EstablishmentInbound();
                     if (acknowledgment.Header.Error == -112)
                     {
@@ -283,7 +288,7 @@ internal sealed class SessionEstablisher(
                     owner.EstablishmentInbound();
                     continue;
                 }
-                var reply = ReplyCodec.Decode(
+                var reply = ReplyCodec.DecodeForValidatedRequest(
                     packet,
                     WatchProtocol.ResetXid,
                     translated,

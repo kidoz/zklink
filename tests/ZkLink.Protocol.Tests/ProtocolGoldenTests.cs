@@ -45,7 +45,7 @@ public sealed class ProtocolGoldenTests
         );
         Assert.Equal(ProtocolFixtures.Bytes(name + "-request"), encoded);
         ProtocolFixtures.Emit(name + "-request", encoded);
-        var reply = ReplyCodec.Decode(
+        var reply = ReplyCodec.DecodeForValidatedRequest(
             ProtocolFixtures.Bytes(name + "-reply"),
             fixture.Xid,
             fixture.Request,
@@ -53,7 +53,7 @@ public sealed class ProtocolGoldenTests
         );
         Assert.Equal(new ReplyHeader(fixture.Xid, 101, 0), reply.Header);
         ProtocolFixtures.AssertResult(fixture.Result, reply.Result);
-        var error = ReplyCodec.Decode(
+        var error = ReplyCodec.DecodeForValidatedRequest(
             ProtocolFixtures.Bytes(name + "-error"),
             fixture.Xid,
             fixture.Request,

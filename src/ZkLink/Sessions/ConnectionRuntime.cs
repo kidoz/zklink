@@ -106,7 +106,12 @@ internal sealed class ConnectionRuntime(
                         return new(RuntimeStop.Stopped);
                     }
                     var shape = expectedShape!;
-                    var reply = ReplyCodec.Decode(packet, header.Xid, shape, options.Limits);
+                    var reply = ReplyCodec.DecodeForValidatedRequest(
+                        packet,
+                        header.Xid,
+                        shape,
+                        options.Limits
+                    );
                     if (reply.Header.Error == 0)
                     {
                         reply = reply with

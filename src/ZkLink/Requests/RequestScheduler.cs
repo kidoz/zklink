@@ -288,7 +288,7 @@ internal sealed class RequestScheduler(
                     nameof(request)
                 );
             }
-            shape = ReplyShape(translated);
+            shape = CaptureReplyShape(translated);
         }
         catch (Exception error)
         {
@@ -370,14 +370,14 @@ internal sealed class RequestScheduler(
         throw new ZooKeeperOperationCanceledException(info, RequestOutcome.NotSent, token);
     }
 
-    private static WireRequest ReplyShape(WireRequest request) =>
+    internal static WireRequest CaptureReplyShape(WireRequest request) =>
         request switch
         {
             SetDataRequest set => set with { Data = null },
             CreateRequest create => create with { Data = null },
             MultiRequest multi => new MultiRequest(
                 multi.ReadOnly,
-                Array.AsReadOnly(multi.Members.Select(ReplyShape).ToArray())
+                Array.AsReadOnly(multi.Members.Select(CaptureReplyShape).ToArray())
             ),
             _ => request,
         };

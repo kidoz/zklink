@@ -21,7 +21,7 @@ public sealed class AllocationBaselineTests(ITestOutputHelper output)
         for (var i = 0; i < 1000; i++)
         {
             RequestCodec.Encode(destination, 1, request, limits);
-            last = ReplyCodec.Decode(replyBytes, 1, request, limits);
+            last = ReplyCodec.DecodeForValidatedRequest(replyBytes, 1, request, limits);
         }
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var i = 0; i < iterations; i++)
@@ -32,7 +32,7 @@ public sealed class AllocationBaselineTests(ITestOutputHelper output)
         before = GC.GetAllocatedBytesForCurrentThread();
         for (var i = 0; i < iterations; i++)
         {
-            last = ReplyCodec.Decode(replyBytes, 1, request, limits);
+            last = ReplyCodec.DecodeForValidatedRequest(replyBytes, 1, request, limits);
         }
         var decoding = GC.GetAllocatedBytesForCurrentThread() - before;
         GC.KeepAlive(last);
