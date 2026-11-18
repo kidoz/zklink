@@ -235,13 +235,22 @@ public sealed class AuxiliaryApiTests : IAsyncLifetime
     [InlineData(ZooKeeperOperation.WhoAmI, InvalidCountCase)] // Null vector.
     [InlineData(ZooKeeperOperation.WhoAmI, ExcessiveCollectionCase)] // Excessive vector count.
     [InlineData(ZooKeeperOperation.WhoAmI, InvalidStringCase)] // Empty identity scheme.
-    public async Task MalformedAuxiliaryRepliesFaultTheProtocol(
+    [Trait("Acceptance", "T14")]
+    [Trait("Acceptance", "T22")]
+    public async Task MalformedAuxiliaryReplyFailsOnlyTheMatchedQuery(
         ZooKeeperOperation operation,
         int kind
     )
     {
-        Task pending = Submit(operation, TestContext.Current.CancellationToken);
-        var packet = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        var token = TestContext.Current.CancellationToken;
+        var generation = Client.Session.ConnectionGeneration;
+        Task pending = Submit(operation, token);
+        var packet = await NextAsync(
+                operation,
+                operation == ZooKeeperOperation.WhoAmI ? null : "/app/node"
+            )
+            .ConfigureAwait(true);
+        var next = Client.SyncAsync("/later", token);
         var bytes = new byte[MalformedReplyBufferBytes];
         var writer = new JuteWriter(bytes, ProtocolFixtures.Limits);
         writer.WriteReplyHeader(new ReplyHeader(packet.Xid, ReplyZxid, SuccessErrorCode));
@@ -268,9 +277,20 @@ public sealed class AuxiliaryApiTests : IAsyncLifetime
                 writer.WriteString("user");
         }
         _peer.Inject(bytes[..writer.WrittenCount]);
-        await SessionTestSupport.Bounded(Client.Manager.Completion).ConfigureAwait(true);
-        await Assert.ThrowsAsync<ZooKeeperException>(() => pending).ConfigureAwait(true);
-        Assert.Equal(ZooKeeperSessionState.Faulted, Client.Session.State);
+        var failure = await Assert
+            .ThrowsAsync<ZooKeeperProtocolException>(() => pending)
+            .ConfigureAwait(true);
+        Assert.Equal(RequestOutcome.Unknown, failure.Outcome);
+        Assert.Null(failure.ErrorCode);
+        Assert.Equal(operation, failure.Request.Operation);
+        Assert.Equal(packet.Xid, failure.Request.RequestId);
+
+        _peer.Reply(await NextAsync(ZooKeeperOperation.Sync, "/app/later").ConfigureAwait(true));
+        await next.ConfigureAwait(true);
+        Assert.Equal(ZooKeeperSessionState.Connected, Client.Session.State);
+        Assert.Equal(generation, Client.Session.ConnectionGeneration);
+        await SessionTestSupport.WaitForBytesReleasedAsync(Client).ConfigureAwait(true);
+        Assert.Equal(0, Client.Manager.Scheduler.PendingCount);
     }
 
     [Fact]

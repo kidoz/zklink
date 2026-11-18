@@ -52,6 +52,11 @@ Server errors, including `Unimplemented` and unknown numeric codes, preserve
 operation, request ID, endpoint and client-relative path metadata. Identity
 queries have no path. There is no capability probe or fallback traversal.
 
+If a complete reply matches the query and reports success, an invalid body
+(such as a relative ephemeral path, a negative descendant count, or an empty
+identity scheme) fails that query with `ZooKeeperProtocolException` and
+outcome `Unknown`. The next queued request proceeds on the same connection.
+
 Cancellation before transmission reports `NotSent`; after transmission it
 reports `Unknown`, with late replies drained safely. Deadlines and disconnects
 follow the same [request outcome rules](connections.md#state-recovery-and-request-outcomes)

@@ -151,7 +151,14 @@ internal sealed class ConnectionRuntime(
         }
         catch (InvalidDataException)
             when (header.Error == 0
-                && shape is ReadRequest { Type: ZooKeeperOperation.GetChildren, Watch: false }
+                && shape
+                    is ReadRequest { Type: ZooKeeperOperation.GetChildren, Watch: false }
+                        or PathRequest
+                        {
+                            Type: ZooKeeperOperation.GetEphemerals
+                                or ZooKeeperOperation.GetAllChildrenNumber
+                        }
+                        or EmptyRequest { Type: ZooKeeperOperation.WhoAmI }
             )
         {
             // The complete frame matched the FIFO head. This read has no watch to reconcile.
