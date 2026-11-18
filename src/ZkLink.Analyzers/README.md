@@ -23,7 +23,7 @@ No code fixes or automatic retries are supplied. Credential storage, watch owner
 Install the analyzer package for a consuming project with:
 
 ```xml
-<PackageReference Include="ZkLink.Analyzers" Version="1.0.1" PrivateAssets="all" />
+<PackageReference Include="ZkLink.Analyzers" Version="1.1.1" PrivateAssets="all" />
 ```
 
 Reference the analyzer without loading it as a runtime library:

@@ -59,8 +59,7 @@ is unhealthy.
 
 Calling `AddZkLink` twice in one service collection throws. Use an explicitly
 owned client for a separate security or coordination identity. The factory,
-terminal policies and health check are available in the development source
-following the 1.0.3 release.
+terminal policies and health check are included in the published 1.1.1 package.
 
 Native AOT verification uses packed core and DI packages, a rooted analysis
 consumer and an unrooted native host. The host checks constructor injection,
@@ -72,6 +71,10 @@ ZooKeeper 3.8.7 and 3.9.6 with TLS and mTLS. See the
 and evidence scope. This verifies the documented host integration; it does not
 establish compatibility for arbitrary application registrations or dependencies.
 
-The public **1.0.2** packages passed this matrix in
+The published 1.1.1 candidate at `b0f06d4` passed native publication and secure
+live checks on Linux x64/arm64, Windows x64 and macOS arm64
+([candidate run 44317716440](https://github.com/kidoz/zklink/actions/runs/44317716440)).
+Those live checks start this host. The public 1.0.2 packages passed the same
+lifecycle in
 [verification run 42410311495](https://github.com/kidoz/zklink/actions/runs/42410311495):
 all eight jobs passed, with 48 native DI lifecycle cases and no trim/AOT warnings.
