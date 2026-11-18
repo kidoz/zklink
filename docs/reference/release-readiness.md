@@ -8,8 +8,9 @@ installed-consumer checks while sustained qualification remains open.
 
 ## Remaining production qualification
 
-The core targets .NET 10, ZooKeeper **3.8.7 and 3.9.6**, and Linux x64/arm64,
-Windows x64 and macOS arm64. Existing scoped managed/native results do not close
+The core targets ZooKeeper **3.8.7 and 3.9.6** on Linux x64/arm64, Windows x64
+and macOS arm64. Managed package checks cover .NET 10 and .NET 11 applications.
+Existing scoped managed/native results do not close
 all production requirements. Optional DI and analyzers have their own evidence;
 arbitrary application dependencies are outside the native host checks.
 

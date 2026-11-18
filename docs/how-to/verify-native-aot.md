@@ -1,6 +1,6 @@
 # Verify Native AOT consumers
 
-Use .NET SDK **10.0.403**, Python 3.12 or newer and the host's native compiler:
+Use .NET SDK **11.0.100**, the **.NET 10 runtime**, Python 3.12 or newer, and the host's native compiler:
 Xcode Command Line Tools on macOS, Visual Studio's Desktop development with C++
 workload on Windows, or Clang and zlib development headers on Linux.
 See [Microsoft's native prerequisites](https://learn.microsoft.com/dotnet/core/deploying/native-aot/#prerequisites).
@@ -13,6 +13,14 @@ The equivalent is `python3 dev/prepare-aot.py`; use `python` on Windows. An opti
 argument selects the expected host RID: `linux-x64`, `linux-arm64`, `win-x64` or
 `osx-arm64`. A mismatched host fails before publication. The command prints its
 `artifacts/aot/run.*/native.json` path.
+
+The default consumer target is `net10.0`. To publish and exercise `net11.0`
+consumers, set `ZKLINK_AOT_TARGET_FRAMEWORK=net11.0`. For example, on macOS with
+the portable Java fixture prerequisites below:
+
+```sh
+ZKLINK_AOT_TARGET_FRAMEWORK=net11.0 just aot-portable-check
+```
 
 The command packs and inspects local core and dependency-injection candidates at
 the same source revision and version, then publishes two independent executables.
@@ -30,9 +38,9 @@ To verify an already published version, set `ZKLINK_AOT_PUBLISHED_VERSION`, for
 example `ZKLINK_AOT_PUBLISHED_VERSION=1.0.3 just aot-check` on macOS/Linux. The
 publisher downloads the core and DI packages from NuGet's public feed, checks their
 shared source revision/version and records their package and compiler-input hashes.
-`just aot-portable-check` supports the same setting. The Native AOT workflow also
-accepts a `published_version` when dispatched manually. Published-package checks
-record the package source revision separately from the test-harness revision.
+`just aot-portable-check` supports the same setting. A manual Native AOT workflow
+run can select `target_framework` and `published_version`. Published-package
+checks record the package source revision separately from the test-harness revision.
 
 Each secure native smoke case also starts a real DI host using `AddZkLink` and a
 constructor-injected `IZooKeeperClientAccessor`. It checks access before startup

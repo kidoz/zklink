@@ -1,6 +1,6 @@
 # Verify a local core package
 
-Run package inspection from the repository root with .NET SDK **10.0.403** and
+Run package inspection from the repository root with .NET SDK **11.0.100**, the **.NET 10 runtime**, and
 Python 3.12 or newer. Docker, Bash and OpenSSL are unnecessary for this command:
 
 ```sh
@@ -55,8 +55,8 @@ A standalone copy of the basic sample sources compiles with a `PackageReference`
 to this candidate. A fresh package cache, exact version constraint and local-only
 package source prevent reuse of an older candidate. Its generated dependency
 lock is restored again in locked mode. The check requires package-only compile
-and runtime assets, compares the output DLL with the package, and verifies the
-actually loaded assembly hash without connecting. The consumer's exact
+and runtime assets for both `net10.0` and `net11.0`, compares each output DLL
+with the same package asset, and verifies the loaded assembly hash without connecting. The consumer's exact
 `--package-check` mode exits after this identity check, before reading connection
 settings or credentials. An incorrect expected assembly hash must fail.
 
@@ -79,7 +79,7 @@ candidate. The release workflow publishes the exact package and symbols that
 this complete command verifies. Failed fixture cleanup returns a nonzero exit
 code.
 
-The installed consumer runs node operations, transactions, auxiliary queries and
+The .NET 10 and .NET 11 consumers run node operations, transactions, auxiliary queries and
 one-shot, persistent and recursive watch examples against every node of isolated
 three-node ZooKeeper **3.8.7** and **3.9.6** ensembles. Each case uses fresh digest
 credentials, explicitly selected local plaintext, disposable ephemeral nodes,

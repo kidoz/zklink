@@ -1,6 +1,6 @@
 # ZkLink
 
-A managed asynchronous client for Apache ZooKeeper, targeting .NET 10.
+A managed asynchronous client for Apache ZooKeeper, for applications targeting .NET 10 or .NET 11.
 The core has no third-party runtime dependencies.
 
 ```sh

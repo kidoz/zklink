@@ -5,6 +5,11 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      target_framework:
+        description: Target framework for the Native AOT consumers
+        type: choice
+        options: [net10.0, net11.0]
+        default: net10.0
       published_version:
         description: Published NuGet version to verify (empty builds source candidates)
         required: false
@@ -32,6 +37,7 @@ env:
   ZKLINK_CANDIDATE_MANIFEST_SHA256: ${{ inputs.candidate_manifest_sha256 }}
   PYTHONDONTWRITEBYTECODE: '1'
   ZKLINK_AOT_PUBLISHED_VERSION: ${{ inputs.published_version || '' }}
+  ZKLINK_AOT_TARGET_FRAMEWORK: ${{ inputs.target_framework || 'net10.0' }}
 
 jobs:
   publish:
@@ -59,6 +65,7 @@ jobs:
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           global-json-file: global.json
+          dotnet-version: '10.0.404'
       - name: Set up Python
         uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
         with:
@@ -120,6 +127,7 @@ jobs:
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           global-json-file: global.json
+          dotnet-version: '10.0.404'
       - name: Set up Python
         uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
         with:

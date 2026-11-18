@@ -10,7 +10,14 @@ try
     }
     else if (args is ["consumer", var assets, var assembly, var manifest])
     {
-        PackageCheck.Consumer(assets, assembly, manifest);
+        PackageCheck.Consumer(assets, assembly, manifest, "net10.0");
+    }
+    else if (
+        args
+        is ["consumer", var multiTargetAssets, var targetAssembly, var reportPath, var framework]
+    )
+    {
+        PackageCheck.Consumer(multiTargetAssets, targetAssembly, reportPath, framework);
     }
     else if (
         args is ["symbols", var packagePath, var symbolsPath, var packageId, var source, var output]
@@ -21,7 +28,7 @@ try
     else
     {
         Console.Error.WriteLine(
-            "Expected package <nupkg> <snupkg> <version> <revision> <report>, consumer <assets> <assembly> <report>, or symbols <nupkg> <snupkg> <id> <revision> <report>."
+            "Expected package <nupkg> <snupkg> <version> <revision> <report>, consumer <assets> <assembly> <report> [framework], or symbols <nupkg> <snupkg> <id> <revision> <report>."
         );
         return 2;
     }

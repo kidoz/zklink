@@ -4,10 +4,11 @@ The release workflow validates the tag and changelog, downloads the original
 package from a successful shared-candidate run for that exact source, verifies
 its hashes and provenance, and runs installed-package examples against both
 pinned ZooKeeper versions. The same job packs and tests `ZkLink.Extensions.DependencyInjection` and
-`ZkLink.Analyzers` at the release version. It verifies a fresh consumer of all
-three, DI registration, analyzer diagnostics and a checksum manifest covering
-all packages. A separate job publishes the three packages through NuGet trusted
-publishing. A final job checks public-only installation of all three and the
+`ZkLink.Analyzers` at the release version. Fresh .NET 10 and .NET 11 consumers
+verify all three packages, DI registration, and analyzer diagnostics. One
+checksum manifest covers all packages. A separate job publishes the three
+packages through NuGet trusted publishing. A final job checks public-only
+installation of all three and the
 indexed core/DI PDBs.
 
 Build and test jobs have read-only permissions. Only the publish job receives

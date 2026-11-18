@@ -17,6 +17,7 @@ from release_version import validate_version
 
 PACKAGES = {"ZkLink": True, "ZkLink.Extensions.DependencyInjection": True, "ZkLink.Analyzers": False}
 MANIFEST = "release-packages.json"
+CONSUMER_FRAMEWORKS = ("net10.0", "net11.0")
 PUBLIC_SOURCE = "https://api.nuget.org/v3/index.json"
 REPOSITORY = "https://github.com/kidoz/zklink"
 
@@ -138,16 +139,17 @@ def consumer(feed, version, run, *, public=False):
     clean = command(run, "consumer-build", ["dotnet", "build", str(project), "-c", "Release", "--no-restore", *properties],
                     environment=environment)
     require("ZKL000" not in clean, "Clean package consumer reported analyzer diagnostics")
-    binary = project / "bin/Release/net10.0/ZkLink.ReleaseConsumer.dll"
-    output = command(run, "consumer-run", ["dotnet", str(binary)], environment=environment)
-    require("Release package identities and DI registration: PASS" in output, "Package consumer did not pass")
-    diagnostic_log = run / "consumer-diagnostic.log"
-    with diagnostic_log.open("w") as output:
-        result = subprocess.run(["dotnet", "build", str(project), "-c", "Release", "--no-restore", *properties,
-                                 "-p:DefineConstants=EXPECT_ANALYZER_DIAGNOSTIC"], cwd=ROOT, env=environment,
-                                stdout=output, stderr=subprocess.STDOUT, timeout=180)
-    require(result.returncode != 0 and "error ZKL0004" in diagnostic_log.read_text(),
-            "Installed analyzer did not reject the intentional unobserved call")
+    for framework in CONSUMER_FRAMEWORKS:
+        binary = project / "bin/Release" / framework / "ZkLink.ReleaseConsumer.dll"
+        output = command(run, f"consumer-run-{framework}", ["dotnet", str(binary)], environment=environment)
+        require("Release package identities and DI registration: PASS" in output, "Package consumer did not pass")
+        diagnostic_log = run / f"consumer-diagnostic-{framework}.log"
+        with diagnostic_log.open("w") as output:
+            result = subprocess.run(["dotnet", "build", str(project), "-c", "Release", "--no-restore", *properties,
+                                     "--framework", framework, "-p:DefineConstants=EXPECT_ANALYZER_DIAGNOSTIC"],
+                                    cwd=ROOT, env=environment, stdout=output, stderr=subprocess.STDOUT, timeout=180)
+        require(result.returncode != 0 and "error ZKL0004" in diagnostic_log.read_text(),
+                "Installed analyzer did not reject the intentional unobserved call")
 
 
 def symbol_reports(feed, version, run):
@@ -208,7 +210,8 @@ def main():
                 require(pdb == symbols.read("lib/net10.0/" + package_id + ".pdb"), "Indexed symbols differ from release")
     consumer(feed, record["version"], run, public=args.mode == "public")
     (run / "result.json").write_text(json.dumps({"version": record["version"], "passed": True,
-        "packages": list(PACKAGES), "public_feed_verified": args.mode == "public",
+        "packages": list(PACKAGES), "consumer_frameworks": list(CONSUMER_FRAMEWORKS),
+        "public_feed_verified": args.mode == "public",
         "indexed_symbols_verified": list(reports) if args.mode == "public" else []}, indent=2) + "\n")
     print("All three installed release packages and analyzer diagnostic: PASS")
 

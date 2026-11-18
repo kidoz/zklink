@@ -92,29 +92,34 @@ def main():
     config_path = consumer / "NuGet.Config"
     ET.ElementTree(config).write(config_path, encoding="utf-8", xml_declaration=True)
     environment["NUGET_PACKAGES"] = str(run / "package-cache")
-    properties = [f"-p:ZkLinkPackageVersion={version}"]
+    properties = [f"-p:ZkLinkPackageVersion={version}", "-p:ZkLinkVerifyAllFrameworks=true"]
     for name, mode in (("consumer-restore", "--force-evaluate"), ("consumer-locked-restore", "--locked-mode")):
         command(name, ["dotnet", "restore", str(consumer), "--configfile", str(config_path), mode, *properties])
     command("consumer-build", ["dotnet", "build", str(consumer), "-c", "Release", *properties, "--no-restore"])
-    binary = consumer / "bin/Release/net10.0/ZkLink.PackageConsumer.dll"
-    assembly = binary.with_name("ZkLink.dll")
-    command("consumer-assets", ["dotnet", str(inspector), "consumer", str(consumer / "obj/project.assets.json"),
-                               str(assembly), str(validation)], marker="Package validation: PASS")
-    command("rejections", [sys.executable, str(ROOT / "dev/test-core-package-rejections.py"), str(inspector), str(run)])
+    assets = consumer / "obj/project.assets.json"
+    files = [package, symbols, validation, run / "compatibility.json",
+             consumer / "obj/packages.lock.json", assets, config_path]
+    consumers = {}
     environment["ZKLINK_PACKAGE_ASSEMBLY_SHA256"] = report["assemblySha256"]
-    command("consumer-identity", ["dotnet", str(binary), "--package-check"], marker="Package identity check: PASS")
     wrong_environment = environment | {"ZKLINK_PACKAGE_ASSEMBLY_SHA256": "incorrect"}
-    command("wrong-loaded-assembly", ["dotnet", str(binary), "--package-check"], env=wrong_environment,
-            expected=1, marker="The loaded driver does not match the candidate package.")
+    for framework in ("net10.0", "net11.0"):
+        binary = consumer / "bin/Release" / framework / "ZkLink.PackageConsumer.dll"
+        assembly = binary.with_name("ZkLink.dll")
+        command(f"{framework}-consumer-assets", ["dotnet", str(inspector), "consumer", str(assets),
+                str(assembly), str(validation), framework], marker="Package validation: PASS")
+        command(f"{framework}-consumer-identity", ["dotnet", str(binary), "--package-check"],
+                marker="Package identity check: PASS")
+        command(f"{framework}-wrong-loaded-assembly", ["dotnet", str(binary), "--package-check"],
+                env=wrong_environment, expected=1, marker="The loaded driver does not match the candidate package.")
+        files.extend([binary, assembly, binary.with_suffix(".deps.json"), binary.with_suffix(".runtimeconfig.json")])
+        consumers[framework] = binary.relative_to(run).as_posix()
+    command("rejections", [sys.executable, str(ROOT / "dev/test-core-package-rejections.py"), str(inspector), str(run)])
     if input_hashes() != initial_inputs or subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip() != revision:
         raise SystemExit("Source inputs changed during verification; prepare a fresh candidate.")
-    files = [package, symbols, validation, run / "compatibility.json", binary, assembly,
-             binary.with_suffix(".deps.json"), binary.with_suffix(".runtimeconfig.json"),
-             consumer / "obj/packages.lock.json", consumer / "obj/project.assets.json", config_path]
     receipt = {"revision": revision, "version": version,
                "host": {"system": platform.system(), "machine": platform.machine(), "os": platform.platform(), "python": sys.version},
                "candidateManifestSha256": sha256(feed / "candidate.json"),
-               "consumer": binary.relative_to(run).as_posix(), "assemblySha256": report["assemblySha256"],
+               "consumers": consumers, "assemblySha256": report["assemblySha256"],
                "inputs": initial_inputs, "artifacts": {path.relative_to(run).as_posix(): sha256(path) for path in files}}
     manifest = run / "package-consumer.json"
     manifest.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")

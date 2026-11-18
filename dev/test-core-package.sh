@@ -14,20 +14,22 @@ if ! preparation=$(python3 dev/prepare-core-package.py "$@"); then
 fi
 printf '%s\n' "${preparation}"
 manifest=$(sed -n 's/^.*Manifest: //p' <<<"${preparation}")
-IFS=$'\t' read -r run binary assembly_hash < <(python3 - "${manifest}" <<'PYTHON'
+IFS=$'\t' read -r run assembly_hash net10_binary net11_binary < <(python3 - "${manifest}" <<'PYTHON'
 import sys
 sys.path.insert(0, 'dev')
 from core_package_artifacts import read_manifest
 manifest, data = read_manifest(sys.argv[1])
-print('\t'.join([str(manifest.parent), str(manifest.parent / data['consumer']), data['assemblySha256']]))
+consumers = [data['consumers'][framework] for framework in ('net10.0', 'net11.0')]
+print('\t'.join([str(manifest.parent), data['assemblySha256'],
+                 *(str(manifest.parent / binary) for binary in consumers)]))
 PYTHON
 )
 # read must fail before any fixture starts if the manifest check failed.
-if [[ -z "${run}" || -z "${binary}" || -z "${assembly_hash}" ]]; then
+if [[ -z "${run}" || -z "${assembly_hash}" || -z "${net10_binary}" || -z "${net11_binary}" ]]; then
   echo "Missing verified package consumer manifest." >&2
   exit 1
 fi
-readonly run binary manifest
+readonly run net10_binary net11_binary manifest
 export ZKLINK_PACKAGE_ASSEMBLY_SHA256="${assembly_hash}"
 nonce=$(python3 -c 'import sys; sys.path.insert(0, "dev"); from core_package_artifacts import candidate_nonce; print(candidate_nonce())')
 readonly nonce
@@ -82,16 +84,19 @@ for server_version in 3.8.7 3.9.6; do
     grep -Fq "Apache ZooKeeper, version ${server_version} " "${run}/${server_version}-${service}-version.txt"
     compose exec -T "${service}" bash /opt/zklink/zookeeper-healthcheck.sh >"${run}/${server_version}-${service}-readiness.txt" 2>&1
     endpoint=$(compose port "${service}" 2181)
-    # Reuse the existing process-group guard; a managed deadline alone cannot bound a stuck host.
-    ZKLINK_USER=zklink-package-consumer ZKLINK_PASSWORD="$(openssl rand -hex 16)" \
-      python3 dev/run-live-benchmark-process.py "${process_guard_seconds}" dotnet "${binary}" \
-      "${endpoint}" --plaintext --nodes --transactions --auxiliary --watches \
-      >"${run}/${server_version}-${service}-consumer.txt" 2>&1
-    grep -Fq 'Close: Acknowledged' "${run}/${server_version}-${service}-consumer.txt"
+    for binary in "${net10_binary}" "${net11_binary}"; do
+      framework=$(basename "$(dirname "${binary}")")
+      log="${run}/${server_version}-${service}-${framework}-consumer.txt"
+      # Reuse the existing process-group guard; a managed deadline alone cannot bound a stuck host.
+      ZKLINK_USER=zklink-package-consumer ZKLINK_PASSWORD="$(openssl rand -hex 16)" \
+        python3 dev/run-live-benchmark-process.py "${process_guard_seconds}" dotnet "${binary}" \
+        "${endpoint}" --plaintext --nodes --transactions --auxiliary --watches >"${log}" 2>&1
+      grep -Fq 'Close: Acknowledged' "${log}"
+    done
   done
   finish_fixture
   project=""
-  echo "Installed core package on ZooKeeper ${server_version}: PASS (three nodes, examples, acknowledged close and cleanup)"
+  echo "Installed core package on ZooKeeper ${server_version}: PASS (.NET 10 and .NET 11, three nodes, acknowledged close and cleanup)"
 done
 printf 'PASS\n' >"${run}/result.txt"
 echo "Core package checks: PASS (local candidate only)"

@@ -2,10 +2,10 @@
 
 [![Build and verification](https://github.com/kidoz/zklink/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/kidoz/zklink/actions/workflows/build.yml)
 [![Language](https://img.shields.io/badge/language-C%23-512BD4)](https://learn.microsoft.com/dotnet/csharp/)
-[![.NET SDK](https://img.shields.io/badge/.NET%20SDK-10.0.403-512BD4)](https://github.com/kidoz/zklink/blob/main/global.json)
+[![.NET SDK](https://img.shields.io/badge/.NET%20SDK-11.0.100-512BD4)](https://github.com/kidoz/zklink/blob/main/global.json)
 [![License](https://img.shields.io/badge/license-MIT-green)](https://github.com/kidoz/zklink/blob/main/LICENSE)
 
-ZkLink is a managed .NET client for Apache ZooKeeper: a first-class C# implementation of the ZooKeeper client TCP protocol, targeting .NET 10. Native AOT has publish and secure live verification on Linux x64/arm64, Windows x64 and macOS arm64; full release qualification remains open.
+ZkLink implements the Apache ZooKeeper client TCP protocol in managed C# for .NET 10 and .NET 11 applications. Native AOT with .NET 10 has publish and secure live verification on Linux x64/arm64, Windows x64 and macOS arm64. Full release qualification remains open.
 
 **Status: under development.** Internal protocol codecs, handshake records, transactions, connection-string/path/chroot handling, immutable result models and request-failure contracts are implemented and tested. A connectable client now provides TCP/TLS, digest authentication, session recovery, state subscriptions, bounded requests, `SyncAsync` and acknowledged close. Node CRUD, stat, children and ACL operations are now available. Typed write transactions, read batches, session ephemeral queries, descendant counts and identity queries are available. TTL creation is available with explicit client opt-in and server enablement; one-shot watched reads and persistent/recursive subscriptions are available, with removal, same-session restoration and explicit persistent reconnect gaps. An optional `AddZkLink` helper provides host-owned dependency injection with server-free lifecycle tests. Six optional Roslyn analyzers cover literal credentials, unsafe plaintext digest, watch ownership and asynchronous usage, with compilation and packed-consumer tests.
 
@@ -15,7 +15,7 @@ ZkLink is a managed .NET client for Apache ZooKeeper: a first-class C# implement
 dotnet add package ZkLink --version 1.0.3
 ```
 
-All three packages are published at **1.0.3** and target .NET 10 applications:
+All three packages are published at **1.0.3**. The core and DI packages provide `net10.0` assets for .NET 10 and .NET 11 applications.
 
 | Package | Purpose |
 | --- | --- |
@@ -34,17 +34,17 @@ of the final package across the declared client platforms.
 ## Current repository state
 
 - **Solution:** `ZkLink.slnx` with the core, dependency-injection and analyzer libraries, five .NET test projects and a runnable connection sample.
-- **Target:** `net10.0`, C# 14, nullable reference types, and warnings as errors.
+- **Target:** `net10.0` library assets with C# 14, nullable reference types, and warnings as errors. Package verification builds and runs applications targeting both `net10.0` and `net11.0`.
 - **Code:** checked protocol encoding/decoding for node, ACL, transaction and control messages; bounded asynchronous framing; new/resume handshake records; connection-string parsing and namespace translation. Public supporting types include immutable results, create options and failure/removal contracts. One explicit session per client, negotiated-timeout heartbeats, endpoint rotation, same-session reconnect, cancellation outcomes and close cleanup are implemented. Sent application requests are never replayed automatically.
 - **Tests:** xUnit suites cover Apache Java fixtures for all implemented opcodes, transaction success/error shapes, every reply split and truncation, all UTF-16 path code units, chroot boundaries and supporting public contracts. A bounded scripted stream and loopback fake server exercise delayed delivery, partial writes, dropped replies and handshake exchanges. Virtual-time tests exercise session and request lifecycles. Loopback TLS tests check chain/name validation, certificate expiry and mutual authentication. The managed connection sample has passed digest auth, sync and acknowledged close on every node of both pinned versions. Live .NET tests cover CRUD, versions, null/empty and 1,000,000-byte data, create modes, chroot, ACL authorization and acknowledged-close ephemeral deletion on both pinned versions. Live transaction tests verify atomic success/rollback, independent read errors, and committed writes whose replies are dropped, followed by same-session resume without replay. Auxiliary tests verify session-scoped textual ephemeral prefixes, chroot, recursive counts, permissions and server identities. One-shot watch tests cover events, sharing/removal, chroot, re-registration and same-session restoration after a connection cut. Persistent/recursive watch tests cover repeated delivery, profile-specific removal and reconnect gaps. Broader live faults remain unverified.
-- **Build:** SDK 10.0.403 is pinned, with central dependency versions and lock files; core has no third-party runtime dependencies. Public API changes are checked against nullable baselines. The [build workflow](.github/workflows/build.yml) defines Linux/Windows/macOS checks and separate Gradle-based Apache Java verification. All four native targets passed [publish and secure live checks](docs/how-to/verify-native-aot.md#evidence-and-remaining-qualification), with retained execution artifacts.
+- **Build:** SDK 11.0.100 is pinned, with central dependency versions and lock files; core has no third-party runtime dependencies. Public API changes are checked against nullable baselines. The [build workflow](.github/workflows/build.yml) defines Linux/Windows/macOS checks and separate Gradle-based Apache Java verification. All four native targets passed [publish and secure live checks](docs/how-to/verify-native-aot.md#evidence-and-remaining-qualification), with retained execution artifacts.
 - **Distribution:** local core candidates include package metadata, documentation, notices and source/symbol information. [Package inspection and installed-consumer identity checks](docs/how-to/verify-core-package.md) pass on Linux, Windows and macOS; Linux live-consumer checks cover both server versions. The current core package is version 1.0.3, with 0.1.0 retained as the API compatibility baseline; broader production and Native AOT qualification remain open. The project is [MIT-licensed](LICENSE); see the [dependency inventory](THIRD-PARTY-NOTICES.md).
 
 The library lives in `src/`; `tests/` contains public-contract tests, protocol tests and an optional Java oracle. The [basic sample](samples/ZkLink.Samples.Basic) can connect, exercise CRUD with `--nodes`, run transactions with `--transactions`, query ephemerals/counts/identities with `--auxiliary`, and exercise one-shot, persistent and recursive watches with `--watches`.
 
 ## Development commands
 
-Install [just](https://just.systems/) and .NET SDK **10.0.403**. Docker with Compose is required for the ZooKeeper fixture. Run `just` to list shortcuts.
+Install [just](https://just.systems/) and .NET SDK **11.0.100** with the **.NET 10 runtime**. Docker with Compose is required for the ZooKeeper fixture. Run `just` to list shortcuts.
 
 | Command | Purpose |
 | --- | --- |

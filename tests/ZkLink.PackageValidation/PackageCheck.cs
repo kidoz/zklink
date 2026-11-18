@@ -80,7 +80,12 @@ internal static class PackageCheck
         File.WriteAllText(report, result.ToJsonString(ReportOptions) + Environment.NewLine);
     }
 
-    internal static void Consumer(string assetsPath, string assemblyPath, string reportPath)
+    internal static void Consumer(
+        string assetsPath,
+        string assemblyPath,
+        string reportPath,
+        string framework
+    )
     {
         using var assets = JsonDocument.Parse(File.ReadAllBytes(assetsPath));
         using var report = JsonDocument.Parse(File.ReadAllBytes(reportPath));
@@ -92,9 +97,11 @@ internal static class PackageCheck
                 && name == key
                 && library.GetProperty("type").GetString() == "package"
         );
-        var targets = assets.RootElement.GetProperty("targets").EnumerateObject().ToArray();
-        Require(targets is [{ Name: "net10.0" }]);
-        var target = targets[0].Value.GetProperty(key);
+        Require(framework is "net10.0" or "net11.0");
+        var targets = assets.RootElement.GetProperty("targets");
+        Require(targets.EnumerateObject().All(entry => entry.Name is "net10.0" or "net11.0"));
+        Require(targets.TryGetProperty(framework, out var selected));
+        Require(selected.TryGetProperty(key, out var target));
         foreach (var kind in new[] { "compile", "runtime" })
         {
             var entries = target.GetProperty(kind).EnumerateObject().ToArray();

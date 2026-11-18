@@ -4,8 +4,8 @@
 
 | Setting | Value | Source |
 | --- | --- | --- |
-| SDK | 10.0.403; roll-forward disabled | [global.json](../../global.json) |
-| Target and language | `net10.0`, C# 14 | [Directory.Build.props](../../Directory.Build.props) |
+| SDK | 11.0.100 with the .NET 10 runtime also installed, SDK roll-forward disabled | [global.json](../../global.json) |
+| Target and language | `net10.0` libraries, `net10.0` and `net11.0` package verification, C# 14 | [Directory.Build.props](../../Directory.Build.props) |
 | Compiler policy | Nullable enabled; warnings as errors | [Directory.Build.props](../../Directory.Build.props) |
 | Formatter | CSharpier 1.3.0 | [Local tool manifest](../../dotnet-tools.json) |
 | Dependency versions | Central versions and per-project lock files | [Directory.Packages.props](../../Directory.Packages.props) |

@@ -9,6 +9,11 @@ broader security, Native AOT or production qualification. See
 
 ## [Unreleased]
 
+### Added
+
+- Verify installed packages in .NET 11 applications alongside .NET 10.
+  Development builds now use SDK 11.0.100.
+
 ### Fixed
 
 - Accept server-negotiated session timeouts from 100 milliseconds through one

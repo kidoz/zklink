@@ -1,8 +1,9 @@
 # ZkLink documentation
 
-ZkLink is a managed C# client for Apache ZooKeeper under development, targeting
-.NET 10. You can build the library, connect a session, authenticate, sync a path and
-close with acknowledgment, use node/ACL operations and typed transactions, and
+ZkLink is a managed C# client for Apache ZooKeeper under development for .NET 10
+and .NET 11 applications. You can build the library, connect a session,
+authenticate, sync a path and close with acknowledgment, use node/ACL operations
+and typed transactions, and
 query session ephemerals, descendant counts and authenticated identities.
 One-shot watched reads and persistent/recursive subscriptions with reconnect
 gap reporting are available. Core 0.1.0 is published; see

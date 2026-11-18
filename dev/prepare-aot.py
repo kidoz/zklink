@@ -36,6 +36,9 @@ def main():
     rid = sys.argv[1] if len(sys.argv) == 2 else host
     if len(sys.argv) > 2 or not rid or rid != host:
         raise SystemExit("Use the matching linux-x64, linux-arm64, win-x64 or osx-arm64 host; cross publication is not qualification.")
+    framework = os.environ.get("ZKLINK_AOT_TARGET_FRAMEWORK", "net10.0")
+    if framework not in {"net10.0", "net11.0"}:
+        raise SystemExit("ZKLINK_AOT_TARGET_FRAMEWORK must be net10.0 or net11.0.")
     artifacts = ROOT / "artifacts" / "aot"
     artifacts.mkdir(parents=True, exist_ok=True)
     run = pathlib.Path(tempfile.mkdtemp(prefix="run.", dir=artifacts))
@@ -106,7 +109,8 @@ def main():
     ET.ElementTree(config).write(config_path, encoding="utf-8", xml_declaration=True)
     (run / "Directory.Build.props").write_text("<Project />\n", encoding="utf-8")
     environment["NUGET_PACKAGES"] = str(run / "package-cache")
-    receipt = {"rid": rid, "revision": package_report.get("revision", revision), "harnessRevision": revision,
+    receipt = {"rid": rid, "targetFramework": framework,
+               "revision": package_report.get("revision", revision), "harnessRevision": revision,
                "version": version, "packageSha256": package_report["packageSha256"],
                "packageOrigin": PUBLIC_FEED if published else "source",
                "candidateManifestSha256": None if published else sha256(feed / "candidate.json"), "consumers": {}}
@@ -130,7 +134,7 @@ def main():
             tree = ET.parse(project / f"{name}.csproj")
             if tree.findall(".//TrimmerRootAssembly") or tree.findall(".//TrimmerRootDescriptor") or tree.findall(".//ProjectReference"):
                 raise SystemExit("The representative consumer must not root the core or reference its source project.")
-        properties = [f"-p:ZkLinkPackageVersion={version}", f"-p:RuntimeIdentifier={rid}",
+        properties = [f"-p:ZkLinkPackageVersion={version}", f"-p:RuntimeIdentifier={rid}", f"-p:TargetFramework={framework}",
                       f"-p:MicrosoftExtensionsVersion={extensions_version}"]
         command(name + "-restore", ["dotnet", "restore", str(project), "--configfile", str(config_path), "--force-evaluate", *properties], cwd=project)
         command(name + "-locked-restore", ["dotnet", "restore", str(project), "--configfile", str(config_path), "--locked-mode", *properties], cwd=project)
@@ -175,14 +179,14 @@ def main():
             environment["ZKLINK_AOT_EXECUTABLE_SHA256"] = sha256(binary)
             command("smoke-native-identity", [str(binary), "--native-check"], cwd=output)
             with (run / "smoke-managed-rejection.txt").open("w", encoding="utf-8") as log:
-                managed = subprocess.run(["dotnet", str(project / f"bin/Release/net10.0/{rid}/{name}.dll"), "--native-check"], env=environment, stdout=log, stderr=subprocess.STDOUT, check=False)
+                managed = subprocess.run(["dotnet", str(project / f"bin/Release/{framework}/{rid}/{name}.dll"), "--native-check"], env=environment, stdout=log, stderr=subprocess.STDOUT, check=False)
             if managed.returncode != 1 or "Native smoke failed: InvalidOperationException" not in (run / "smoke-managed-rejection.txt").read_text(encoding="utf-8"):
                 raise SystemExit("The native assertion did not reject managed execution.")
     if input_hashes() != initial_inputs:
         raise SystemExit("Source inputs changed during publication; publish a fresh candidate.")
     receipt["inputs"] = initial_inputs
     (run / "native.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
-    print(f"Native publish and rooted execution: PASS ({rid}). Live smoke remains required. Manifest: {run / 'native.json'}", flush=True)
+    print(f"Native publish and rooted execution: PASS ({framework}, {rid}). Live smoke remains required. Manifest: {run / 'native.json'}", flush=True)
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ production qualification is claimed.
 
 | Area | Implemented and verified scope | Remaining limits |
 | --- | --- | --- |
-| Build and packages | .NET 10, C# 14, pinned SDK 10.0.403, locked dependencies, deterministic builds and API/package/source/symbol/installed-consumer checks; core has no third-party runtime dependencies | Repeat applicable checks for each candidate; package availability does not establish production qualification |
+| Build and packages | `net10.0` package assets for .NET 10 and .NET 11 applications, C# 14, pinned SDK 11.0.100, locked dependencies, deterministic builds and API/package/source/symbol/installed-consumer checks; core has no third-party runtime dependencies | Repeat applicable checks for each candidate; package availability does not establish production qualification |
 | Sessions and operations | TCP/TLS, digest replay, one owned session, bounded requests/events, node/stat/children/ACL operations, transactions/read batches, auxiliary queries, explicit TTL opt-in, cancellation outcomes and acknowledged close | No automatic replacement of a terminal session or replay of uncertain requests; final sustained qualification remains open |
 | Watches | One-shot, persistent and recursive watches, shared removal, bounded restoration and explicit reconnect gaps, with controlled-peer and two-patch live evidence | Invalidations are not change history; recursive watches exclude child-list duplicates; compatibility-profile restrictions apply |
 | Security | TLS required by default, custom roots, mTLS, digest and explicit ACLs, redaction; scoped managed/native certificate and online-revocation controls | Plaintext digest requires explicit unsafe opt-in and literal loopback endpoints only; DNS names including localhost and remote/mixed lists are rejected in this checkout. Deployment PKI, rotation and full security qualification remain separate |
@@ -23,7 +23,7 @@ production qualification is claimed.
 ## Native AOT and platform evidence
 
 Core enables `IsAotCompatible`; core and DI enable trim/AOT analyzers. Native AOT
-has scoped packed-consumer evidence on **linux-x64, linux-arm64, win-x64 and
+with .NET 10 has scoped packed-consumer evidence on **linux-x64, linux-arm64, win-x64 and
 osx-arm64**. This is available verification, not an unimplemented feature.
 
 The repository records [candidate run 42406361077](https://github.com/kidoz/zklink/actions/runs/42406361077)
@@ -36,6 +36,11 @@ across the four targets and both server patches. The live fixtures use private
 PKI with `NoCheck`. Dedicated core online-revocation controls are separate.
 These recorded runs cover the 1.0.2 packages and do not verify the published
 1.0.3 source.
+
+On macOS arm64, .NET 11 Native AOT consumers of the public core and DI 1.0.3
+packages passed rooted and unrooted publication, secure TLS/mTLS cases against
+ZooKeeper 3.8.7 and 3.9.6, and online certificate revocation controls. Hosted
+.NET 11 Native AOT verification for Linux and Windows remains open.
 
 See [Native AOT verification](../how-to/verify-native-aot.md) for exact scope,
 commands and platform limits. Full production and sustained qualification remain
