@@ -1,3 +1,5 @@
+using System.Net.Sockets;
+
 namespace ZkLink;
 
 /// <summary>Initial connection failed and all partially owned resources were released.</summary>
@@ -9,7 +11,20 @@ public sealed class ZooKeeperConnectionException : IOException
         ZooKeeperEndpoint? endpoint = null,
         int? errorCode = null
     )
-        : base("ZooKeeper connection failed; inspect connection metadata.")
+        : this(failure, endpoint, errorCode, null, null) { }
+
+    internal ZooKeeperConnectionException(
+        ZooKeeperConnectionFailure failure,
+        ZooKeeperEndpoint? endpoint,
+        int? errorCode,
+        ZooKeeperTlsFailureReason? tlsFailureReason,
+        SocketError? socketError
+    )
+        : base(
+            FormattableString.Invariant(
+                $"ZooKeeper connection failed ({failure}, TLS {tlsFailureReason}, socket {socketError}, server code {errorCode})."
+            )
+        )
     {
         if (!Enum.IsDefined(failure))
         {
@@ -19,10 +34,18 @@ public sealed class ZooKeeperConnectionException : IOException
         {
             throw new ArgumentOutOfRangeException(nameof(errorCode));
         }
+        TlsFailureReason = tlsFailureReason;
+        SocketError = socketError;
         Failure = failure;
         Endpoint = endpoint;
         ErrorCode = errorCode;
     }
+
+    /// <summary>Gets the platform or provider TLS failure category when available.</summary>
+    public ZooKeeperTlsFailureReason? TlsFailureReason { get; }
+
+    /// <summary>Gets the socket failure code when available.</summary>
+    public SocketError? SocketError { get; }
 
     /// <summary>Gets a safe failure classification.</summary>
     public ZooKeeperConnectionFailure Failure { get; }

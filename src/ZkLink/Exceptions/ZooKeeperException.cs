@@ -9,7 +9,7 @@ public class ZooKeeperException : Exception, IZooKeeperRequestFailure
         RequestOutcome outcome,
         int? errorCode = null
     )
-        : base("ZooKeeper request failed; inspect request outcome and error metadata.")
+        : base(FormatMessage(request, outcome, errorCode))
     {
         ArgumentNullException.ThrowIfNull(request);
         ValidateOutcome(outcome);
@@ -53,6 +53,20 @@ public class ZooKeeperException : Exception, IZooKeeperRequestFailure
         ErrorCode is { } code && Enum.IsDefined((ZooKeeperErrorCode)code)
             ? (ZooKeeperErrorCode)code
             : null;
+
+    internal static string FormatMessage(
+        ZooKeeperRequestInfo request,
+        RequestOutcome outcome,
+        int? errorCode = null
+    )
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return errorCode is { } code
+            ? FormattableString.Invariant(
+                $"ZooKeeper {request.Operation} failed ({outcome}, {(ZooKeeperErrorCode)code}, code {code})."
+            )
+            : $"ZooKeeper {request.Operation} failed ({outcome}).";
+    }
 
     internal static void ValidateOutcome(RequestOutcome outcome)
     {

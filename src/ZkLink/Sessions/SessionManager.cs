@@ -191,7 +191,9 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                                     ? ZooKeeperConnectionFailure.Timeout
                                     : lastFailure.Failure,
                                 lastFailure.Endpoint,
-                                lastFailure.ErrorCode
+                                lastFailure.ErrorCode,
+                                lastFailure.TlsFailureReason,
+                                lastFailure.SocketError
                             );
                             PublishTerminal(ZooKeeperSessionState.Faulted);
                         }

@@ -17,6 +17,10 @@ public sealed class FailureContractTests
             "/settings"
         );
         var exception = new ZooKeeperException(request, RequestOutcome.Rejected, code);
+        Assert.Contains("SetData", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Rejected", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("/settings", exception.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("zk.example", exception.ToString(), StringComparison.Ordinal);
         Assert.Same(request, exception.Request);
         Assert.Equal(code, exception.ErrorCode);
         Assert.Equal(known, exception.KnownErrorCode);

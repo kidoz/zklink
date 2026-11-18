@@ -51,6 +51,7 @@ internal sealed class HostResolver : IHostResolver
 internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRandom random)
     : ITransportConnector
 {
+    private int _providerBusy;
     private static readonly TimeSpan MinimumRetrievalTimeout = TimeSpan.FromMilliseconds(1);
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -65,11 +66,17 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
         CancellationToken cancellationToken
     )
     {
+        var provider = options.Settings.Tls.CredentialsProvider;
+        using var credentials = provider is null
+            ? null
+            : await LoadCredentialsAsync(provider, endpoint, cancellationToken)
+                .ConfigureAwait(false);
         var addresses = await resolver
             .ResolveAsync(endpoint.Host, cancellationToken)
             .ConfigureAwait(false);
         random.Shuffle(addresses);
-        var tlsFailed = false;
+        ZooKeeperTlsFailureReason? tlsFailure = null;
+        SocketError? socketError = null;
         var addressTimedOut = false;
         var remainingAddresses = addresses.Count(IsUsable);
         foreach (var address in addresses)
@@ -93,6 +100,7 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
             };
             NetworkStream? network = null;
             SslStream? ssl = null;
+            ZooKeeperTlsFailureReason? certificateFailure = null;
             try
             {
                 await socket
@@ -102,11 +110,24 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
                 socket = null;
                 if (options.Settings.Tls.Enabled)
                 {
-                    ssl = new SslStream(network, leaveInnerStreamOpen: false);
+                    ssl = new SslStream(
+                        network,
+                        leaveInnerStreamOpen: false,
+                        (_, _, chain, errors) =>
+                        {
+                            if (errors == SslPolicyErrors.None)
+                            {
+                                return true;
+                            }
+                            certificateFailure = ClassifyCertificate(errors, chain);
+                            return false;
+                        }
+                    );
                     network = null;
                     var tls = options.Settings.Tls;
                     var authentication = new SslClientAuthenticationOptions
                     {
+                        AllowTlsResume = provider is null,
                         TargetHost = tls.ServerName ?? endpoint.Host,
                         EnabledSslProtocols = SslProtocols.None,
                         CertificateRevocationCheckMode = tls.RevocationMode,
@@ -122,17 +143,19 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
                                 : options.Settings.ConnectAttemptTimeout,
                     };
                     authentication.CertificateChainPolicy = policy;
-                    if (tls.ClientCertificate is not null)
+                    var certificate = credentials?.ClientCertificate ?? tls.ClientCertificate;
+                    var roots = credentials?.TrustRoots ?? tls.TrustRoots;
+                    if (certificate is not null)
                     {
                         authentication.ClientCertificates = new X509CertificateCollection
                         {
-                            tls.ClientCertificate,
+                            certificate,
                         };
                     }
-                    if (tls.TrustRoots.Count != 0)
+                    if (roots.Count != 0)
                     {
                         policy.TrustMode = X509ChainTrustMode.CustomRootTrust;
-                        foreach (var root in tls.TrustRoots)
+                        foreach (var root in roots)
                         {
                             policy.CustomTrustStore.Add(root);
                         }
@@ -165,12 +188,22 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
             }
             catch (AuthenticationException)
             {
-                tlsFailed = true;
+                tlsFailure =
+                    certificateFailure ?? tlsFailure ?? ZooKeeperTlsFailureReason.HandshakeFailed;
             }
-            catch (SocketException) { }
+            catch (SocketException error)
+            {
+                socketError = error.SocketErrorCode;
+            }
             catch (IOException)
             {
-                tlsFailed |= options.Settings.Tls.Enabled;
+                if (options.Settings.Tls.Enabled)
+                {
+                    tlsFailure =
+                        certificateFailure
+                        ?? tlsFailure
+                        ?? ZooKeeperTlsFailureReason.HandshakeFailed;
+                }
             }
             finally
             {
@@ -186,21 +219,130 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
             }
         }
         var failure = new ZooKeeperConnectionException(
-            tlsFailed ? ZooKeeperConnectionFailure.Tls
+            tlsFailure.HasValue ? ZooKeeperConnectionFailure.Tls
                 : addressTimedOut ? ZooKeeperConnectionFailure.Timeout
                 : ZooKeeperConnectionFailure.Unreachable,
-            endpoint
+            endpoint,
+            null,
+            tlsFailure,
+            tlsFailure.HasValue ? null : socketError
         );
         if (cancellationToken.IsCancellationRequested)
         {
             // The caller decides whether its token or the endpoint deadline ended the attempt.
             throw new OperationCanceledException(
                 null,
-                tlsFailed ? failure : null,
+                tlsFailure.HasValue ? failure : null,
                 cancellationToken
             );
         }
         throw failure;
+    }
+
+    private async Task<ZooKeeperTlsCredentials> LoadCredentialsAsync(
+        Func<CancellationToken, ValueTask<ZooKeeperTlsCredentials>> provider,
+        ZooKeeperEndpoint endpoint,
+        CancellationToken token
+    )
+    {
+        token.ThrowIfCancellationRequested();
+        var failure = new ZooKeeperConnectionException(
+            ZooKeeperConnectionFailure.Tls,
+            endpoint,
+            null,
+            ZooKeeperTlsFailureReason.ProviderFailed,
+            null
+        );
+        if (Interlocked.Exchange(ref _providerBusy, 1) != 0)
+        {
+            throw failure;
+        }
+        // Bound outstanding application callbacks even when the provider ignores its token.
+        var pending = Task.Run(async () => await provider(token).ConfigureAwait(false), token);
+        bool detached = false;
+        try
+        {
+            return await pending.WaitAsync(token).ConfigureAwait(false) ?? throw failure;
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            detached = true;
+            _ = DisposeLateCredentialsAsync(pending);
+            throw new OperationCanceledException(null, failure, token);
+        }
+        catch (Exception)
+        {
+            throw failure;
+        }
+        finally
+        {
+            if (!detached)
+            {
+                Volatile.Write(ref _providerBusy, 0);
+            }
+        }
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "An abandoned application provider may fail after the deadline. Its exception must be observed without exposing provider details."
+    )]
+    private async Task DisposeLateCredentialsAsync(Task<ZooKeeperTlsCredentials> pending)
+    {
+        try
+        {
+            (await pending.ConfigureAwait(false))?.Dispose();
+        }
+        catch (Exception) { }
+        finally
+        {
+            Volatile.Write(ref _providerBusy, 0);
+        }
+    }
+
+    private static ZooKeeperTlsFailureReason ClassifyCertificate(
+        SslPolicyErrors errors,
+        X509Chain? chain
+    )
+    {
+        if ((errors & SslPolicyErrors.RemoteCertificateNotAvailable) != 0)
+        {
+            return ZooKeeperTlsFailureReason.CertificateMissing;
+        }
+        if ((errors & SslPolicyErrors.RemoteCertificateNameMismatch) != 0)
+        {
+            return ZooKeeperTlsFailureReason.NameMismatch;
+        }
+        var flags = X509ChainStatusFlags.NoError;
+        if (chain is not null)
+        {
+            foreach (var status in chain.ChainStatus)
+            {
+                flags |= status.Status;
+            }
+        }
+        if ((flags & X509ChainStatusFlags.Revoked) != 0)
+        {
+            return ZooKeeperTlsFailureReason.Revoked;
+        }
+        if ((flags & X509ChainStatusFlags.NotTimeValid) != 0)
+        {
+            return ZooKeeperTlsFailureReason.InvalidValidityPeriod;
+        }
+        if (
+            (
+                flags
+                & (
+                    X509ChainStatusFlags.RevocationStatusUnknown
+                    | X509ChainStatusFlags.OfflineRevocation
+                )
+            ) != 0
+        )
+        {
+            return ZooKeeperTlsFailureReason.RevocationUnavailable;
+        }
+        return ZooKeeperTlsFailureReason.UntrustedChain;
     }
 
     private static bool IsUsable(IPAddress address) =>

@@ -40,6 +40,26 @@ public sealed class ZooKeeperTlsOptions
         string? serverName = null
     ) => new(true, revocationMode, clientCertificate, trustRoots, serverName);
 
+    /// <summary>Requires TLS and fetches a fresh credential snapshot for each endpoint attempt.</summary>
+    public static ZooKeeperTlsOptions RequiredWithProvider(
+        Func<CancellationToken, ValueTask<ZooKeeperTlsCredentials>> credentialsProvider,
+        X509RevocationMode revocationMode = X509RevocationMode.Online,
+        string? serverName = null
+    )
+    {
+        ArgumentNullException.ThrowIfNull(credentialsProvider);
+        return new(true, revocationMode, null, null, serverName)
+        {
+            CredentialsProvider = credentialsProvider,
+        };
+    }
+
+    internal Func<CancellationToken, ValueTask<ZooKeeperTlsCredentials>>? CredentialsProvider
+    {
+        get;
+        private init;
+    }
+
     /// <summary>Explicitly selects plaintext, intended for controlled development fixtures.</summary>
     public static ZooKeeperTlsOptions Disabled() =>
         new(false, X509RevocationMode.Online, null, null, null);

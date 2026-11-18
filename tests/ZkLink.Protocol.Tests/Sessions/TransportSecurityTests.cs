@@ -68,6 +68,129 @@ public sealed class TransportSecurityTests
             .ConfigureAwait(true);
     }
 
+    [Fact(Timeout = 15000)]
+    public async Task ReconnectRotatesBothCertificateAndRootWhileResumingTheSession()
+    {
+        var token = TestContext.Current.CancellationToken;
+        using var first = new EphemeralCertificates();
+        using var second = new EphemeralCertificates();
+        using var socket = new TcpListener(IPAddress.Loopback, 0);
+        socket.Start();
+        int calls = 0;
+        var rotated = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var options = new ZooKeeperClientOptions
+        {
+            ConnectionString = $"zk.test:{((IPEndPoint)socket.LocalEndpoint).Port}",
+            Tls = ZooKeeperTlsOptions.RequiredWithProvider(
+                _ =>
+                {
+                    var certs = Interlocked.Increment(ref calls) == 1 ? first : second;
+                    return ValueTask.FromResult(
+                        new ZooKeeperTlsCredentials(certs.Client, [certs.Root])
+                    );
+                },
+                X509RevocationMode.NoCheck
+            ),
+        };
+        var peer = ServeBothAsync();
+        var random = new SessionRandom(new Random(1));
+        var client = await ZooKeeperClient.ConnectCoreAsync(
+            ClientOptionsSnapshot.Capture(options),
+            TimeProvider.System,
+            new SocketTransportConnector(Resolver(), random),
+            random,
+            token
+        );
+        await using var owner = client.ConfigureAwait(true);
+        await client.SyncAsync("/first", token);
+        await rotated.Task.WaitAsync(token);
+        await client.WaitForConnectionAsync(token);
+        await client.SyncAsync("/second", token);
+        Assert.Equal(123, client.Session.SessionId);
+        Assert.Equal(2, calls);
+        await client.CloseAsync(token);
+        await peer.ConfigureAwait(true);
+
+        async Task ServeBothAsync()
+        {
+            foreach (var certs in new[] { first, second })
+            {
+                using var tcp = await socket.AcceptTcpClientAsync(token).ConfigureAwait(false);
+                using var tls = new SslStream(tcp.GetStream());
+                await tls.AuthenticateAsServerAsync(certs.ServerOptions(true), token)
+                    .ConfigureAwait(false);
+                Assert.Equal(
+                    certs.Client.GetCertHashString(),
+                    tls.RemoteCertificate!.GetCertHashString()
+                );
+                await ServeSessionAsync(
+                        tls,
+                        token,
+                        certs == first,
+                        certs == second ? rotated : null,
+                        certs == first ? 0 : 123
+                    )
+                    .ConfigureAwait(false);
+            }
+        }
+    }
+
+    [Theory(Timeout = 10000)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProviderFailureOrDeadlinePreservesSafeTlsReason(bool timeout)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var began = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var provider = new TaskCompletionSource<ZooKeeperTlsCredentials>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        var time = new ManualTimeProvider();
+        var duration = TimeSpan.FromSeconds(1);
+        var random = new SessionRandom(new Random(1));
+        var options = ClientOptionsSnapshot.Capture(
+            new ZooKeeperClientOptions
+            {
+                ConnectionString = "zk.test",
+                InitialConnectTimeout = duration,
+                ConnectAttemptTimeout = duration,
+                Tls = ZooKeeperTlsOptions.RequiredWithProvider(_ =>
+                {
+                    began.TrySetResult();
+                    return new ValueTask<ZooKeeperTlsCredentials>(provider.Task);
+                }),
+            }
+        );
+        var connection = ZooKeeperClient.ConnectCoreAsync(
+            options,
+            time,
+            new SocketTransportConnector(Resolver(), random),
+            random,
+            token
+        );
+        await began.Task.WaitAsync(token).ConfigureAwait(true);
+        if (!timeout)
+        {
+            provider.SetException(new InvalidOperationException("private provider diagnostics"));
+        }
+        // Advance in bounded increments so both the attempt and any retry backoff expire.
+        while (!connection.IsCompleted)
+        {
+            time.Advance(duration);
+            await Task.Delay(1, token).ConfigureAwait(true);
+        }
+        var error = await Assert
+            .ThrowsAsync<ZooKeeperConnectionException>(() => connection)
+            .ConfigureAwait(true);
+        Assert.Equal(ZooKeeperTlsFailureReason.ProviderFailed, error.TlsFailureReason);
+        Assert.DoesNotContain(
+            "private provider diagnostics",
+            error.ToString(),
+            StringComparison.Ordinal
+        );
+        provider.TrySetCanceled(token);
+    }
+
     [Theory(Timeout = 10000)]
     [InlineData("name")]
     [InlineData("trust")]
@@ -121,6 +244,15 @@ public sealed class TransportSecurityTests
             .ConfigureAwait(true);
         Assert.Equal(ZooKeeperConnectionFailure.Tls, error.Failure);
         await server.Completion.ConfigureAwait(true);
+        Assert.Equal(
+            failure switch
+            {
+                "name" => ZooKeeperTlsFailureReason.NameMismatch,
+                "expired" => ZooKeeperTlsFailureReason.InvalidValidityPeriod,
+                _ => ZooKeeperTlsFailureReason.UntrustedChain,
+            },
+            error.TlsFailureReason
+        );
         Assert.Equal(0, applicationBytes);
     }
 
@@ -438,12 +570,27 @@ public sealed class TransportSecurityTests
         return resolver;
     }
 
-    internal static async Task ServeSessionAsync(Stream stream, CancellationToken token)
+    internal static async Task ServeSessionAsync(
+        Stream stream,
+        CancellationToken token,
+        bool dropAfterSync = false,
+        TaskCompletionSource? resumed = null,
+        long? expectedSession = null
+    )
     {
         var limits = new ProtocolLimits();
         var reader = new FrameReader(stream, limits);
         var writer = new FrameWriter(stream, limits);
-        Assert.NotNull(await reader.ReadAsync(token).ConfigureAwait(false));
+        var connect = await reader.ReadAsync(token).ConfigureAwait(false);
+        Assert.NotNull(connect);
+        if (expectedSession.HasValue)
+        {
+            var input = new JuteReader(connect, limits);
+            _ = input.ReadInt32();
+            _ = input.ReadInt64();
+            _ = input.ReadInt32();
+            Assert.Equal(expectedSession.Value, input.ReadInt64());
+        }
         var bytes = new byte[64];
         var handshake = new JuteWriter(bytes, limits);
         handshake.WriteInt32(0);
@@ -454,6 +601,7 @@ public sealed class TransportSecurityTests
         await writer
             .WriteFrameAsync(PeerTests.Frame(bytes[..handshake.WrittenCount]), token)
             .ConfigureAwait(false);
+        resumed?.TrySetResult();
         while (true)
         {
             var packet =
@@ -465,7 +613,7 @@ public sealed class TransportSecurityTests
             await writer
                 .WriteFrameAsync(PeerTests.Frame(SessionPeer.Packet(header.Xid, path: path)), token)
                 .ConfigureAwait(false);
-            if (header.Opcode == -11)
+            if (header.Opcode == -11 || (dropAfterSync && path is not null))
             {
                 return;
             }

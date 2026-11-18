@@ -11,7 +11,7 @@ public sealed class ZooKeeperOperationCanceledException
         RequestOutcome outcome,
         CancellationToken cancellationToken = default
     )
-        : base("ZooKeeper request wait was cancelled; inspect request outcome.", cancellationToken)
+        : base(ZooKeeperException.FormatMessage(request, outcome), cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         ZooKeeperException.ValidateOutcome(outcome);

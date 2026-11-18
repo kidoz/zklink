@@ -196,3 +196,6 @@ See the [connection reference](../reference/connections.md) and
 what these checks establish.
 
 [How-to guides](README.md) · [Documentation home](../README.md)
+
+For local rotation verification, run the protocol test
+`ReconnectRotatesBothCertificateAndRootWhileResumingTheSession`. Its two TLS handshakes require distinct client certificates and trust roots and verify the resumed session ID.

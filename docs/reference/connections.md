@@ -208,3 +208,19 @@ automatic delete retry. See Apache's
 [consistency guarantees](https://zookeeper.apache.org/doc/r3.9.6/zookeeperInternals.html).
 
 [Reference](README.md) · [Documentation home](../README.md)
+
+### Rotating TLS credentials
+
+Use `ZooKeeperTlsOptions.RequiredWithProvider` to select a client certificate
+and trust roots together on every endpoint attempt. Return a fresh
+`ZooKeeperTlsCredentials` built from the current certificates. Its constructor
+copies their handles. The driver disposes the returned snapshot after the
+attempt, and the application retains ownership of the originals. The provider
+receives the attempt cancellation token. At most one provider call is
+outstanding per client. TLS session resumption is disabled for this mode so
+each connection authenticates with the selected credentials.
+
+Connection exceptions expose `TlsFailureReason` and `SocketError` when the
+platform provides them. Request exception messages include the operation,
+outcome and available server code. Paths and endpoints remain available as
+explicit properties.

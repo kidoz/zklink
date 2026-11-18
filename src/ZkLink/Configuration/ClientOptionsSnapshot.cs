@@ -112,13 +112,15 @@ internal sealed class ClientOptionsSnapshot : IDisposable
             {
                 ConnectionString = options.ConnectionString,
                 Chroot = options.Chroot,
-                Tls = options.Tls.Enabled
-                    ? ZooKeeperTlsOptions.Required(
-                        options.Tls.RevocationMode,
-                        certificate,
-                        roots,
-                        options.Tls.ServerName
-                    )
+                Tls =
+                    options.Tls.CredentialsProvider is not null ? options.Tls
+                    : options.Tls.Enabled
+                        ? ZooKeeperTlsOptions.Required(
+                            options.Tls.RevocationMode,
+                            certificate,
+                            roots,
+                            options.Tls.ServerName
+                        )
                     : ZooKeeperTlsOptions.Disabled(),
                 AllowUnsafePlaintextDigest = options.AllowUnsafePlaintextDigest,
                 EnableTtlNodes = options.EnableTtlNodes,
