@@ -9,8 +9,15 @@ public sealed class ZNodeData
 
     /// <summary>Copies data while preserving the distinction between null and empty.</summary>
     public ZNodeData(ReadOnlyMemory<byte>? data, ZNodeStat stat)
+        : this(stat, Snapshot.Data(data)) { }
+
+    // The reply decoder allocated this buffer exclusively for the returned result.
+    internal static ZNodeData FromOwnedData(byte[]? data, ZNodeStat stat) =>
+        new(stat, Snapshot.AsNullableMemory(data));
+
+    private ZNodeData(ZNodeStat stat, ReadOnlyMemory<byte>? ownedData)
     {
-        Data = Snapshot.Data(data);
+        Data = ownedData;
         Stat = stat;
     }
 

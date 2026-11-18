@@ -64,7 +64,7 @@ public sealed partial class ZooKeeperClient
         return Array.AsReadOnly(results);
     }
 
-    private static async Task<IReadOnlyList<ZooKeeperReadResult>> ReadReadMultiAsync(
+    internal static async Task<IReadOnlyList<ZooKeeperReadResult>> ReadReadMultiAsync(
         Task<WireReply> task
     )
     {
@@ -75,10 +75,7 @@ public sealed partial class ZooKeeperClient
             results[i] = multi.Members[i].Result switch
             {
                 DataResult data => new ZooKeeperDataReadResult(
-                    new ZNodeData(
-                        data.Data is null ? (ReadOnlyMemory<byte>?)null : data.Data,
-                        ToPublic(data.Stat)
-                    )
+                    ZNodeData.FromOwnedData(data.Data, ToPublic(data.Stat))
                 ),
                 StringsResult children => new ZooKeeperChildrenReadResult(children.Values),
                 ErrorResult error => new ZooKeeperReadErrorResult(error.Error),

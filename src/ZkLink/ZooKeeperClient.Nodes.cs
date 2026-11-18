@@ -209,13 +209,10 @@ public sealed partial class ZooKeeperClient
     private static async Task<ZNodeStat> ReadStatAsync(Task<WireReply> task) =>
         ToPublic(((StatResult)(await task.ConfigureAwait(false)).Result).Stat);
 
-    private static async Task<ZNodeData> ReadDataAsync(Task<WireReply> task)
+    internal static async Task<ZNodeData> ReadDataAsync(Task<WireReply> task)
     {
         var result = (DataResult)(await task.ConfigureAwait(false)).Result;
-        return new ZNodeData(
-            result.Data is null ? (ReadOnlyMemory<byte>?)null : result.Data,
-            ToPublic(result.Stat)
-        );
+        return ZNodeData.FromOwnedData(result.Data, ToPublic(result.Stat));
     }
 
     private static async Task<ZNodeChildren> ReadChildrenAsync(Task<WireReply> task)

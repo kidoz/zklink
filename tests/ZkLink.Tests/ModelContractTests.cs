@@ -10,7 +10,10 @@ public sealed class ModelContractTests
     {
         byte[] bytes = [1, 2, 3];
         var snapshot = new ZNodeData(bytes, default);
+        var slice = new ZNodeData(bytes.AsMemory(1, 2), default);
         bytes[0] = 255;
+        bytes[1] = 254;
+        Assert.Equal(new byte[] { 2, 3 }, slice.Data!.Value.ToArray());
         Assert.Equal(new byte[] { 1, 2, 3 }, snapshot.Data!.Value.ToArray());
         Assert.Null(new ZNodeData(null, default).Data);
         byte[]? nullArray = null;

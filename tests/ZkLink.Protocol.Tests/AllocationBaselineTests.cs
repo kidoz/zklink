@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using ZkLink.Protocol;
@@ -7,6 +8,58 @@ namespace ZkLink.Protocol.Tests;
 public sealed class AllocationBaselineTests(ITestOutputHelper output)
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Acceptance", "T35")]
+    public async Task DecodedDataBecomesAPublicResultWithinTheAllocationBudget(bool multi)
+    {
+        const int payloadBytes = 64 * 1024;
+        const int iterations = 256;
+        var encodedBuffer = new byte[sizeof(int) + payloadBytes];
+        BinaryPrimitives.WriteInt32BigEndian(encodedBuffer, payloadBytes);
+        encodedBuffer[^1] = 42;
+        var reader = new JuteReader(encodedBuffer, ProtocolFixtures.Limits);
+        var data = new DataResult(
+            reader.ReadBuffer(),
+            ProtocolFixtures.Stat with
+            {
+                DataLength = payloadBytes,
+            }
+        );
+        Array.Clear(encodedBuffer);
+        WireResult result = multi
+            ? new MultiResult([new WireMultiMember((int)ZooKeeperOperation.GetData, 0, data)])
+            : data;
+        var reply = Task.FromResult(new WireReply(new ReplyHeader(1, 1, 0), result));
+
+        // A completed reply keeps the actual result mapping on the measuring thread.
+        // Warm it once, then count only the allocations made after decoding.
+        ZNodeData node = await MapAsync().ConfigureAwait(true);
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < iterations; i++)
+        {
+            node = await MapAsync().ConfigureAwait(true);
+        }
+        var bytesPerResult = (GC.GetAllocatedBytesForCurrentThread() - before) / (double)iterations;
+        output.WriteLine(
+            $"{(multi ? "MultiRead" : "GetData")} 64 KiB result mapping: {bytesPerResult} bytes/op"
+        );
+        Assert.Equal(42, node.Data!.Value.Span[^1]);
+        Assert.Equal(payloadBytes, node.Stat.DataLength);
+        Assert.InRange(bytesPerResult, 0, 1024);
+
+        async ValueTask<ZNodeData> MapAsync()
+        {
+            if (!multi)
+            {
+                return await ZooKeeperClient.ReadDataAsync(reply).ConfigureAwait(true);
+            }
+            var members = await ZooKeeperClient.ReadReadMultiAsync(reply).ConfigureAwait(true);
+            return ((ZooKeeperDataReadResult)members[0]).Value;
+        }
+    }
 
     [Fact]
     [Trait("Acceptance", "T35")]
