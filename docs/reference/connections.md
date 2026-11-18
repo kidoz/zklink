@@ -25,7 +25,7 @@ client, except that endpoint updates affect future connection attempts.
 | `AllowUnsafePlaintextDigest` | False; explicit opt-in and literal loopback addresses required for every plaintext digest endpoint, including endpoint updates; DNS names (including localhost), remote and mixed lists are rejected |
 | `EnableTtlNodes` | False; operator assertion that every endpoint enables extended node types; required for TTL creation |
 | `CompatibilityProfile` | `ZooKeeper38`; `ZooKeeper39` enables independent watch modes at one path; assert all endpoints qualify, without negotiated discovery |
-| `SessionTimeout` | 30 seconds requested; actual negotiated timeout governs liveness |
+| `SessionTimeout` | Requests 30 seconds by default. The accepted server timeout governs liveness. |
 | `InitialConnectTimeout` | 30 seconds through initial authentication and readiness, across endpoint attempts; completion also waits for owned TLS cleanup |
 | `ConnectAttemptTimeout` | 5 seconds for DNS, TCP, TLS and the handshake; reduced by remaining initial/recovery time. Also bounds each platform certificate download where supported |
 | `OperationTimeout` | 30 seconds from invocation, including queue time |
@@ -52,6 +52,11 @@ endpoint returns an invalid handshake until the initial deadline expires,
 session rejection, an authentication failure, or a protocol error after handshake
 acceptance remains terminal.
 
+The client accepts server-negotiated session timeouts from **100 milliseconds
+through 1 hour**, inclusive. A positive timeout outside this range triggers
+endpoint failover. A nonpositive timeout signals session rejection on initial
+connection or expiry during recovery.
+
 After the handshake is accepted, authentication and watch restoration use the
 negotiated inbound liveness timers. Valid replies refresh those timers, so a
 progressing restore can exceed `ConnectAttemptTimeout` and the negotiated session
@@ -61,7 +66,7 @@ Before the client first becomes ready, the total `InitialConnectTimeout` still
 applies through authentication and any retries of the accepted session. Later
 reconnects use the negotiated session budget rather than that initial deadline.
 
-Timeouts require positive whole milliseconds, at most `int.MaxValue` milliseconds.
+Configured timeouts require positive whole milliseconds, at most `int.MaxValue` milliseconds.
 Frame/data limits do not change the server's Jute limits. Chroot is namespace
 translation; it does not provide ACL isolation or create the chroot node.
 

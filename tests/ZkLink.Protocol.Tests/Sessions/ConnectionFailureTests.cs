@@ -25,11 +25,13 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
         }
     }
 
-    [Fact(Timeout = 10000)]
+    [Theory(Timeout = 10000)]
+    [InlineData(0)]
+    [InlineData(-1)]
     [Trait("Acceptance", "T07")]
-    public async Task RejectedInitialHandshakeDoesNotCreateOrReplaceASession()
+    public async Task RejectedInitialHandshakeDoesNotCreateOrReplaceASession(int timeout)
     {
-        var peer = Peer(timeout: 0, id: 0);
+        var peer = Peer(timeout: timeout, id: 0);
         var error = await Assert
             .ThrowsAsync<ZooKeeperConnectionException>(() =>
                 _fixture.ConnectAsync(
@@ -41,6 +43,58 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
         Assert.Equal(ZooKeeperConnectionFailure.SessionRejected, error.Failure);
         Assert.True(peer.IsDisposed);
         Assert.Equal(1, _fixture.Connector.Attempts.Reader.Count);
+    }
+
+    [Theory(Timeout = 10000)]
+    [InlineData(1, 100)]
+    [InlineData(99, 3_600_000)]
+    [InlineData(3_600_001, 100)]
+    [InlineData(int.MaxValue, 3_600_000)]
+    [Trait("Acceptance", "T07")]
+    [Trait("Acceptance", "T08")]
+    public async Task OutOfRangeNegotiatedTimeoutRotatesToAnEndpointAtTheBoundary(
+        int rejected,
+        int accepted
+    )
+    {
+        var first = Peer(timeout: rejected, id: 456);
+        _fixture.Connector.Add(first);
+        var client = await _fixture
+            .ConnectAsync(
+                Peer(timeout: accepted),
+                SessionFixture.Options(connection: "one:2181,two:2181"),
+                TestContext.Current.CancellationToken
+            )
+            .ConfigureAwait(true);
+
+        Assert.True(first.IsDisposed);
+        Assert.Equal(2, _fixture.Connector.Attempts.Reader.Count);
+        Assert.Equal(1, client.Session.ConnectionGeneration);
+        Assert.Equal(123, client.Session.SessionId);
+        Assert.Equal(TimeSpan.FromMilliseconds(accepted), client.Session.NegotiatedTimeout);
+    }
+
+    [Theory(Timeout = 10000)]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [Trait("Acceptance", "T10")]
+    public async Task NonpositiveTimeoutOnResumeExpiresTheOwnedSession(int timeout)
+    {
+        var first = Peer();
+        var client = await _fixture
+            .ConnectAsync(
+                first,
+                SessionFixture.Options(connection: "one:2181,two:2181"),
+                TestContext.Current.CancellationToken
+            )
+            .ConfigureAwait(true);
+        _fixture.Connector.Add(Peer(timeout: timeout, id: 0));
+        first.Drop();
+        await SessionTestSupport.Bounded(client.Manager.Completion).ConfigureAwait(true);
+
+        Assert.Equal(ZooKeeperSessionState.Expired, client.Session.State);
+        Assert.Equal(1, client.Session.ConnectionGeneration);
+        Assert.Equal(2, _fixture.Connector.Attempts.Reader.Count);
     }
 
     [Fact(Timeout = 10000)]

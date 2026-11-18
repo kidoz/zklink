@@ -11,6 +11,9 @@ broader security, Native AOT or production qualification. See
 
 ### Fixed
 
+- Accept server-negotiated session timeouts from 100 milliseconds through one
+  hour, inclusive. Other positive values trigger endpoint failover during initial
+  connection and session recovery.
 - Try the next endpoint after an invalid ZooKeeper handshake during initial
   connection or recovery of an existing session.
 - Decode replies to previously encoded requests without measuring their request

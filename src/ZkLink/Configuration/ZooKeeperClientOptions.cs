@@ -27,6 +27,7 @@ public sealed class ZooKeeperClientOptions
         ZooKeeperCompatibilityProfile.ZooKeeper38;
 
     /// <summary>Gets the requested session timeout; the server's negotiated value governs liveness.</summary>
+    /// <remarks>The client accepts a negotiated value from 100 milliseconds through one hour, inclusive.</remarks>
     public TimeSpan SessionTimeout { get; init; } = TimeSpan.FromSeconds(30);
 
     /// <summary>Gets the total deadline for initial connection across all endpoints.</summary>

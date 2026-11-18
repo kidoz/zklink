@@ -7,8 +7,21 @@ namespace ZkLink.Sessions;
 
 internal sealed partial class SessionManager
 {
+    private const int MinNegotiatedTimeoutMilliseconds = 100;
+    private const int MaxNegotiatedTimeoutMilliseconds = 60 * 60 * 1000;
+
     internal TimeSpan AcceptHandshake(ConnectResponse handshake)
     {
+        if (
+            handshake.TimeoutMilliseconds
+            is < MinNegotiatedTimeoutMilliseconds
+                or > MaxNegotiatedTimeoutMilliseconds
+        )
+        {
+            throw new InvalidDataException(
+                "Negotiated session timeout is outside the supported range."
+            );
+        }
         lock (_gate)
         {
             if (_sessionId != 0 && _sessionId != handshake.SessionId)

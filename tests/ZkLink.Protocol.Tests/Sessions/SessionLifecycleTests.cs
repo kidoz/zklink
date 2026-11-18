@@ -8,9 +8,9 @@ public sealed class SessionLifecycleTests : IAsyncLifetime
     private readonly SessionFixture _fixture = new();
     private readonly List<SessionPeer> _peers = [];
 
-    private SessionPeer Peer(long id = 123)
+    private SessionPeer Peer(long id = 123, int timeout = 600)
     {
-        var value = new SessionPeer { Id = id };
+        var value = new SessionPeer { Id = id, NegotiatedTimeout = timeout };
         _peers.Add(value);
         return value;
     }
@@ -66,21 +66,23 @@ public sealed class SessionLifecycleTests : IAsyncLifetime
     }
 
     [Theory(Timeout = 10000)]
-    [InlineData(false)]
-    [InlineData(true)]
+    [InlineData(null, 600)]
+    [InlineData(456L, 600)]
+    [InlineData(123L, 99)]
     [Trait("Acceptance", "T08")]
     [Trait("Acceptance", "T10")]
     public async Task ResumePreservesSessionCredentialsAndWatermarkWithoutReplayingApplicationRequests(
-        bool wrongSessionFirst
+        long? rejectedPeerId,
+        int timeout
     )
     {
         var first = Peer();
         var second = Peer();
         _fixture.Connector.Add(first);
-        var wrongSession = wrongSessionFirst ? Peer(id: 456) : null;
-        if (wrongSession is not null)
+        var rejectedPeer = rejectedPeerId is { } id ? Peer(id, timeout) : null;
+        if (rejectedPeer is not null)
         {
-            _fixture.Connector.Add(wrongSession);
+            _fixture.Connector.Add(rejectedPeer);
         }
         _fixture.Connector.Add(second);
         var client = await SessionTestSupport
@@ -116,13 +118,13 @@ public sealed class SessionLifecycleTests : IAsyncLifetime
             .ConfigureAwait(true);
         Assert.Equal(RequestOutcome.Unknown, failure.Outcome);
         Assert.True(first.IsDisposed);
-        if (wrongSession is not null)
+        if (rejectedPeer is not null)
         {
             Assert.True(
-                (await SessionTestSupport.NextAsync(wrongSession).ConfigureAwait(true)).Handshake
+                (await SessionTestSupport.NextAsync(rejectedPeer).ConfigureAwait(true)).Handshake
             );
-            Assert.True(wrongSession.IsDisposed);
-            Assert.Equal(0, wrongSession.Requests.Count);
+            Assert.True(rejectedPeer.IsDisposed);
+            Assert.Equal(0, rejectedPeer.Requests.Count);
         }
         var resumed = await SessionTestSupport.NextAsync(second).ConfigureAwait(true);
         Assert.True(resumed.Handshake);
