@@ -544,6 +544,47 @@ public sealed class TransportSecurityTests
             .ConfigureAwait(true);
     }
 
+    [Fact(Timeout = 10000)]
+    public async Task ResolverSocketErrorSurvivesTheInitialConnectionDeadline()
+    {
+        var time = new ManualTimeProvider();
+        var duration = TimeSpan.FromSeconds(1);
+        var random = new SessionRandom(new Random(1));
+        var resolver = Substitute.For<IHostResolver>();
+        resolver
+            .ResolveAsync("private.test", Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                time.Advance(duration);
+                return Task.FromException<IPAddress[]>(
+                    new SocketException((int)SocketError.HostNotFound)
+                );
+            });
+        var options = ClientOptionsSnapshot.Capture(
+            new ZooKeeperClientOptions
+            {
+                ConnectionString = "private.test",
+                InitialConnectTimeout = duration,
+                ConnectAttemptTimeout = duration,
+            }
+        );
+        var error = await Assert
+            .ThrowsAsync<ZooKeeperConnectionException>(() =>
+                ZooKeeperClient.ConnectCoreAsync(
+                    options,
+                    time,
+                    new SocketTransportConnector(resolver, random),
+                    random,
+                    TestContext.Current.CancellationToken
+                )
+            )
+            .ConfigureAwait(true);
+        Assert.Equal(ZooKeeperConnectionFailure.Timeout, error.Failure);
+        Assert.Equal(SocketError.HostNotFound, error.SocketError);
+        Assert.Contains("HostNotFound", error.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("private.test", error.ToString(), StringComparison.Ordinal);
+    }
+
     [Fact]
     public void CertificateSnapshotsOwnIndependentHandles()
     {
