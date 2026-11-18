@@ -11,6 +11,14 @@ broader security, Native AOT or production qualification. See
 
 ### Added
 
+- Supply a new client certificate and trust roots together on each endpoint
+  attempt with `ZooKeeperTlsOptions.RequiredWithProvider`. Connection failures
+  report available TLS and socket failure categories.
+
+- Configure the host-owned client at startup through an `AddZkLink` factory.
+  `ZkLinkHealthCheck` reports readiness, and an explicit terminal policy can
+  request host shutdown or create a new session.
+
 - Warn when a caller directly discards the result of `SubscribeStateChanges()`
   (analyzer rule ZKL0007).
 
@@ -21,6 +29,13 @@ broader security, Native AOT or production qualification. See
   Development builds now use SDK 11.0.100.
 
 ### Fixed
+
+- Keep credential-bearing options private to the hosted registration.
+  Applications that previously resolved `ZooKeeperClientOptions` directly from
+  the service provider must register their own instance.
+
+- Capture each caller-supplied transaction and ACL entry once. Request failure
+  messages now include the operation, outcome and available server error code.
 
 - Isolate slow state subscribers. When a subscription fills its queue, its
   reader receives the buffered transitions followed by
