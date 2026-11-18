@@ -449,11 +449,17 @@ public sealed class NodeApiTests : IAsyncLifetime
     }
 
     [Theory(Timeout = TestTimeoutMilliseconds)]
-    [InlineData("seq-0000000001")]
-    [InlineData("/app-other/seq-0000000001")]
+    [InlineData(ZooKeeperOperation.CreateWithStat, "seq-0000000001")]
+    [InlineData(ZooKeeperOperation.CreateWithStat, "/app-other/seq-0000000001")]
+    [InlineData(ZooKeeperOperation.SetData, null)]
+    [InlineData(ZooKeeperOperation.SetAcl, null)]
+    [InlineData(ZooKeeperOperation.Delete, null)]
     [Trait("Acceptance", "T13")]
     [Trait("Acceptance", "T34")]
-    public async Task InvalidSequentialCreateReplyFailsOnlyTheCreateWithoutReplay(string replyPath)
+    public async Task InvalidStandaloneWriteReplyFailsOnlyTheWriteWithoutReplay(
+        ZooKeeperOperation operation,
+        string? replyPath
+    )
     {
         const string counter = "zklink.protocol.rejected_replies";
         var token = TestContext.Current.CancellationToken;
@@ -463,25 +469,50 @@ public sealed class NodeApiTests : IAsyncLifetime
         capture.Collect();
         double before = capture.Value(counter);
 
-        var create = Client.CreateAsync(
-            "/seq-",
-            null,
-            new CreateOptions([ZooKeeperAcl.OpenUnsafe], CreateMode.PersistentSequential),
-            token
-        );
-        var packet = await NextPathAsync((int)ZooKeeperOperation.CreateWithStat, "/app/seq-")
-            .ConfigureAwait(true);
+        string path = operation == ZooKeeperOperation.CreateWithStat ? "/seq-" : "/node";
+        Task write = operation switch
+        {
+            ZooKeeperOperation.CreateWithStat => Client.CreateAsync(
+                path,
+                null,
+                new CreateOptions([ZooKeeperAcl.OpenUnsafe], CreateMode.PersistentSequential),
+                token
+            ),
+            ZooKeeperOperation.SetData => Client.SetDataAsync(
+                path,
+                ReadOnlyMemory<byte>.Empty,
+                ZNodeVersion.Any,
+                token
+            ),
+            ZooKeeperOperation.SetAcl => Client.SetAclAsync(
+                path,
+                [ZooKeeperAcl.OpenUnsafe],
+                ZNodeVersion.Any,
+                token
+            ),
+            ZooKeeperOperation.Delete => Client.DeleteAsync(path, ZNodeVersion.Any, token),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation)),
+        };
+        var packet = await NextPathAsync((int)operation, "/app" + path).ConfigureAwait(true);
         var next = Client.ExistsAsync("/next", token);
-        Reply(packet, new PathResult(replyPath, Stat));
+        if (replyPath is not null)
+        {
+            Reply(packet, new PathResult(replyPath, Stat));
+        }
+        else
+        {
+            // One byte is an incomplete stat for either setter and trailing data for delete.
+            _peer.Inject([.. SessionPeer.Packet(packet.Xid), 0]);
+        }
 
         var failure = await Assert
-            .ThrowsAsync<ZooKeeperProtocolException>(() => create)
+            .ThrowsAsync<ZooKeeperProtocolException>(() => write)
             .ConfigureAwait(true);
         Assert.Equal(RequestOutcome.Unknown, failure.Outcome);
         Assert.Null(failure.ErrorCode);
         Assert.Equal(packet.Xid, failure.Request.RequestId);
-        Assert.Equal(ZooKeeperOperation.CreateWithStat, failure.Request.Operation);
-        Assert.Equal("/seq-", failure.Request.Path);
+        Assert.Equal(operation, failure.Request.Operation);
+        Assert.Equal(path, failure.Request.Path);
 
         var following = await NextPathAsync((int)ZooKeeperOperation.Exists, "/app/next")
             .ConfigureAwait(true);

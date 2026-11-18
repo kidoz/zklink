@@ -179,6 +179,9 @@ internal sealed class ConnectionRuntime(
                         }
                         or EmptyRequest { Type: ZooKeeperOperation.WhoAmI }
                         or CreateRequest
+                        or SetDataRequest
+                        or SetAclRequest
+                        or VersionRequest { Type: ZooKeeperOperation.Delete }
                         or MultiRequest { ReadOnly: true }
             )
         {

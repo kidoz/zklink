@@ -151,7 +151,8 @@ a globally fresh snapshot or expose node data.
 | Definitive server rejection | `Rejected` |
 | Transmission started and result is missing, or server error is ambiguous | `Unknown` |
 
-For standalone `CreateAsync` calls, `MultiReadAsync`, `SyncAsync`,
+For standalone writes (`CreateAsync`, `SetDataAsync`, `SetAclAsync`, `DeleteAsync`),
+`MultiReadAsync`, `SyncAsync`,
 unwatched node reads (`ExistsAsync`, `GetDataAsync`, `GetChildrenAsync`,
 `GetAclAsync`) and auxiliary queries (`GetEphemeralsAsync`,
 `GetAllChildrenNumberAsync`, `WhoAmIAsync`), an invalid body in a complete,

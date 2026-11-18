@@ -74,6 +74,12 @@ matched success reply with an invalid body fails only that read with
 `ZooKeeperProtocolException` and outcome `Unknown`. For example, an incomplete
 stat in an `ExistsAsync` reply raises the exception. The session stays connected.
 
+The same rule applies to standalone writes. An incomplete stat in a
+`SetDataAsync` or `SetAclAsync` success reply, or trailing bytes in a
+`DeleteAsync` success reply, leave the write outcome uncertain. The server
+may already have applied the change. The driver never replays the write, and
+queued requests continue on the same connection.
+
 ACLs do not inherit. Create/delete permission is checked on the parent; read/write
 permission applies to the node; admin permission controls ACL replacement.
 An `auth` ACL is expanded by the server to authenticated identities. Digest
