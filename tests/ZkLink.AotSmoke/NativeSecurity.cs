@@ -74,7 +74,10 @@ internal static class NativeSecurity
         }
 
         await Console
-            .Out.WriteLineAsync("Native TLS/digest and distinct ACL identities: verified.")
+            .Out.WriteLineAsync(
+                "Native TLS/digest and distinct ACL identities: verified.".AsMemory(),
+                CancellationToken.None
+            )
             .ConfigureAwait(false);
     }
 
@@ -105,7 +108,8 @@ internal static class NativeSecurity
 
         await Console
             .Out.WriteLineAsync(
-                "Native certificate/name/trust/plaintext rejection controls: verified."
+                "Native certificate/name/trust/plaintext rejection controls: verified.".AsMemory(),
+                CancellationToken.None
             )
             .ConfigureAwait(false);
 
@@ -150,7 +154,8 @@ internal static class NativeSecurity
                 // the server's explicit rejection, with valid controls on both sides.
                 await Console
                     .Out.WriteLineAsync(
-                        $"Native missing-client-certificate connection rejected ({error.Failure}); server evidence required."
+                        $"Native missing-client-certificate connection rejected ({error.Failure}); server evidence required.".AsMemory(),
+                        CancellationToken.None
                     )
                     .ConfigureAwait(false);
             }

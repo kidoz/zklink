@@ -20,20 +20,28 @@ internal sealed class SampleSession(TextWriter output, TextWriter error)
             foreach (var step in steps)
             {
                 var message = await step.RunAsync(client, cancellationToken).ConfigureAwait(false);
-                await output.WriteLineAsync(message).ConfigureAwait(false);
+                await output
+                    .WriteLineAsync(message.AsMemory(), cancellationToken)
+                    .ConfigureAwait(false);
             }
 
             await client.SyncAsync("/", cancellationToken).ConfigureAwait(false);
             await output
                 .WriteLineAsync(
-                    FormattableString.Invariant(
-                        $"State: {client.Session.State}; generation: {client.Session.ConnectionGeneration}; negotiated timeout: {client.Session.NegotiatedTimeout}"
-                    )
+                    FormattableString
+                        .Invariant(
+                            $"State: {client.Session.State}; generation: {client.Session.ConnectionGeneration}; negotiated timeout: {client.Session.NegotiatedTimeout}"
+                        )
+                        .AsMemory(),
+                    cancellationToken
                 )
                 .ConfigureAwait(false);
             await client.CloseAsync(cancellationToken).ConfigureAwait(false);
             await output
-                .WriteLineAsync($"Close: {client.Session.CloseStatus}")
+                .WriteLineAsync(
+                    $"Close: {client.Session.CloseStatus}".AsMemory(),
+                    CancellationToken.None
+                )
                 .ConfigureAwait(false);
             return 0;
         }
@@ -46,7 +54,9 @@ internal sealed class SampleSession(TextWriter output, TextWriter error)
                         or OperationCanceledException
             )
         {
-            await error.WriteLineAsync(exception.Message).ConfigureAwait(false);
+            await error
+                .WriteLineAsync(exception.Message.AsMemory(), CancellationToken.None)
+                .ConfigureAwait(false);
             return 1;
         }
     }

@@ -28,7 +28,8 @@ internal static class NativeRecovery
 
         await Console
             .Out.WriteLineAsync(
-                "Native same-session persistent/recursive restore/gap/removal, cancellation and acknowledged-close ephemeral cleanup: verified."
+                "Native same-session persistent/recursive restore/gap/removal, cancellation and acknowledged-close ephemeral cleanup: verified.".AsMemory(),
+                CancellationToken.None
             )
             .ConfigureAwait(false);
     }
@@ -119,7 +120,8 @@ internal static class NativeRecovery
             await NativeSettings.CloseAsync(owner, bounded).ConfigureAwait(false);
             await Console
                 .Out.WriteLineAsync(
-                    "Native sent cancellation: PASS (Unknown, same session, one committed child, no replay)."
+                    "Native sent cancellation: PASS (Unknown, same session, one committed child, no replay).".AsMemory(),
+                    CancellationToken.None
                 )
                 .ConfigureAwait(false);
         }

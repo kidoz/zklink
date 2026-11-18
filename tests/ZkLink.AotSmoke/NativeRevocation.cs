@@ -81,7 +81,10 @@ internal static class NativeRevocation
                 NativeSettings.Require(failure.CancellationToken == cancellation.Token);
             }
             await Console
-                .Out.WriteLineAsync("Native revocation case HeldCancellation: PASS")
+                .Out.WriteLineAsync(
+                    "Native revocation case HeldCancellation: PASS".AsMemory(),
+                    CancellationToken.None
+                )
                 .ConfigureAwait(false);
         }
         finally
@@ -111,7 +114,10 @@ internal static class NativeRevocation
             .ConfigureAwait(false);
         NativeSettings.Require(authority.Requests == 0);
         await Console
-            .Out.WriteLineAsync("Native NoCheck control " + scenario + ": PASS")
+            .Out.WriteLineAsync(
+                ("Native NoCheck control " + scenario + ": PASS").AsMemory(),
+                CancellationToken.None
+            )
             .ConfigureAwait(false);
         await ConnectAsync(
                 authority,
@@ -122,7 +128,10 @@ internal static class NativeRevocation
             .ConfigureAwait(false);
         NativeSettings.Require(authority.Requests > 0);
         await Console
-            .Out.WriteLineAsync("Native revocation case " + scenario + ": PASS")
+            .Out.WriteLineAsync(
+                ("Native revocation case " + scenario + ": PASS").AsMemory(),
+                CancellationToken.None
+            )
             .ConfigureAwait(false);
     }
 
@@ -177,7 +186,8 @@ internal static class NativeRevocation
                 {
                     await Console
                         .Out.WriteLineAsync(
-                            $"Native revocation rejection: failure={failure.Failure}, requests={authority.Requests}, application-frames={applicationFrames}"
+                            $"Native revocation rejection: failure={failure.Failure}, requests={authority.Requests}, application-frames={applicationFrames}".AsMemory(),
+                            CancellationToken.None
                         )
                         .ConfigureAwait(false);
                     NativeSettings.Require(failure.Failure == ZooKeeperConnectionFailure.Tls);

@@ -99,7 +99,9 @@ internal static class NativeDependencyInjection
             catch (ZooKeeperException error)
                 when (error.KnownErrorCode == ZooKeeperErrorCode.NoNode) { }
         }
-        await Console.Out.WriteLineAsync(Success).ConfigureAwait(false);
+        await Console
+            .Out.WriteLineAsync(Success.AsMemory(), CancellationToken.None)
+            .ConfigureAwait(false);
     }
 
     private static void RequireUnavailable(IZooKeeperClientAccessor accessor)
