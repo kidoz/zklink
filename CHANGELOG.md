@@ -9,6 +9,8 @@ broader security, Native AOT or production qualification. See
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-18
+
 ### Added
 
 - Supply a new client certificate and trust roots together on each endpoint
@@ -79,32 +81,33 @@ broader security, Native AOT or production qualification. See
   connection and session recovery.
 - Try the next endpoint after an invalid ZooKeeper handshake during initial
   connection or recovery of an existing session.
-- Decode replies to previously encoded requests without measuring their request
-  bodies again. This also applies to authentication and watch restoration replies.
-- Send each ZooKeeper frame in one stream write, including handshakes, requests,
-  heartbeats, authentication, watch restoration and close.
 - Reject requests whose encoded length differs from the byte reservation before
   assigning an xid or sending the frame. This covers transaction and ACL lists
   that change during submission.
-- Apply digest transport policy and credential size limits to a single captured
-  authentication list.
 - Preserve replacement watches when an older handle requests removal. Repeating
   a successful server-confirmed removal returns the original disposition.
 - Bind the hosted connection to the options passed to `AddZkLink` regardless of
   later options registrations.
-- Perform transport writes outside the session lock after the writer takes
-  ownership of the encoded packet.
 - Retain an earlier TLS failure when a later resolved address times out.
 - Share the remaining endpoint deadline across resolved addresses so a stalled
   TCP or TLS connection leaves time to try the next address.
-
-- Keep isolated-soak maintenance connections behind an owned loopback relay to
-  the verified leader, preserving plaintext-digest restrictions and cleanup.
-
 - Restrict unsafe plaintext digest authentication in the core to literal loopback
   endpoints, rejecting DNS names (including localhost), remote and mixed lists.
 - Align recursive-watch matching with the existing routing rule excluding
   child-list notifications.
+
+### Changed
+
+- Decode replies to previously encoded requests without measuring their request
+  bodies again. This also applies to authentication and watch restoration replies.
+- Send each ZooKeeper frame in one stream write, including handshakes, requests,
+  heartbeats, authentication, watch restoration and close.
+- Apply digest transport policy and credential size limits to a single captured
+  authentication list.
+- Perform transport writes outside the session lock after the writer takes
+  ownership of the encoded packet.
+- Keep isolated-soak maintenance connections behind an owned loopback relay to
+  the verified leader, preserving plaintext-digest restrictions and cleanup.
 - Consolidate current capability and Native AOT claims and preserve superseded
   release evidence in historical records.
 
