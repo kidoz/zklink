@@ -44,6 +44,14 @@ share of the remaining endpoint time among the addresses still to try. An early
 failure leaves the unused time for later addresses. All TLS attempts validate
 the configured server identity.
 
+If an endpoint returns an invalid ZooKeeper handshake, the client closes that
+transport and tries another endpoint within the current connection or recovery
+deadline. During recovery, each attempt resumes the existing session. If every
+endpoint returns an invalid handshake until the initial deadline expires,
+`ConnectAsync` reports `ZooKeeperConnectionFailure.Protocol`. An explicit
+session rejection, an authentication failure, or a protocol error after handshake
+acceptance remains terminal.
+
 After the handshake is accepted, authentication and watch restoration use the
 negotiated inbound liveness timers. Valid replies refresh those timers, so a
 progressing restore can exceed `ConnectAttemptTimeout` and the negotiated session

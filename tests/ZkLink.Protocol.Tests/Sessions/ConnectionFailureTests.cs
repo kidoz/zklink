@@ -44,6 +44,42 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
     }
 
     [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T08")]
+    public async Task InvalidHandshakesReportProtocolAtTheInitialDeadline()
+    {
+        var first = Peer(id: 0);
+        var second = Peer(id: 0);
+        _fixture.Connector.Add(first);
+        var budget = TimeSpan.FromMilliseconds(1);
+        var connecting = _fixture.ConnectAsync(
+            second,
+            new ZooKeeperClientOptions
+            {
+                ConnectionString = "one:2181,two:2181",
+                Tls = ZooKeeperTlsOptions.Disabled(),
+                InitialConnectTimeout = budget,
+            },
+            TestContext.Current.CancellationToken
+        );
+
+        Assert.True(first.IsDisposed);
+        Assert.True(second.IsDisposed);
+        Assert.False(connecting.IsCompleted);
+        var attempts = _fixture.Connector.Attempts.Reader;
+        Assert.True(attempts.TryRead(out var firstEndpoint));
+        Assert.True(attempts.TryRead(out var secondEndpoint));
+        Assert.NotEqual(firstEndpoint, secondEndpoint);
+
+        _fixture.Time.Advance(budget);
+        var error = await Assert
+            .ThrowsAsync<ZooKeeperConnectionException>(() => connecting)
+            .ConfigureAwait(true);
+        Assert.Equal(ZooKeeperConnectionFailure.Protocol, error.Failure);
+        Assert.Equal(secondEndpoint, error.Endpoint);
+        Assert.Equal(0, attempts.Count);
+    }
+
+    [Fact(Timeout = 10000)]
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Reliability",
         "CA2025",
@@ -197,11 +233,13 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
         Assert.Equal(2, client.Session.ConnectionGeneration);
     }
 
-    [Fact(Timeout = 10000)]
+    [Theory(Timeout = 10000)]
+    [InlineData(false)]
+    [InlineData(true)]
     [Trait("Acceptance", "T08")]
-    public async Task InitialHandshakeAttemptCanTimeOutAndRetryBeforeApplicationAdmission()
+    public async Task FailedInitialHandshakeRotatesBeforeApplicationAdmission(bool invalidReply)
     {
-        var first = Peer();
+        var first = Peer(id: invalidReply ? 0 : 123);
         first.ReplyHandshake = false;
         var second = Peer();
         var pending = _fixture.ConnectAsync(
@@ -211,7 +249,14 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
         );
         Assert.True((await SessionTestSupport.NextAsync(first).ConfigureAwait(true)).Handshake);
         _fixture.Connector.Add(second);
-        _fixture.Time.Advance(TimeSpan.FromSeconds(1));
+        if (invalidReply)
+        {
+            first.HandshakeReply();
+        }
+        else
+        {
+            _fixture.Time.Advance(TimeSpan.FromSeconds(1));
+        }
         var client = await SessionTestSupport.Bounded(pending).ConfigureAwait(true);
         Assert.True(first.IsDisposed);
         Assert.True((await SessionTestSupport.NextAsync(second).ConfigureAwait(true)).Handshake);

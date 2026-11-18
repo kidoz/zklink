@@ -244,6 +244,7 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                     deadline.Token
                 );
                 TransportConnection? transport = null;
+                var handshakeAccepted = false;
                 try
                 {
                     if (_sessionId != 0)
@@ -275,6 +276,7 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                         .RunAsync(
                             () =>
                             {
+                                handshakeAccepted = true;
                                 // The endpoint-attempt limit ends at handshake acceptance;
                                 // the initial total deadline still includes authentication.
                                 if (_initialReady.Task.IsCompletedSuccessfully)
@@ -374,6 +376,19 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                     {
                         lastFailure = new(ZooKeeperConnectionFailure.Timeout, endpoint);
                     }
+                }
+                catch (InvalidDataException) when (!handshakeAccepted)
+                {
+                    lastFailure = new ZooKeeperConnectionException(
+                        ZooKeeperConnectionFailure.Protocol,
+                        endpoint
+                    );
+                }
+                catch (ZooKeeperConnectionException error)
+                    when (!handshakeAccepted && error.Failure == ZooKeeperConnectionFailure.Protocol
+                    )
+                {
+                    lastFailure = error;
                 }
                 catch (ZooKeeperConnectionException error)
                 {

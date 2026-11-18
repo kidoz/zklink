@@ -11,6 +11,8 @@ broader security, Native AOT or production qualification. See
 
 ### Fixed
 
+- Try the next endpoint after an invalid ZooKeeper handshake during initial
+  connection or recovery of an existing session.
 - Decode replies to previously encoded requests without measuring their request
   bodies again. This also applies to authentication and watch restoration replies.
 - Send each ZooKeeper frame in one stream write, including handshakes, requests,

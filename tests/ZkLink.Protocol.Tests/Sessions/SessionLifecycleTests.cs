@@ -8,9 +8,9 @@ public sealed class SessionLifecycleTests : IAsyncLifetime
     private readonly SessionFixture _fixture = new();
     private readonly List<SessionPeer> _peers = [];
 
-    private SessionPeer Peer()
+    private SessionPeer Peer(long id = 123)
     {
-        var value = new SessionPeer();
+        var value = new SessionPeer { Id = id };
         _peers.Add(value);
         return value;
     }
@@ -65,20 +65,29 @@ public sealed class SessionLifecycleTests : IAsyncLifetime
         Assert.Equal(0, client.Manager.Scheduler.OwnedBytes);
     }
 
-    [Fact(Timeout = 10000)]
+    [Theory(Timeout = 10000)]
+    [InlineData(false)]
+    [InlineData(true)]
     [Trait("Acceptance", "T08")]
     [Trait("Acceptance", "T10")]
-    public async Task ResumePreservesSessionCredentialsAndWatermarkWithoutReplayingApplicationRequests()
+    public async Task ResumePreservesSessionCredentialsAndWatermarkWithoutReplayingApplicationRequests(
+        bool wrongSessionFirst
+    )
     {
         var first = Peer();
         var second = Peer();
         _fixture.Connector.Add(first);
+        var wrongSession = wrongSessionFirst ? Peer(id: 456) : null;
+        if (wrongSession is not null)
+        {
+            _fixture.Connector.Add(wrongSession);
+        }
         _fixture.Connector.Add(second);
         var client = await SessionTestSupport
             .Bounded(
                 ZooKeeperClient.ConnectCoreAsync(
                     ZkLink.Configuration.ClientOptionsSnapshot.Capture(
-                        SessionFixture.Options(connection: "first:2181,second:2181")
+                        SessionFixture.Options(connection: "one:2181,two:2181,three:2181")
                     ),
                     _fixture.Time,
                     _fixture.Connector,
@@ -107,6 +116,14 @@ public sealed class SessionLifecycleTests : IAsyncLifetime
             .ConfigureAwait(true);
         Assert.Equal(RequestOutcome.Unknown, failure.Outcome);
         Assert.True(first.IsDisposed);
+        if (wrongSession is not null)
+        {
+            Assert.True(
+                (await SessionTestSupport.NextAsync(wrongSession).ConfigureAwait(true)).Handshake
+            );
+            Assert.True(wrongSession.IsDisposed);
+            Assert.Equal(0, wrongSession.Requests.Count);
+        }
         var resumed = await SessionTestSupport.NextAsync(second).ConfigureAwait(true);
         Assert.True(resumed.Handshake);
         var reader = new JuteReader(resumed.Bytes, ProtocolFixtures.Limits);
