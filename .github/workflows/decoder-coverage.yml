@@ -1,0 +1,30 @@
+name: Decoder coverage campaign
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '41 3 * * 0'
+
+permissions:
+  contents: read
+
+jobs:
+  decoder-properties:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+          dotnet-version: '10.0.404'
+      - name: Explore generated decoder cases
+        run: python3 dev/test-decoder-coverage.py --seed "${GITHUB_RUN_ID}" --cases 48
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: decoder-coverage
+          path: artifacts/decoder-coverage/
+          if-no-files-found: error

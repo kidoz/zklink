@@ -51,7 +51,18 @@ jobs:
       - name: Test public contracts
         run: dotnet test --project tests/ZkLink.Tests -c Release --no-build --no-restore
       - name: Test protocol
+        if: matrix.os != 'ubuntu-latest'
         run: dotnet test --project tests/ZkLink.Protocol.Tests -c Release --no-build --no-restore
+      - name: Test protocol with coverage
+        if: matrix.os == 'ubuntu-latest'
+        run: dotnet test --project tests/ZkLink.Protocol.Tests -c Release --no-build --no-restore --results-directory artifacts/coverage --coverage --coverage-output-format cobertura --coverage-output protocol.xml
+      - name: Upload protocol coverage
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: protocol-coverage
+          path: artifacts/coverage/**/protocol.xml
+          if-no-files-found: error
       - name: Test dependency injection
         run: dotnet test --project tests/ZkLink.Extensions.DependencyInjection.Tests -c Release --no-build --no-restore
       - name: Test analyzers

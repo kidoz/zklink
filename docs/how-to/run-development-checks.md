@@ -58,6 +58,21 @@ just test tests/ZkLink.Analyzers.Tests
 All four suites are server-free. Use `--project` with `dotnet test`; this repository
 selects Microsoft.Testing.Platform in [global.json](../../global.json).
 
+## Exercise decoder properties with coverage feedback
+
+Run `python3 dev/test-decoder-coverage.py --cases 24 --seed 1729`. Each case
+generates bounded handshakes, notifications, connection strings and framed
+replies from the Apache fixtures. The runner retains seeds that reach new
+decoder lines and changes individual bits in retained seeds to select later
+cases. Reports and the retained corpus are written to
+`artifacts/decoder-coverage/`. Replay a case by setting
+`ZKLINK_DECODER_CAMPAIGN_SEED` to its recorded integer and running the protocol
+suite with `--filter-class '*DecoderPropertyTests'`.
+
+The weekly and manually dispatched decoder workflow keeps its corpus and test
+logs. The Linux build uploads a Cobertura report from the protocol suite.
+CodeQL checks C# and Python on pushes and pull requests targeting main.
+
 ## Compare protocol bytes with Apache Java
 
 On macOS or Linux, install JDK 25 and Python 3 in addition to the

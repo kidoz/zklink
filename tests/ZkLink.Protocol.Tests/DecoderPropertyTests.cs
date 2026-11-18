@@ -13,15 +13,49 @@ namespace ZkLink.Protocol.Tests;
 )]
 public sealed class DecoderPropertyTests
 {
+    private static string? CampaignSeed =>
+        Environment.GetEnvironmentVariable("ZKLINK_DECODER_CAMPAIGN_SEED");
+
     public static TheoryData<int> Seeds
     {
         get
         {
+            if (CampaignSeed is { Length: > 0 } candidate)
+            {
+                return new TheoryData<int> { int.Parse(candidate, CultureInfo.InvariantCulture) };
+            }
             var seeds = new TheoryData<int> { 17, 1729, 65537 };
             if (Environment.GetEnvironmentVariable("ZKLINK_DECODER_SEED") is { Length: > 0 } seed)
                 seeds.Add(int.Parse(seed, CultureInfo.InvariantCulture));
             return seeds;
         }
+    }
+
+    [Theory]
+    [MemberData(nameof(Seeds))]
+    public void TruncatedHandshakeAndTrailingNotificationDataAreRejected(int seed)
+    {
+        var handshake = ProtocolFixtures.Bytes("connect-reply");
+        int length = (int)((uint)seed % (handshake.Length - 1));
+        Assert.Throws<InvalidDataException>(() =>
+        {
+            using var unexpected = HandshakeCodec.Decode(
+                handshake.AsSpan(0, length),
+                ProtocolFixtures.Limits
+            );
+        });
+
+        var notification = new byte[128];
+        var writer = new JuteWriter(notification, ProtocolFixtures.Limits);
+        writer.WriteReplyHeader(new ReplyHeader(-1, seed, 0));
+        writer.WriteInt32(3);
+        writer.WriteInt32(3);
+        writer.WriteString("/fixture");
+        int trailing = 1 + (int)((uint)seed % 7);
+        int size = writer.WrittenCount + trailing;
+        Assert.Throws<InvalidDataException>(() =>
+            ReplyCodec.DecodeNotification(notification.AsSpan(0, size), ProtocolFixtures.Limits)
+        );
     }
 
     [Theory]
@@ -33,7 +67,10 @@ public sealed class DecoderPropertyTests
         var fixtures = ProtocolFixtures.All;
         using var stream = new MemoryStream();
         var expected = new List<(ProtocolFixture Fixture, long Zxid)>();
-        foreach (var fixture in random.GetItems(fixtures, 64))
+        var cases = CampaignSeed is null
+            ? random.GetItems(fixtures, 64)
+            : [fixtures[(int)((uint)seed % fixtures.Length)]];
+        foreach (var fixture in cases)
         {
             var payload = ProtocolFixtures.Bytes(fixture.Name + "-reply");
             long zxid = random.NextInt64();
@@ -87,12 +124,18 @@ public sealed class DecoderPropertyTests
             Assert.Equal(new WireNotification(type, 3, path, zxid), notification);
 
             var port = random.Next(1, 65536);
+            bool ipv6 = (seed & 1) != 0;
+            string authority = ipv6 ? "[::1]" : "zk.example";
+            bool multiple = (seed & 2) != 0;
             var parsed = ConnectionStringParser.Parse(
-                FormattableString.Invariant($"zk.example:{port}{path}")
+                FormattableString.Invariant(
+                    $"{authority}:{port}{(multiple ? ",replica" : "")}{path}"
+                )
             );
             Assert.Equal(path, parsed.Chroot);
-            var endpoint = Assert.Single(parsed.Endpoints);
-            Assert.Equal("zk.example", endpoint.Host);
+            Assert.Equal(multiple ? 2 : 1, parsed.Endpoints.Count);
+            var endpoint = parsed.Endpoints[0];
+            Assert.Equal(ipv6 ? "::1" : "zk.example", endpoint.Host);
             Assert.Equal(port, endpoint.Port);
         }
     }
@@ -110,7 +153,11 @@ public sealed class DecoderPropertyTests
             var sessionId = random.NextInt64(1, long.MaxValue);
             BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(sizeof(int)), timeout);
             BinaryPrimitives.WriteInt64BigEndian(bytes.AsSpan(2 * sizeof(int)), sessionId);
-            using var reply = HandshakeCodec.Decode(bytes, ProtocolFixtures.Limits);
+            bool legacy = (seed & 4) != 0;
+            using var reply = HandshakeCodec.Decode(
+                legacy ? bytes.AsSpan(0, bytes.Length - 1) : bytes,
+                ProtocolFixtures.Limits
+            );
             Assert.True(reply.Accepted);
             Assert.Equal(timeout, reply.TimeoutMilliseconds);
             Assert.Equal(sessionId, reply.SessionId);
