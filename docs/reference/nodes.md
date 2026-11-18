@@ -30,6 +30,12 @@ modes are implemented. Ordinary creates use `create2`; container creates use
 suffixes are returned exactly as received; they do not promise a globally unique
 or permanently positive counter.
 
+If a matched success reply to `CreateAsync` has an invalid body, such as a
+relative path or a path outside the chroot, the call throws
+`ZooKeeperProtocolException` with outcome `Unknown`. The server may already
+have created the node. The driver keeps the session connected and never
+replays the create. Retrying a sequential create can create a second node.
+
 Ephemeral nodes belong to the session and cannot have children. Acknowledged
 close has been tested to remove them. Disconnection or unacknowledged close alone
 does not prove removal. Empty containers can be removed asynchronously by the

@@ -178,6 +178,7 @@ internal sealed class ConnectionRuntime(
                                 or ZooKeeperOperation.GetAllChildrenNumber
                         }
                         or EmptyRequest { Type: ZooKeeperOperation.WhoAmI }
+                        or CreateRequest
                         or MultiRequest { ReadOnly: true }
             )
         {

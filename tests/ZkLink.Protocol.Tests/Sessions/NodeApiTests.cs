@@ -1,7 +1,10 @@
+using ZkLink.Diagnostics;
 using ZkLink.Protocol;
+using ZkLink.Testing;
 
 namespace ZkLink.Protocol.Tests.Sessions;
 
+[Collection("Telemetry")]
 public sealed class NodeApiTests : IAsyncLifetime
 {
     private const int TestTimeoutMilliseconds = 10_000;
@@ -443,6 +446,56 @@ public sealed class NodeApiTests : IAsyncLifetime
         input.EnsureEnd();
         Reply(packet, new EmptyResult());
         await delete.ConfigureAwait(true);
+    }
+
+    [Theory(Timeout = TestTimeoutMilliseconds)]
+    [InlineData("seq-0000000001")]
+    [InlineData("/app-other/seq-0000000001")]
+    [Trait("Acceptance", "T13")]
+    [Trait("Acceptance", "T34")]
+    public async Task InvalidSequentialCreateReplyFailsOnlyTheCreateWithoutReplay(string replyPath)
+    {
+        const string counter = "zklink.protocol.rejected_replies";
+        var token = TestContext.Current.CancellationToken;
+        var generation = Client.Session.ConnectionGeneration;
+        using var capture = new TelemetryCapture();
+        await ZooKeeperTelemetry.FlushAsync(token).ConfigureAwait(true);
+        capture.Collect();
+        double before = capture.Value(counter);
+
+        var create = Client.CreateAsync(
+            "/seq-",
+            null,
+            new CreateOptions([ZooKeeperAcl.OpenUnsafe], CreateMode.PersistentSequential),
+            token
+        );
+        var packet = await NextPathAsync((int)ZooKeeperOperation.CreateWithStat, "/app/seq-")
+            .ConfigureAwait(true);
+        var next = Client.ExistsAsync("/next", token);
+        Reply(packet, new PathResult(replyPath, Stat));
+
+        var failure = await Assert
+            .ThrowsAsync<ZooKeeperProtocolException>(() => create)
+            .ConfigureAwait(true);
+        Assert.Equal(RequestOutcome.Unknown, failure.Outcome);
+        Assert.Null(failure.ErrorCode);
+        Assert.Equal(packet.Xid, failure.Request.RequestId);
+        Assert.Equal(ZooKeeperOperation.CreateWithStat, failure.Request.Operation);
+        Assert.Equal("/seq-", failure.Request.Path);
+
+        var following = await NextPathAsync((int)ZooKeeperOperation.Exists, "/app/next")
+            .ConfigureAwait(true);
+        Reply(following, new StatResult(Stat));
+        Assert.Equal(PublicStat, await next.ConfigureAwait(true));
+        Assert.Equal(ZooKeeperSessionState.Connected, Client.Session.State);
+        Assert.Equal(generation, Client.Session.ConnectionGeneration);
+        capture.Collect();
+        Assert.Equal(before + 1, capture.Value(counter));
+
+        await Client.CloseAsync(token).ConfigureAwait(true);
+        var close = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        Assert.Equal((int)ZooKeeperOperation.CloseSession, close.Opcode);
+        Assert.Equal(0, _peer.Requests.Count);
     }
 
     [Fact(Timeout = 10000)]

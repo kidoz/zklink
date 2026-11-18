@@ -19,6 +19,11 @@ broader security, Native AOT or production qualification. See
 
 ### Fixed
 
+- Keep the session connected when a standalone `CreateAsync` receives an invalid
+  body in a matched success reply. The call reports `RequestOutcome.Unknown`
+  because the server may already have created the node. The driver never replays
+  the create.
+
 - Fail a read batch with `ZooKeeperProtocolException` when its matched success
   reply contains an invalid member or terminator. Queued requests can continue
   on the same connection. An explicit session-expiry error still ends the session.
