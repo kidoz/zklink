@@ -1,9 +1,12 @@
 using System.Globalization;
+using ZkLink.Diagnostics;
 using ZkLink.Protocol;
+using ZkLink.Testing;
 using ZkLink.Watches;
 
 namespace ZkLink.Protocol.Tests.Sessions;
 
+[Collection("Telemetry")]
 public sealed class PersistentWatchTests : IAsyncLifetime
 {
     private const int TestTimeoutMilliseconds = 10_000;
@@ -211,6 +214,134 @@ public sealed class PersistentWatchTests : IAsyncLifetime
         _peer.Reply(cleanup);
         await BarrierAsync().ConfigureAwait(true);
         Assert.Equal(0, Client.Manager.WatchCount);
+    }
+
+    [Theory(Timeout = TestTimeoutMilliseconds)]
+    [InlineData(
+        ZooKeeperCompatibilityProfile.ZooKeeper38,
+        PersistentWatchMode.Persistent,
+        WatchProtocol.Any,
+        null
+    )]
+    [InlineData(
+        ZooKeeperCompatibilityProfile.ZooKeeper38,
+        PersistentWatchMode.PersistentRecursive,
+        WatchProtocol.Any,
+        ZooKeeperErrorCode.NoAuth
+    )]
+    [InlineData(
+        ZooKeeperCompatibilityProfile.ZooKeeper39,
+        PersistentWatchMode.Persistent,
+        WatchProtocol.Persistent,
+        ZooKeeperErrorCode.NoAuth
+    )]
+    [InlineData(
+        ZooKeeperCompatibilityProfile.ZooKeeper39,
+        PersistentWatchMode.PersistentRecursive,
+        WatchProtocol.PersistentRecursive,
+        null
+    )]
+    [Trait("Acceptance", "T25")]
+    public async Task MalformedAddAcknowledgmentCleansTheUnclaimedWatch(
+        ZooKeeperCompatibilityProfile profile,
+        PersistentWatchMode mode,
+        int removalCategory,
+        ZooKeeperErrorCode? bodyStatus
+    )
+    {
+        var token = TestContext.Current.CancellationToken;
+        using var peer = new SessionPeer { ReplyApplications = false };
+        var fixture = new SessionFixture();
+        await using var fixtureLifetime = fixture.ConfigureAwait(true);
+        var client = await fixture
+            .ConnectAsync(
+                peer,
+                SessionFixture.Options(inFlight: 1, connection: "first:2181/app", profile: profile),
+                token
+            )
+            .ConfigureAwait(true);
+        await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
+        var generation = client.Session.ConnectionGeneration;
+        const string counter = "zklink.protocol.rejected_replies";
+        using var capture = new TelemetryCapture();
+        await ZooKeeperTelemetry.FlushAsync(token).ConfigureAwait(true);
+        capture.Collect();
+        double before = capture.Value(counter);
+
+        var add = client.AddWatchAsync("/node", mode, token);
+        var packet = await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
+        AssertWatchRequest(packet, ZooKeeperOperation.AddWatch, "/app/node", (int)mode);
+        var next = client.SyncAsync("/next", token);
+        var bytes = new byte[PacketBytes];
+        var writer = new JuteWriter(bytes, ProtocolFixtures.Limits);
+        writer.WriteReplyHeader(new ReplyHeader(packet.Xid, Watermark, WatchProtocol.Success));
+        if (bodyStatus.HasValue)
+        {
+            writer.WriteInt32((int)bodyStatus.Value);
+        }
+        peer.Inject(bytes[..writer.WrittenCount]);
+
+        var failure = await Assert
+            .ThrowsAsync<ZooKeeperProtocolException>(() => add)
+            .ConfigureAwait(true);
+        Assert.Equal(RequestOutcome.Unknown, failure.Outcome);
+        Assert.Equal(packet.Xid, failure.Request.RequestId);
+        Assert.Equal(ZooKeeperOperation.AddWatch, failure.Request.Operation);
+        Assert.Null(failure.ErrorCode);
+        Assert.Equal(0, client.Manager.WatchCount);
+
+        var following = new[]
+        {
+            await SessionTestSupport.NextAsync(peer).ConfigureAwait(true),
+            await SessionTestSupport.NextAsync(peer).ConfigureAwait(true),
+        };
+        var cleanup = Assert.Single(
+            following,
+            request => request.Opcode == (int)ZooKeeperOperation.RemoveWatches
+        );
+        AssertWatchRequest(cleanup, ZooKeeperOperation.RemoveWatches, "/app/node", removalCategory);
+        Assert.Single(following, request => request.Opcode == (int)ZooKeeperOperation.Sync);
+        foreach (var request in following)
+        {
+            peer.Reply(request);
+        }
+        await next.ConfigureAwait(true);
+        Assert.Equal(ZooKeeperSessionState.Connected, client.Session.State);
+        Assert.Equal(generation, client.Session.ConnectionGeneration);
+        capture.Collect();
+        Assert.Equal(before + 1, capture.Value(counter));
+    }
+
+    [Theory(Timeout = TestTimeoutMilliseconds)]
+    [InlineData(PersistentWatchMode.Persistent, "/node")]
+    [InlineData(PersistentWatchMode.PersistentRecursive, "/node/child")]
+    [Trait("Acceptance", "T25")]
+    public async Task MalformedAddAcknowledgmentPreservesTheSharedRegistration(
+        PersistentWatchMode mode,
+        string eventPath
+    )
+    {
+        var token = TestContext.Current.CancellationToken;
+        var existing = await RegisterAsync(mode).ConfigureAwait(true);
+        var add = Client.AddWatchAsync("/node", mode, token);
+        var packet = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        _peer.Inject(SessionPeer.Packet(packet.Xid));
+        await Assert.ThrowsAsync<ZooKeeperProtocolException>(() => add).ConfigureAwait(true);
+        Assert.Equal(1, Client.Manager.WatchCount);
+
+        var barrier = Client.SyncAsync("/barrier", token);
+        var sync = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        Assert.Equal((int)ZooKeeperOperation.Sync, sync.Opcode);
+        Notify(_peer, ZooKeeperWatchEventKind.NodeDataChanged, "/app" + eventPath);
+        _peer.Reply(sync);
+        await barrier.ConfigureAwait(true);
+        await using var reader = existing.ReadEventsAsync(token).GetAsyncEnumerator(token);
+        Assert.True(await reader.MoveNextAsync().ConfigureAwait(true));
+        Assert.Equal(existing.RegistrationId, reader.Current.RegistrationId);
+        Assert.Equal(eventPath, reader.Current.Path);
+        Assert.Equal(ZooKeeperWatchEventKind.NodeDataChanged, reader.Current.Kind);
+        Assert.True(existing.Active);
+        Assert.Equal(0, _peer.Requests.Count);
     }
 
     [Fact(Timeout = TestTimeoutMilliseconds)]

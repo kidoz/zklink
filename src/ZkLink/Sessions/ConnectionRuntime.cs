@@ -181,6 +181,7 @@ internal sealed class ConnectionRuntime(
                         or SetDataRequest
                         or SetAclRequest
                         or VersionRequest { Type: ZooKeeperOperation.Delete }
+                        or WatchRequest { Type: ZooKeeperOperation.AddWatch }
                         or MultiRequest
             )
         {
