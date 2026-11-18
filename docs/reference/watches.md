@@ -192,9 +192,10 @@ replacement session. Malformed or unsupported restore responses fault explicitly
 
 `MaxWatches` defaults to 10,000, with range 1–1,000,000. Pending registrations and
 unread completed streams retain a handle slot until released. Cleanup metadata
-is also bounded by this limit, so a new path can encounter local backpressure
-while cleanup is outstanding. A watched path must fit a one-path restoration
-frame after chroot expansion.
+uses the same limit. Disposing the last active handle at a path and category
+reuses its registration slot for cleanup, even when the table is full. A new
+path can encounter local backpressure while cleanup is outstanding. A watched
+path must fit a one-path restoration frame after chroot expansion.
 
 Watch queues share `MaxBufferedEvents` and count every logical recipient after
 fan-out, including reconnect gaps. State subscriptions have independent queues. Persistent streams

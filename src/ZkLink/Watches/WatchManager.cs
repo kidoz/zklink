@@ -406,6 +406,11 @@ internal sealed class WatchManager(
                 bucket.Dirty = false;
                 _cleanup.Remove(key);
             }
+            if (mode == WatchRemovalMode.Local && active && !shared)
+            {
+                // Retain the active registration's slot for cleanup before releasing its last handle.
+                Cleanup(key);
+            }
             if (!watch.Pending)
             {
                 Release(watch);
@@ -425,29 +430,6 @@ internal sealed class WatchManager(
             }
             if (mode == WatchRemovalMode.Local)
             {
-                if (active)
-                {
-                    // Release may have pruned an empty bucket; retain a bounded cleanup intent.
-                    if (!_buckets.ContainsKey(key))
-                    {
-                        if (_buckets.Count >= options.Settings.MaxWatches)
-                        {
-                            throw new ZooKeeperBackpressureException(
-                                new ZooKeeperRequestInfo(
-                                    ZooKeeperOperation.RemoveWatches,
-                                    path: watch.Path
-                                )
-                            );
-                        }
-                        bucket ??= new Bucket();
-                        _buckets.Add(key, bucket);
-                        if (key.Category == WatchProtocol.PersistentRecursive)
-                        {
-                            _recursive.Add(key.Path, bucket);
-                        }
-                    }
-                    Cleanup(key);
-                }
                 return Task.FromResult(
                     new ZooKeeperWatchRemovalResult(
                         watch.RegistrationId,

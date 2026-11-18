@@ -294,13 +294,15 @@ public sealed class WatchManagerTests
 
     [Fact(Timeout = 10000)]
     [Trait("Acceptance", "T29")]
-    public async Task CancelingEnumerationDisposesTheRegistrationAndSchedulesCleanup()
+    public async Task CancelingEnumerationAtWatchCapacitySuppressesOnlyItsOwnHandle()
     {
         using var fixture = new RemovalFixture();
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(
             TestContext.Current.CancellationToken
         );
+        var other = fixture.Register("/other");
         var watch = fixture.Register();
+        Assert.Equal(2, fixture.Manager.Count);
         await using var events = watch
             .ReadEventsAsync(stop.Token)
             .GetAsyncEnumerator(TestContext.Current.CancellationToken);
@@ -310,8 +312,20 @@ public sealed class WatchManagerTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reading);
         Assert.True(watch.Suppressed);
         Assert.False(watch.Active);
-        Assert.Equal(0, fixture.Manager.Count);
+        Assert.Equal(1, fixture.Manager.Count);
+        Assert.True(other.Active);
         fixture.Session.Received().WakeWriter();
+        lock (fixture.Gate)
+        {
+            fixture.Manager.PrepareCleanup();
+        }
+        fixture
+            .Session.Received(1)
+            .TryWatchCleanup(
+                Arg.Is<WatchRequest>(request => request.Path == watch.Path),
+                Arg.Any<IRequestObserver>(),
+                out Arg.Any<Task<WireReply>?>()
+            );
     }
 
     private sealed class RemovalFixture : IDisposable
@@ -352,12 +366,12 @@ public sealed class WatchManagerTests
             Pending = SessionTestSupport.CreatePendingRequest(Info, _options, Gate);
         }
 
-        internal ZooKeeperWatch Register()
+        internal ZooKeeperWatch Register(string path = "/node")
         {
             var intent = Manager.Begin(
-                "/node",
+                path,
                 ZooKeeperWatchMode.Persistent,
-                new ZooKeeperRequestInfo(ZooKeeperOperation.AddWatch, path: "/node")
+                new ZooKeeperRequestInfo(ZooKeeperOperation.AddWatch, path: path)
             );
             lock (Gate)
             {
