@@ -23,14 +23,17 @@ def main():
     run = pathlib.Path(sys.argv[1]).resolve()
     artifacts = run / "compatibility"
     artifacts.mkdir()
-    properties = ["MSBuildSDKsPath", "MSBuildToolsPath", "NuGetPackageRoot", "PackageId",
+    properties = ["DotNetApiCompatTaskAssembly", "MSBuildToolsPath", "NuGetPackageRoot", "PackageId",
                   "PackageValidationBaselineVersion", "EnablePackageValidation",
                   "ApiCompatEnableRuleCannotChangeParameterName", "ApiCompatEnableRuleAttributesMustMatch"]
     result = subprocess.run(["dotnet", "msbuild", str(ROOT / "src/ZkLink"), "-nologo", "-p:Configuration=Release",
-                             "-getProperty:" + ",".join(properties)], cwd=ROOT, capture_output=True,
+                             "-getProperty:" + ",".join(properties), "-getItem:ApiCompatExcludeAttributesFile"],
+                            cwd=ROOT, capture_output=True,
                             text=True, timeout=COMMAND_GUARD_SECONDS, check=True)
     (artifacts / "properties.json").write_text(result.stdout, encoding="utf-8")
-    settings = json.loads(result.stdout)["Properties"]
+    evaluation = json.loads(result.stdout)
+    settings = evaluation["Properties"]
+    exclusions = evaluation["Items"]["ApiCompatExcludeAttributesFile"]
     baseline_version = settings["PackageValidationBaselineVersion"]
     if not baseline_version or settings["PackageId"] != "ZkLink" or any(
         settings[name].lower() != "true" for name in ["EnablePackageValidation",
@@ -58,8 +61,7 @@ def main():
     tools = pathlib.Path(settings["MSBuildToolsPath"])
     project = ET.Element("Project")
     ET.SubElement(project, "UsingTask", TaskName="Microsoft.DotNet.ApiCompat.Task.ValidatePackageTask",
-                  AssemblyFile=str(pathlib.Path(settings["MSBuildSDKsPath"]) /
-                                   "Microsoft.NET.Sdk/tools/net10.0/Microsoft.DotNet.ApiCompat.Task.dll"))
+                  AssemblyFile=settings["DotNetApiCompatTaskAssembly"])
     target = ET.SubElement(project, "Target", Name="CheckCompatibility")
     references = ET.SubElement(target, "MSBuild", Projects=str(ROOT / "src/ZkLink/ZkLink.csproj"),
                                Targets="GetReferencesForApiCompatValidatePackage",
@@ -70,6 +72,7 @@ def main():
                   RoslynAssembliesPath=str(tools / "Roslyn/bincore"),
                   RuntimeGraph=str(tools / "PortableRuntimeIdentifierGraph.json"),
                   PackageAssemblyReferences="@(CompatibilityReferences)",
+                  ExcludeAttributesFiles=";".join(item["FullPath"] for item in exclusions),
                   EnableRuleAttributesMustMatch=settings["ApiCompatEnableRuleAttributesMustMatch"],
                   EnableRuleCannotChangeParameterName=settings["ApiCompatEnableRuleCannotChangeParameterName"])
     harness = artifacts / "check.proj"

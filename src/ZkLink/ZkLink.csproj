@@ -30,6 +30,8 @@
     <None Include="../../THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="/" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The iterator attribute refers to a private state machine whose name can change. -->
+    <ApiCompatExcludeAttributesFile Include="ApiCompatExcludedAttributes.txt" />
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
     <AdditionalFiles Include="PublicAPI.Shipped.txt" />
     <AdditionalFiles Include="PublicAPI.Unshipped.txt" />

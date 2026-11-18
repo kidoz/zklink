@@ -18,6 +18,7 @@ def input_hashes():
         "Directory.Build.props", "Directory.Packages.props", "NuGet.Config", "global.json",
         "LICENSE", "THIRD-PARTY-NOTICES.md", "src/ZkLink/README.md",
         "src/ZkLink/PublicAPI.Shipped.txt", "src/ZkLink/PublicAPI.Unshipped.txt",
+        "src/ZkLink/ApiCompatExcludedAttributes.txt",
         "dev/core_package_artifacts.py", "dev/prepare-core-package.py",
         "dev/test-core-package.sh", "dev/test-core-package-rejections.py", "dev/release_version.py",
         "dev/check-core-compatibility.py", "dev/release_candidate.py",

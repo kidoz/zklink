@@ -27,6 +27,7 @@ def input_hashes():
     inputs += [path for path in (ROOT / "src/ZkLink.Extensions.DependencyInjection").iterdir()
                if path.is_file() and path.suffix in {".cs", ".csproj", ".json", ".md", ".txt"}]
     inputs += [ROOT / "dev/release-packages.py", ROOT / "dev/aot_packages.py"]
+    inputs += [ROOT / "src/ZkLink/ApiCompatExcludedAttributes.txt"]
     return {str(path.relative_to(ROOT)): sha256(path) for path in inputs if not {"obj", "bin"}.intersection(path.relative_to(ROOT).parts)}
 
 

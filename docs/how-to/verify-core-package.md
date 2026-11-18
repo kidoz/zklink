@@ -26,6 +26,8 @@ assets and runtime package dependencies are rejected. Assembly references must
 belong to the installed .NET runtime. SDK package validation and the existing
 public API analyzer run during the build. The SDK also compares the package
 against published **0.1.0**, including public parameter names and attributes.
+The validator excludes the compiler-generated async iterator attribute because
+it names a private state machine. Public method signatures are still checked.
 Compatible API additions are allowed. The core's shipped declaration baseline
 still records the initial 0.1.0 release.
 
