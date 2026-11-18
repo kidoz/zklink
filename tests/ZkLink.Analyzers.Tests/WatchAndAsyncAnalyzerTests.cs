@@ -187,6 +187,43 @@ public sealed class WatchAndAsyncAnalyzerTests
 
     [Fact]
     [Trait("Acceptance", "T41")]
+    public async Task MissingCancellationRespectsLambdaParametersAndStaticCaptureBoundaries()
+    {
+        var diagnostics = await AnalyzerTestHarness.AnalyzeAsync(
+            """
+            using System;
+            using System.Threading;
+            using System.Threading.Tasks;
+            using ZkLink;
+            public static class Example
+            {
+                public static Func<CancellationToken, Task> Callback(ZooKeeperClient client) =>
+                    token => client.SyncAsync("/available");
+
+                public static void Run(CancellationToken outer)
+                {
+                    static Task Local(ZooKeeperClient c) => c.SyncAsync("/local");
+                    Func<ZooKeeperClient, Task> simple = static c => c.SyncAsync("/simple");
+                    Func<ZooKeeperClient, Task> parenthesized = static (c) => c.SyncAsync("/paren");
+                    Func<ZooKeeperClient, CancellationToken, Task> own =
+                        static (c, token) => c.SyncAsync("/own");
+                }
+            }
+            """,
+            new MissingCancellationTokenAnalyzer()
+        );
+
+        var calls = diagnostics.Select(diagnostic =>
+            diagnostic.Location.SourceTree!.GetText().ToString(diagnostic.Location.SourceSpan)
+        );
+        Assert.Equal(
+            ["""c.SyncAsync("/own")""", """client.SyncAsync("/available")"""],
+            calls.Order(StringComparer.Ordinal)
+        );
+    }
+
+    [Fact]
+    [Trait("Acceptance", "T41")]
     public async Task SyncOverAsyncCoversResultWaitAndGetResultOnlyOnDirectCalls()
     {
         var diagnostics = await AnalyzerTestHarness.AnalyzeAsync(

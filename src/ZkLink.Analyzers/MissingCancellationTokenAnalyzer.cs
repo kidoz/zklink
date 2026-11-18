@@ -33,7 +33,7 @@ public sealed class MissingCancellationTokenAnalyzer : DiagnosticAnalyzer
         if (
             context.SemanticModel.GetSymbolInfo(invocation).Symbol is not IMethodSymbol method
             || !ZkLinkAnalyzerHelpers.IsAsyncMethod(method)
-            || !AcceptsCancellationToken(method)
+            || !HasCancellationTokenParameter(method)
             || ArgumentsContainCancellationToken(context, invocation)
             || !IsCancellationTokenAvailableInScope(context, invocation)
         )
@@ -50,7 +50,7 @@ public sealed class MissingCancellationTokenAnalyzer : DiagnosticAnalyzer
         );
     }
 
-    private static bool AcceptsCancellationToken(IMethodSymbol method)
+    private static bool HasCancellationTokenParameter(IMethodSymbol method)
     {
         foreach (var parameter in method.Parameters)
         {
@@ -84,48 +84,27 @@ public sealed class MissingCancellationTokenAnalyzer : DiagnosticAnalyzer
         SyntaxNode node
     )
     {
-        foreach (var ancestor in node.Ancestors())
+        var symbol = context.SemanticModel.GetEnclosingSymbol(
+            node.SpanStart,
+            context.CancellationToken
+        );
+        while (symbol is IMethodSymbol method)
         {
-            switch (ancestor)
-            {
-                case MethodDeclarationSyntax method:
-                    return HasCancellationTokenParameter(context, method.ParameterList);
-                case LocalFunctionStatementSyntax localFunction:
-                    if (HasCancellationTokenParameter(context, localFunction.ParameterList))
-                    {
-                        return true;
-                    }
-
-                    break;
-                case ParenthesizedLambdaExpressionSyntax lambda:
-                    if (HasCancellationTokenParameter(context, lambda.ParameterList))
-                    {
-                        return true;
-                    }
-
-                    break;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool HasCancellationTokenParameter(
-        SyntaxNodeAnalysisContext context,
-        ParameterListSyntax parameterList
-    )
-    {
-        foreach (var parameter in parameterList.Parameters)
-        {
-            if (
-                context.SemanticModel.GetDeclaredSymbol(parameter) is { Type: { } type }
-                && IsCancellationToken(type)
-            )
+            if (HasCancellationTokenParameter(method))
             {
                 return true;
             }
-        }
 
+            if (
+                method.IsStatic
+                || method.MethodKind
+                    is not (MethodKind.AnonymousFunction or MethodKind.LocalFunction)
+            )
+            {
+                break;
+            }
+            symbol = method.ContainingSymbol;
+        }
         return false;
     }
 
