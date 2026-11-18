@@ -776,6 +776,121 @@ public sealed class PersistentWatchTests : IAsyncLifetime
         Assert.Equal(1, client.Manager.WatchCount);
     }
 
+    [Theory(Timeout = TestTimeoutMilliseconds)]
+    [InlineData(WatchProtocol.Success, WatchRemovalStatus.ServerConfirmed)]
+    [InlineData((int)ZooKeeperErrorCode.NoWatcher, WatchRemovalStatus.NoWatcher)]
+    [Trait("Acceptance", "T29")]
+    public async Task MalformedRemovalAcknowledgmentLeavesConfirmationRetryable(
+        int retryCode,
+        WatchRemovalStatus expected
+    )
+    {
+        var token = TestContext.Current.CancellationToken;
+        var watch = await RegisterAsync(PersistentWatchMode.Persistent).ConfigureAwait(true);
+        var generation = Client.Session.ConnectionGeneration;
+        var removal = watch.RemoveAsync(WatchRemovalMode.ServerConfirmed, token);
+        var packet = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        AssertWatchRequest(
+            packet,
+            ZooKeeperOperation.RemoveWatches,
+            "/app/node",
+            WatchProtocol.Persistent
+        );
+        var next = Client.SyncAsync("/next", token);
+        _peer.Inject([.. SessionPeer.Packet(packet.Xid), 1]);
+
+        var failure = await Assert
+            .ThrowsAsync<ZooKeeperProtocolException>(() => removal)
+            .ConfigureAwait(true);
+        Assert.Equal(RequestOutcome.Unknown, failure.Outcome);
+        Assert.Equal(packet.Xid, failure.Request.RequestId);
+        Assert.Equal(ZooKeeperOperation.RemoveWatches, failure.Request.Operation);
+        Assert.Null(failure.ErrorCode);
+        Assert.Null(watch.ConfirmedRemoval);
+        Assert.True(watch.Suppressed);
+        Notify(_peer, ZooKeeperWatchEventKind.NodeDataChanged, "/app/node");
+        var sync = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        Assert.Equal((int)ZooKeeperOperation.Sync, sync.Opcode);
+        _peer.Reply(sync);
+        await next.ConfigureAwait(true);
+        Assert.Equal(0, watch.Queue.Reader.Count);
+        Assert.Equal(ZooKeeperSessionState.Connected, Client.Session.State);
+        Assert.Equal(generation, Client.Session.ConnectionGeneration);
+
+        var retry = watch.RemoveAsync(WatchRemovalMode.ServerConfirmed, token);
+        var retryPacket = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        AssertWatchRequest(
+            retryPacket,
+            ZooKeeperOperation.RemoveWatches,
+            "/app/node",
+            WatchProtocol.Persistent
+        );
+        _peer.Reply(retryPacket, retryCode);
+        Assert.Equal(expected, (await retry.ConfigureAwait(true)).Status);
+    }
+
+    [Fact(Timeout = TestTimeoutMilliseconds)]
+    [Trait("Acceptance", "T29")]
+    public async Task MalformedCleanupAcknowledgmentRetainsCapacityAndProtectsTheNextOwner()
+    {
+        var token = TestContext.Current.CancellationToken;
+        using var peer = new SessionPeer { ReplyApplications = false };
+        var fixture = new SessionFixture();
+        await using var fixtureLifetime = fixture.ConfigureAwait(true);
+        var client = await fixture
+            .ConnectAsync(peer, SessionFixture.Options(watches: 1), token)
+            .ConfigureAwait(true);
+        await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
+        var add = client.AddWatchAsync("/node", PersistentWatchMode.Persistent, token);
+        peer.Reply(await SessionTestSupport.NextAsync(peer).ConfigureAwait(true));
+        var original = await add.ConfigureAwait(true);
+        var generation = client.Session.ConnectionGeneration;
+        const string counter = "zklink.protocol.rejected_replies";
+        using var capture = new TelemetryCapture();
+        await ZooKeeperTelemetry.FlushAsync(token).ConfigureAwait(true);
+        capture.Collect();
+        double before = capture.Value(counter);
+
+        await original.DisposeAsync().ConfigureAwait(true);
+        var cleanup = await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
+        AssertWatchRequest(cleanup, ZooKeeperOperation.RemoveWatches, "/node", WatchProtocol.Any);
+        peer.Inject([.. SessionPeer.Packet(cleanup.Xid), 1]);
+        var barrier = client.SyncAsync("/next", token);
+        var sync = await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
+        Assert.Equal((int)ZooKeeperOperation.Sync, sync.Opcode);
+        peer.Reply(sync);
+        await barrier.ConfigureAwait(true);
+        Assert.Equal(ZooKeeperSessionState.Connected, client.Session.State);
+        Assert.Equal(generation, client.Session.ConnectionGeneration);
+        capture.Collect();
+        Assert.Equal(before + 1, capture.Value(counter));
+        Assert.Throws<ZooKeeperBackpressureException>(() =>
+        {
+            _ = client.AddWatchAsync("/other", PersistentWatchMode.Persistent, token);
+        });
+
+        var replacement = client.AddWatchAsync("/node", PersistentWatchMode.Persistent, token);
+        var packet = await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
+        AssertWatchRequest(
+            packet,
+            ZooKeeperOperation.AddWatch,
+            "/node",
+            (int)PersistentWatchMode.Persistent
+        );
+        peer.Reply(packet);
+        var survivor = await replacement.ConfigureAwait(true);
+        var status = await original
+            .RemoveAsync(WatchRemovalMode.ServerConfirmed, token)
+            .ConfigureAwait(true);
+        Assert.Equal(WatchRemovalStatus.SharedRegistrationRetained, status.Status);
+        Notify(peer, ZooKeeperWatchEventKind.NodeDataChanged, "/node");
+        await using var events = survivor.ReadEventsAsync(token).GetAsyncEnumerator(token);
+        Assert.True(await events.MoveNextAsync().ConfigureAwait(true));
+        Assert.Equal(survivor.RegistrationId, events.Current.RegistrationId);
+        Assert.Equal(ZooKeeperWatchEventKind.NodeDataChanged, events.Current.Kind);
+        Assert.Equal(0, peer.Requests.Count);
+    }
+
     [Fact(Timeout = TestTimeoutMilliseconds)]
     public async Task RejectedRemovalRetainsCapacityWithoutSpinningAndAnAcknowledgedRetryReleasesIt()
     {

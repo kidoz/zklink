@@ -322,14 +322,14 @@ internal sealed class WatchManager(
         }
     }
 
-    private void RejectCleanup(Key key)
+    private void RetainUnconfirmedCleanup(Key key)
     {
         SessionGate.RequireHeld(_gate);
         if (_buckets.TryGetValue(key, out var bucket))
         {
             bucket.Removing = false;
             bucket.Dirty = true;
-            // Retain the bound after a definitive rejection, without a tight retry loop.
+            // Keep the cleanup record bounded until an explicit retry or disconnect.
             _cleanup.Remove(key);
         }
     }
@@ -907,7 +907,10 @@ internal sealed class WatchManager(
         public void Replied(PendingRequest pending, WireReply reply)
         {
             _observed = true;
-            if (reply.Header.Error is WatchProtocol.Success or (int)ZooKeeperErrorCode.NoWatcher)
+            if (
+                reply.Result is not InvalidReplyBodyResult
+                && reply.Header.Error is WatchProtocol.Success or (int)ZooKeeperErrorCode.NoWatcher
+            )
             {
                 if (watch is not null)
                 {
@@ -920,7 +923,7 @@ internal sealed class WatchManager(
             }
             else
             {
-                manager.RejectCleanup(key);
+                manager.RetainUnconfirmedCleanup(key);
             }
         }
 

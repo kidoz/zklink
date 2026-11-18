@@ -19,6 +19,11 @@ broader security, Native AOT or production qualification. See
 
 ### Fixed
 
+- Keep the session connected when a watch removal acknowledgment contains
+  trailing data. Explicit removal reports `ZooKeeperProtocolException` with
+  outcome `Unknown`. Background cleanup retains the unconfirmed removal for
+  an explicit retry.
+
 - Keep the session connected when a one-shot watched read or `AddWatchAsync`
   receives a malformed body in a matched success reply. The call reports
   `ZooKeeperProtocolException` with outcome `Unknown`. The driver schedules

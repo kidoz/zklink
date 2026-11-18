@@ -122,11 +122,18 @@ child, persistent and persistent-recursive watches have separate categories.
 Removing one handle preserves other handles and independent categories. Registration and removal admission are ordered so an earlier cleanup
 cannot remove a later re-registration.
 
-A canceled or failed confirmation never revives local delivery. A definitive
-cleanup rejection retains bounded metadata without continuously retrying; an
-explicit confirmation retry or transport teardown can release it. A confirmation
-that needs a server reply fails with request-outcome metadata while disconnected.
-Local disposal still works.
+A canceled or failed confirmation leaves the handle locally suppressed. A
+successful removal reply must have an empty body. If a matched success reply
+contains trailing data, `RemoveAsync(ServerConfirmed)` throws
+`ZooKeeperProtocolException` with the original request ID and outcome `Unknown`.
+The server may already have removed the watch. The session stays connected.
+
+After a malformed acknowledgment or a definitive rejection, the driver keeps a
+bounded cleanup record and waits for an explicit retry. This also applies to
+background cleanup after disposal. Each malformed reply increments the rejection
+counter once. Disconnect clears connection-bound cleanup records.
+A confirmation that needs a server reply fails with request-outcome metadata
+while disconnected. Local disposal still works.
 
 Repeating a successful server-confirmed removal on the same handle returns its
 original disposition, even after another watch is registered at that path. The

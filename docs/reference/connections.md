@@ -152,7 +152,7 @@ a globally fresh snapshot or expose node data.
 | Transmission started and result is missing, or server error is ambiguous | `Unknown` |
 
 For standalone writes (`CreateAsync`, `SetDataAsync`, `SetAclAsync`, `DeleteAsync`),
-`MultiAsync`, `MultiReadAsync`, `SyncAsync`, `AddWatchAsync`,
+`MultiAsync`, `MultiReadAsync`, `SyncAsync`, `AddWatchAsync`, server-confirmed watch removal,
 node reads (`ExistsAsync`, `GetDataAsync`, `GetChildrenAsync`, `GetAclAsync`),
 the three one-shot watched reads, and auxiliary queries (`GetEphemeralsAsync`,
 `GetAllChildrenNumberAsync`, `WhoAmIAsync`), an invalid body in a complete,
