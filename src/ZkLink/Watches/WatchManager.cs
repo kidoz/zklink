@@ -211,7 +211,11 @@ internal sealed class WatchManager(
             return;
         }
         watch.Absent = reply.Header.Error == (int)ZooKeeperErrorCode.NoNode;
-        if (watch.Suppressed || pending.Completion.Task.IsCompleted)
+        if (
+            watch.Suppressed
+            || pending.Completion.Task.IsCompleted
+            || reply.Result is InvalidReplyBodyResult
+        )
         {
             Suppress(watch);
             Cleanup(For(watch));

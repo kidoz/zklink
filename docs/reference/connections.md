@@ -153,8 +153,8 @@ a globally fresh snapshot or expose node data.
 
 For standalone writes (`CreateAsync`, `SetDataAsync`, `SetAclAsync`, `DeleteAsync`),
 `MultiAsync`, `MultiReadAsync`, `SyncAsync`,
-unwatched node reads (`ExistsAsync`, `GetDataAsync`, `GetChildrenAsync`,
-`GetAclAsync`) and auxiliary queries (`GetEphemeralsAsync`,
+node reads (`ExistsAsync`, `GetDataAsync`, `GetChildrenAsync`, `GetAclAsync`),
+the three one-shot watched reads, and auxiliary queries (`GetEphemeralsAsync`,
 `GetAllChildrenNumberAsync`, `WhoAmIAsync`), an invalid body in a complete,
 matched success reply fails only that call with `ZooKeeperProtocolException`
 and outcome `Unknown`. This includes a create or sync reply that returns a

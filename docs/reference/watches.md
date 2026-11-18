@@ -14,6 +14,12 @@ registered locally before the reader handles the next frame. An event can
 therefore be buffered before the method's task completes or enumeration begins.
 Ordinary reads and transaction reads continue to register no watch.
 
+If a complete success reply matches a one-shot read but its body is invalid, the
+call throws `ZooKeeperProtocolException` with the original request ID and
+outcome `Unknown`. The caller receives no watch. The session stays connected
+and schedules best-effort removal of the server watch if it has no other local
+owner. Other handles sharing that registration continue to receive events.
+
 ## Persistent registration
 
 `AddWatchAsync(path, PersistentWatchMode.Persistent, cancellationToken)` returns

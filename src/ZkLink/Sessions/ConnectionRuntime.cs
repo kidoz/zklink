@@ -165,7 +165,6 @@ internal sealed class ConnectionRuntime(
                 && shape
                     is ReadRequest
                         {
-                            Watch: false,
                             Type: ZooKeeperOperation.Exists
                                 or ZooKeeperOperation.GetData
                                 or ZooKeeperOperation.GetChildren
@@ -185,7 +184,6 @@ internal sealed class ConnectionRuntime(
                         or MultiRequest
             )
         {
-            // The complete frame matched the FIFO head. These calls have no watch to reconcile.
             return new WireReply(header, new InvalidReplyBodyResult(memberSessionError));
         }
     }

@@ -19,6 +19,11 @@ broader security, Native AOT or production qualification. See
 
 ### Fixed
 
+- Keep the session connected when a one-shot watched read receives a malformed
+  body in a matched success reply. The call reports `ZooKeeperProtocolException`
+  with outcome `Unknown`. The driver schedules cleanup for an unclaimed watch
+  and preserves any other handle sharing the registration.
+
 - Keep the session connected when a standalone `CreateAsync`, `SetDataAsync`,
   `SetAclAsync`, or `DeleteAsync` receives an invalid body in a matched success
   reply. The call reports `RequestOutcome.Unknown` because the server may already

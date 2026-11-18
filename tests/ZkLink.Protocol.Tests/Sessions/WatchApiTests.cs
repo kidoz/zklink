@@ -254,6 +254,92 @@ public sealed class WatchApiTests : IAsyncLifetime
     }
 
     [Theory(Timeout = TestTimeoutMilliseconds)]
+    [InlineData(ZooKeeperWatchMode.OneShotChildren, WatchProtocol.Children)]
+    [InlineData(ZooKeeperWatchMode.OneShotData, WatchProtocol.Data)]
+    [InlineData(ZooKeeperWatchMode.OneShotExists, WatchProtocol.Data)]
+    [Trait("Acceptance", "T23")]
+    public async Task MalformedWatchedReadCleansTheUnclaimedRegistration(
+        ZooKeeperWatchMode mode,
+        int category
+    )
+    {
+        const string counter = "zklink.protocol.rejected_replies";
+        var token = TestContext.Current.CancellationToken;
+        var generation = Client.Session.ConnectionGeneration;
+        using var capture = new TelemetryCapture();
+        await ZooKeeperTelemetry.FlushAsync(token).ConfigureAwait(true);
+        capture.Collect();
+        double before = capture.Value(counter);
+
+        var pending = Start(mode);
+        var packet = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        AssertWatchRequest(packet, mode, "/app/node");
+        var next = Client.SyncAsync("/next", token);
+        var sync = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        Assert.Equal((int)ZooKeeperOperation.Sync, sync.Opcode);
+        if (mode == ZooKeeperWatchMode.OneShotChildren)
+        {
+            ReplyWithInvalidChildName(packet);
+        }
+        else
+        {
+            // A success header without the required data or stat.
+            _peer.Inject(SessionPeer.Packet(packet.Xid));
+        }
+
+        var failure = await Assert
+            .ThrowsAsync<ZooKeeperProtocolException>(() => pending)
+            .ConfigureAwait(true);
+        Assert.Equal(RequestOutcome.Unknown, failure.Outcome);
+        Assert.Equal(packet.Xid, failure.Request.RequestId);
+        Assert.Null(failure.ErrorCode);
+        var cleanup = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        AssertRemoval(cleanup, "/app/node", category);
+        _peer.Reply(sync);
+        _peer.Reply(cleanup);
+        await next.ConfigureAwait(true);
+        await BarrierAsync().ConfigureAwait(true);
+        Assert.Equal(0, Client.Manager.WatchCount);
+        Assert.Equal(ZooKeeperSessionState.Connected, Client.Session.State);
+        Assert.Equal(generation, Client.Session.ConnectionGeneration);
+        capture.Collect();
+        Assert.Equal(before + 1, capture.Value(counter));
+    }
+
+    [Fact(Timeout = TestTimeoutMilliseconds)]
+    [Trait("Acceptance", "T23")]
+    public async Task MalformedChildReadPreservesTheExistingSharedWatch()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var watch = await RegisterAsync(ZooKeeperWatchMode.OneShotChildren).ConfigureAwait(true);
+        // Observe the reader's decision before the public API can dispose the failed handle.
+        var (unclaimed, reply) = Client.Manager.WatchRead(
+            "/node",
+            ZooKeeperWatchMode.OneShotChildren,
+            token
+        );
+        var packet = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        ReplyWithInvalidChildName(packet);
+        await Assert.ThrowsAsync<ZooKeeperProtocolException>(() => reply).ConfigureAwait(true);
+        Assert.True(unclaimed.Suppressed);
+        Assert.Equal(1, Client.Manager.WatchCount);
+
+        Notify(_peer, ZooKeeperWatchEventKind.NodeChildrenChanged, "/app/node");
+        var barrier = Client.SyncAsync("/barrier", token);
+        var sync = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        Assert.Equal((int)ZooKeeperOperation.Sync, sync.Opcode);
+        _peer.Reply(sync);
+        await barrier.ConfigureAwait(true);
+        Assert.False(unclaimed.Queue.Reader.TryPeek(out _));
+        await using var events = watch.ReadEventsAsync(token).GetAsyncEnumerator(token);
+        Assert.True(await events.MoveNextAsync().ConfigureAwait(true));
+        Assert.Equal(watch.RegistrationId, events.Current.RegistrationId);
+        Assert.Equal(ZooKeeperWatchEventKind.NodeChildrenChanged, events.Current.Kind);
+        Assert.False(await events.MoveNextAsync().ConfigureAwait(true));
+        Assert.Equal(0, Client.Manager.WatchCount);
+    }
+
+    [Theory(Timeout = TestTimeoutMilliseconds)]
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Acceptance", "T28")]
@@ -932,6 +1018,16 @@ public sealed class WatchApiTests : IAsyncLifetime
             writer.WriteStat(ProtocolFixtures.Stat);
         }
         peer.Inject(bytes[..writer.WrittenCount]);
+    }
+
+    private void ReplyWithInvalidChildName(ReceivedPacket packet)
+    {
+        var bytes = new byte[ReplyBufferBytes];
+        var writer = new JuteWriter(bytes, ProtocolFixtures.Limits);
+        writer.WriteReplyHeader(new ReplyHeader(packet.Xid, Watermark, WatchProtocol.Success));
+        writer.WriteStringVector(["invalid/name"]);
+        writer.WriteStat(ProtocolFixtures.Stat);
+        _peer.Inject(bytes[..writer.WrittenCount]);
     }
 
     private static void Notify(
