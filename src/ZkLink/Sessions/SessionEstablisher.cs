@@ -156,24 +156,7 @@ internal sealed class SessionEstablisher(
                                 "Unexpected authentication notification."
                             );
                         }
-                        var impact = ErrorClassifier.NotificationImpact(notification.State);
-                        if (
-                            impact
-                            is ZooKeeperConnectionFailure.SessionRejected
-                                or ZooKeeperConnectionFailure.Authentication
-                        )
-                        {
-                            throw new ZooKeeperConnectionException(
-                                impact.Value,
-                                transport.Endpoint
-                            );
-                        }
-                        if (impact.HasValue)
-                        {
-                            throw new InvalidDataException(
-                                "Unexpected authentication notification."
-                            );
-                        }
+                        CheckSessionNotification(notification.State);
                         owner.EstablishmentInbound();
                         continue;
                     }
@@ -244,21 +227,7 @@ internal sealed class SessionEstablisher(
                     }
                     if (notification.Type == WatchProtocol.SessionEvent)
                     {
-                        if (ErrorClassifier.NotificationImpact(notification.State) is { } failure)
-                        {
-                            throw new ZooKeeperConnectionException(
-                                failure,
-                                transport.Endpoint,
-                                notification.State switch
-                                {
-                                    WatchProtocol.ServerExpired => (int)
-                                        ZooKeeperErrorCode.SessionExpired,
-                                    WatchProtocol.ServerAuthFailed => (int)
-                                        ZooKeeperErrorCode.AuthFailed,
-                                    _ => null,
-                                }
-                            );
-                        }
+                        CheckSessionNotification(notification.State);
                     }
                     else
                     {
@@ -287,6 +256,23 @@ internal sealed class SessionEstablisher(
             }
         }
         return restoredZxid;
+    }
+
+    private void CheckSessionNotification(int state)
+    {
+        if (ErrorClassifier.NotificationImpact(state) is { } failure)
+        {
+            throw new ZooKeeperConnectionException(
+                failure,
+                transport.Endpoint,
+                state switch
+                {
+                    WatchProtocol.ServerExpired => (int)ZooKeeperErrorCode.SessionExpired,
+                    WatchProtocol.ServerAuthFailed => (int)ZooKeeperErrorCode.AuthFailed,
+                    _ => null,
+                }
+            );
+        }
     }
 
     private void CheckAcknowledgment(int errorCode, ReplyPhase phase)

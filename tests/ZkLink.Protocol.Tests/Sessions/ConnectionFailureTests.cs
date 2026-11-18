@@ -249,6 +249,57 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
     [Fact(Timeout = 10000)]
     [Trait("Acceptance", "T08")]
     [Trait("Acceptance", "T21")]
+    public async Task DisconnectDuringAuthenticationReplayRetriesTheSameSession()
+    {
+        var token = TestContext.Current.CancellationToken;
+        using var credentials = ZooKeeperAuthentication.Digest("user", "disposable");
+        var first = Peer();
+        var second = Peer();
+        var third = Peer();
+        second.ReplyAuth = false;
+        third.ReplyAuth = false;
+        var client = await _fixture
+            .ConnectAsync(
+                first,
+                SessionFixture.Options(
+                    connection: "127.0.0.1,127.0.0.2,127.0.0.3",
+                    authentication: [credentials]
+                ),
+                token
+            )
+            .ConfigureAwait(true);
+        var originalId = client.Session.SessionId;
+        _fixture.Connector.Add(second);
+        _fixture.Connector.Add(third);
+        first.Drop();
+        await SessionTestSupport.NextAsync(second).ConfigureAwait(true);
+        var replay = await SessionTestSupport.NextAsync(second).ConfigureAwait(true);
+        Assert.Equal(Xids.Auth, replay.Xid);
+        var ready = client.WaitForConnectionAsync(token);
+        var observer = new StateObserver(client);
+        await using var observerLifetime = observer.ConfigureAwait(true);
+        second.Inject(SessionNotification(KeeperState.Disconnected));
+        await observer.WaitAsync(ZooKeeperSessionState.Disconnected).ConfigureAwait(true);
+
+        var handshake = await SessionTestSupport.NextAsync(third).ConfigureAwait(true);
+        Assert.True(handshake.Handshake);
+        var reader = new JuteReader(handshake.Bytes, ProtocolFixtures.Limits);
+        reader.ReadInt32();
+        reader.ReadInt64();
+        reader.ReadInt32();
+        Assert.Equal(originalId, reader.ReadInt64());
+        replay = await SessionTestSupport.NextAsync(third).ConfigureAwait(true);
+        Assert.Equal(Xids.Auth, replay.Xid);
+        Assert.False(ready.IsCompleted);
+        third.Reply(replay);
+        await SessionTestSupport.Bounded(ready).ConfigureAwait(true);
+        Assert.Equal(ZooKeeperSessionState.Connected, client.Session.State);
+        Assert.Equal(3, client.Session.ConnectionGeneration);
+    }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T08")]
+    [Trait("Acceptance", "T21")]
     public async Task InitialDeadlineDoesNotLimitAuthenticationAfterTheClientWasReady()
     {
         using var authentication = ZooKeeperAuthentication.Digest("user", "disposable");
@@ -562,13 +613,13 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
         }
     }
 
-    private static byte[] SessionNotification()
+    private static byte[] SessionNotification(KeeperState state = KeeperState.SyncConnected)
     {
         var data = new byte[64];
         var writer = new JuteWriter(data, ProtocolFixtures.Limits);
         writer.WriteReplyHeader(new ReplyHeader(-1, -1, 0));
         writer.WriteInt32(-1);
-        writer.WriteInt32(3);
+        writer.WriteInt32((int)state);
         writer.WriteString(null);
         return data[..writer.WrittenCount];
     }
