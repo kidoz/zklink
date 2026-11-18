@@ -124,42 +124,11 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
                         }
                     );
                     network = null;
-                    var tls = options.Settings.Tls;
-                    var authentication = new SslClientAuthenticationOptions
-                    {
-                        AllowTlsResume = provider is null,
-                        TargetHost = tls.ServerName ?? endpoint.Host,
-                        EnabledSslProtocols = SslProtocols.None,
-                        CertificateRevocationCheckMode = tls.RevocationMode,
-                    };
-                    // Native chain evaluation can outlive token cancellation. Bound each
-                    // download where the platform supports it; macOS ignores this value.
-                    var policy = new X509ChainPolicy
-                    {
-                        RevocationMode = tls.RevocationMode,
-                        UrlRetrievalTimeout =
-                            options.Settings.ConnectAttemptTimeout < MinimumRetrievalTimeout
-                                ? MinimumRetrievalTimeout
-                                : options.Settings.ConnectAttemptTimeout,
-                    };
-                    authentication.CertificateChainPolicy = policy;
-                    var certificate = credentials?.ClientCertificate ?? tls.ClientCertificate;
-                    var roots = credentials?.TrustRoots ?? tls.TrustRoots;
-                    if (certificate is not null)
-                    {
-                        authentication.ClientCertificates = new X509CertificateCollection
-                        {
-                            certificate,
-                        };
-                    }
-                    if (roots.Count != 0)
-                    {
-                        policy.TrustMode = X509ChainTrustMode.CustomRootTrust;
-                        foreach (var root in roots)
-                        {
-                            policy.CustomTrustStore.Add(root);
-                        }
-                    }
+                    var authentication = CreateAuthentication(
+                        endpoint,
+                        options.Settings,
+                        credentials
+                    );
                     await ssl.AuthenticateAsClientAsync(authentication, addressToken)
                         .ConfigureAwait(false);
                 }
@@ -237,6 +206,48 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
             );
         }
         throw failure;
+    }
+
+    private static SslClientAuthenticationOptions CreateAuthentication(
+        ZooKeeperEndpoint endpoint,
+        ZooKeeperClientOptions settings,
+        ZooKeeperTlsCredentials? credentials
+    )
+    {
+        var tls = settings.Tls;
+        var authentication = new SslClientAuthenticationOptions
+        {
+            AllowTlsResume = tls.CredentialsProvider is null,
+            TargetHost = tls.ServerName ?? endpoint.Host,
+            EnabledSslProtocols = SslProtocols.None,
+            CertificateRevocationCheckMode = tls.RevocationMode,
+        };
+        // Native chain evaluation can outlive token cancellation. Bound each
+        // download where the platform supports it; macOS ignores this value.
+        var policy = new X509ChainPolicy
+        {
+            RevocationMode = tls.RevocationMode,
+            UrlRetrievalTimeout =
+                settings.ConnectAttemptTimeout < MinimumRetrievalTimeout
+                    ? MinimumRetrievalTimeout
+                    : settings.ConnectAttemptTimeout,
+        };
+        authentication.CertificateChainPolicy = policy;
+        var certificate = credentials?.ClientCertificate ?? tls.ClientCertificate;
+        var roots = credentials?.TrustRoots ?? tls.TrustRoots;
+        if (certificate is not null)
+        {
+            authentication.ClientCertificates = new X509CertificateCollection { certificate };
+        }
+        if (roots.Count != 0)
+        {
+            policy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+            foreach (var root in roots)
+            {
+                policy.CustomTrustStore.Add(root);
+            }
+        }
+        return authentication;
     }
 
     private async Task<ZooKeeperTlsCredentials> LoadCredentialsAsync(

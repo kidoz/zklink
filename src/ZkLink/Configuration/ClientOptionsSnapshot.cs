@@ -1,6 +1,5 @@
 using System.Net;
 using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 using ZkLink.Protocol;
 
 namespace ZkLink.Configuration;
@@ -8,13 +7,16 @@ namespace ZkLink.Configuration;
 internal sealed class ClientOptionsSnapshot : IDisposable
 {
     private int _disposed;
+    private readonly ZooKeeperTlsCredentials? _credentials;
 
     private ClientOptionsSnapshot(
         ZooKeeperClientOptions settings,
         ParsedConnectionString parsed,
-        byte[][] authentication
+        byte[][] authentication,
+        ZooKeeperTlsCredentials? credentials
     )
     {
+        _credentials = credentials;
         Settings = settings;
         Endpoints = parsed.Endpoints;
         Paths = new ChrootPath(parsed.Chroot);
@@ -84,25 +86,20 @@ internal sealed class ClientOptionsSnapshot : IDisposable
             }
             total += length;
         }
-        var roots = new List<X509Certificate2>();
-        X509Certificate2? certificate = null;
+        ZooKeeperTlsCredentials? credentials = null;
         var copies = new List<byte[]>();
         try
         {
-            foreach (var root in options.Tls.TrustRoots)
+            var tls = options.Tls;
+            if (tls.Enabled && tls.CredentialsProvider is null)
             {
-                roots.Add(new X509Certificate2(root));
-            }
-            if (options.Tls.ClientCertificate is { } clientCertificate)
-            {
-                if (!clientCertificate.HasPrivateKey)
-                {
-                    throw new ArgumentException(
-                        "The mTLS certificate requires a private key.",
-                        nameof(options)
-                    );
-                }
-                certificate = new X509Certificate2(clientCertificate);
+                credentials = new ZooKeeperTlsCredentials(tls.ClientCertificate, tls.TrustRoots);
+                tls = ZooKeeperTlsOptions.Required(
+                    tls.RevocationMode,
+                    credentials.ClientCertificate,
+                    credentials.TrustRoots,
+                    tls.ServerName
+                );
             }
             foreach (var auth in authentication)
             {
@@ -112,16 +109,7 @@ internal sealed class ClientOptionsSnapshot : IDisposable
             {
                 ConnectionString = options.ConnectionString,
                 Chroot = options.Chroot,
-                Tls =
-                    options.Tls.CredentialsProvider is not null ? options.Tls
-                    : options.Tls.Enabled
-                        ? ZooKeeperTlsOptions.Required(
-                            options.Tls.RevocationMode,
-                            certificate,
-                            roots,
-                            options.Tls.ServerName
-                        )
-                    : ZooKeeperTlsOptions.Disabled(),
+                Tls = tls,
                 AllowUnsafePlaintextDigest = options.AllowUnsafePlaintextDigest,
                 EnableTtlNodes = options.EnableTtlNodes,
                 CompatibilityProfile = options.CompatibilityProfile,
@@ -139,9 +127,8 @@ internal sealed class ClientOptionsSnapshot : IDisposable
                 MaxBufferedEvents = options.MaxBufferedEvents,
                 MaxWatches = options.MaxWatches,
             };
-            var result = new ClientOptionsSnapshot(settings, parsed, copies.ToArray());
-            certificate = null;
-            roots.Clear();
+            var result = new ClientOptionsSnapshot(settings, parsed, copies.ToArray(), credentials);
+            credentials = null;
             copies.Clear();
             return result;
         }
@@ -151,11 +138,7 @@ internal sealed class ClientOptionsSnapshot : IDisposable
             {
                 CryptographicOperations.ZeroMemory(copy);
             }
-            foreach (var root in roots)
-            {
-                root.Dispose();
-            }
-            certificate?.Dispose();
+            credentials?.Dispose();
         }
     }
 
@@ -215,10 +198,6 @@ internal sealed class ClientOptionsSnapshot : IDisposable
         {
             CryptographicOperations.ZeroMemory(value);
         }
-        Settings.Tls.ClientCertificate?.Dispose();
-        foreach (var root in Settings.Tls.TrustRoots)
-        {
-            root.Dispose();
-        }
+        _credentials?.Dispose();
     }
 }
