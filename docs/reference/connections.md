@@ -46,7 +46,9 @@ the configured server identity.
 
 If an endpoint returns an invalid ZooKeeper handshake, the client closes that
 transport and tries another endpoint within the current connection or recovery
-deadline. During recovery, each attempt resumes the existing session. If every
+deadline. During recovery, each attempt presents the existing session ID. A
+response with a different session ID fails handshake validation and allows the
+client to try another endpoint within the same recovery deadline. If every
 endpoint returns an invalid handshake until the initial deadline expires,
 `ConnectAsync` reports `ZooKeeperConnectionFailure.Protocol`. An explicit
 session rejection or authentication failure is terminal. Protocol errors during
