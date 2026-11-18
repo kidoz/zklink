@@ -9,5 +9,5 @@ internal interface IJuteOutput
     void WriteBuffer(ReadOnlySpan<byte> value);
     void WriteNullBuffer();
     void WriteStat(WireStat stat);
-    void WriteStringVector(IReadOnlyList<string?>? values, bool allowNull = false);
+    void WritePath(string path, bool sequential);
 }

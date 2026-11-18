@@ -29,12 +29,19 @@ public sealed class MultiApiTests : IAsyncLifetime
     }
 
     [Theory(Timeout = 10000)]
-    [InlineData(false)]
-    [InlineData(true)]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
     [Trait("Acceptance", "T18")]
-    public async Task InputThatShrinksAfterMeasurementReleasesCapacityWithoutSending(bool setAcl)
+    public async Task InputThatChangesSizeAfterMeasurementReleasesCapacityWithoutSending(
+        bool setAcl,
+        bool grows
+    )
     {
         var token = TestContext.Current.CancellationToken;
+        var first = grows ? "/a" : "/longer-path";
+        var second = grows ? "/longer-path" : "/a";
         Task submission;
         if (setAcl)
         {
@@ -42,11 +49,12 @@ public sealed class MultiApiTests : IAsyncLifetime
             entries.Count.Returns(1);
             entries[0]
                 .Returns(
-                    new ZooKeeperAcl(ZooKeeperPermissions.Read, "digest", "longer-identity"),
-                    new ZooKeeperAcl(ZooKeeperPermissions.Read, "digest", "short")
+                    new ZooKeeperAcl(ZooKeeperPermissions.Read, "digest", first),
+                    new ZooKeeperAcl(ZooKeeperPermissions.Read, "digest", second)
                 );
             submission = Client.SetAclAsync("/a", entries, ZNodeVersion.Any, token);
             _ = entries.Received(1).Count;
+            _ = entries.Received(2)[0];
         }
         else
         {
@@ -54,11 +62,12 @@ public sealed class MultiApiTests : IAsyncLifetime
             operations.Count.Returns(1);
             operations[0]
                 .Returns(
-                    ZooKeeperWriteOperation.Delete("/longer-path", ZNodeVersion.Any),
-                    ZooKeeperWriteOperation.Delete("/a", ZNodeVersion.Any)
+                    ZooKeeperWriteOperation.Delete(first, ZNodeVersion.Any),
+                    ZooKeeperWriteOperation.Delete(second, ZNodeVersion.Any)
                 );
             submission = Client.MultiAsync(operations, token);
             _ = operations.Received(1).Count;
+            _ = operations.Received(2)[0];
         }
 
         var next = Client.ExistsAsync("/next", token);
@@ -67,7 +76,12 @@ public sealed class MultiApiTests : IAsyncLifetime
         Assert.Equal(1, packet.Xid);
         _peer.Reply(packet, -101);
         Assert.Null(await next.ConfigureAwait(true));
-        await Assert.ThrowsAsync<ArgumentException>(() => submission).ConfigureAwait(true);
+        await Assert
+            .ThrowsAsync(
+                grows ? typeof(InvalidDataException) : typeof(ArgumentException),
+                () => submission
+            )
+            .ConfigureAwait(true);
         Assert.Equal(0, Client.Manager.Scheduler.PendingCount);
         Assert.Equal(0, Client.Manager.Scheduler.OwnedBytes);
     }

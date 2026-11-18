@@ -1,4 +1,5 @@
 using System.Globalization;
+using ZkLink.Configuration;
 using ZkLink.Protocol;
 using ZkLink.Requests;
 
@@ -35,6 +36,7 @@ internal sealed class CodecWorkload
     private const int MultiTerminator = -1;
     private const string NodePath = "/benchmark/node";
     private static readonly ProtocolLimits Limits = new();
+    private static readonly ChrootPath Paths = new("/tenant");
     private readonly WireRequest _request;
     private readonly WireRequest _replyShape;
     private readonly byte[] _reply;
@@ -125,6 +127,26 @@ internal sealed class CodecWorkload
     internal int ReplyBytes => _reply.Length;
 
     internal int Encode() => RequestCodec.Encode(_destination, Xid, _request, Limits);
+
+    internal byte[] PrepareFrame()
+    {
+        var size = NamespaceTranslator.Measure(_request, Paths, Limits);
+        var packet = FrameWriter.AllocateFrame(size, Limits);
+        RequestCodec.EncodeMeasured(packet.AsSpan(sizeof(int)), Xid, _request, Paths, Limits);
+        return packet;
+    }
+
+    internal void VerifyPreparedFrame()
+    {
+        var translated = NamespaceTranslator.ToServer(_request, Paths, Limits);
+        var size = RequestCodec.Measure(Xid, translated, Limits);
+        var expected = FrameWriter.AllocateFrame(size, Limits);
+        RequestCodec.Encode(expected.AsSpan(sizeof(int)), Xid, translated, Limits);
+        if (!PrepareFrame().AsSpan().SequenceEqual(expected))
+        {
+            throw new InvalidDataException("Prepared frame content mismatch.");
+        }
+    }
 
     internal object Decode() =>
         ReplyCodec.DecodeForValidatedRequest(_reply, Xid, _replyShape, Limits);

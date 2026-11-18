@@ -28,6 +28,8 @@ internal ref struct JuteWriter : IJuteOutput
 
     public void WriteBoolean(bool value) => Take(1)[0] = value ? (byte)1 : (byte)0;
 
+    public void WritePath(string path, bool sequential) => WriteString(path);
+
     public void WriteString(string? value)
     {
         if (value is null)

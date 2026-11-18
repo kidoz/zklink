@@ -1,9 +1,10 @@
 using System.Text;
+using ZkLink.Configuration;
 
 namespace ZkLink.Protocol;
 
 // Uses the same protocol visitor as the writer, without allocating encoded storage.
-internal struct JuteSizer(ProtocolLimits limits) : IJuteOutput
+internal struct JuteSizer(ProtocolLimits limits, ChrootPath? paths = null) : IJuteOutput
 {
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     internal int WrittenCount { get; private set; }
@@ -41,26 +42,13 @@ internal struct JuteSizer(ProtocolLimits limits) : IJuteOutput
         }
     }
 
-    public void WriteStringVector(IReadOnlyList<string?>? values, bool allowNull = false)
+    public void WritePath(string path, bool sequential)
     {
-        if (values is null)
+        if (paths is not null)
         {
-            if (!allowNull)
-            {
-                throw new ArgumentNullException(nameof(values));
-            }
-            Add(4);
-            return;
+            Add(paths.AddedBytes(path, sequential));
         }
-        if (values.Count > limits.MaxCollectionElements)
-        {
-            throw new InvalidDataException("Vector exceeds configured bounds.");
-        }
-        Add(4);
-        foreach (var value in values)
-        {
-            WriteString(value);
-        }
+        WriteString(path);
     }
 
     private void Add(int length)

@@ -31,6 +31,30 @@ public class CodecBenchmarks
     "CA1515",
     Justification = "BenchmarkDotNet generates a separate assembly that references this public benchmark type."
 )]
+public class RequestPreparationBenchmarks
+{
+    private CodecWorkload _workload = null!;
+
+    [Params(CodecCase.GetSmall, CodecCase.MultiLarge)]
+    public CodecCase Workload { get; set; }
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _workload = new CodecWorkload(Workload);
+        _workload.VerifyPreparedFrame();
+    }
+
+    [Benchmark]
+    public byte[] PrepareFrame() => _workload.PrepareFrame();
+}
+
+[MemoryDiagnoser]
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Maintainability",
+    "CA1515",
+    Justification = "BenchmarkDotNet generates a separate assembly that references this public benchmark type."
+)]
 [System.Diagnostics.CodeAnalysis.SuppressMessage(
     "Design",
     "CA1001",

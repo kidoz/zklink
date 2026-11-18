@@ -329,11 +329,10 @@ public sealed class RequestTransitionTableTests : IDisposable
 
     private AdmittedSubmit StartAdmittedSubmit(bool failEncode)
     {
-        // Measure walks members twice before the reservation lock. The third walk is
-        // ToServer, after that lock has been released and before Prepared is set.
+        // Admission measures by enumerating. Translation snapshots by index after reservation.
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var members = new ThirdWalkGate(
+        var members = new PreparationGate(
             [new VersionRequest(ZooKeeperOperation.Delete, "/a", -1)],
             entered,
             release,
@@ -416,16 +415,16 @@ public sealed class RequestTransitionTableTests : IDisposable
         Task<WireReply> submit,
         TaskCompletionSource entered,
         TaskCompletionSource release,
-        ThirdWalkGate members
+        PreparationGate members
     )
     {
         internal Task<WireReply> Submit { get; } = submit;
         internal TaskCompletionSource Entered { get; } = entered;
         internal TaskCompletionSource Release { get; } = release;
-        internal ThirdWalkGate Members { get; } = members;
+        internal PreparationGate Members { get; } = members;
     }
 
-    private sealed class ThirdWalkGate(
+    private sealed class PreparationGate(
         WireRequest[] items,
         TaskCompletionSource entered,
         TaskCompletionSource release,
@@ -437,12 +436,9 @@ public sealed class RequestTransitionTableTests : IDisposable
         internal int Walks => Volatile.Read(ref _walks);
 
         public int Count => items.Length;
-        public WireRequest this[int index] => items[index];
-
-        public IEnumerator<WireRequest> GetEnumerator()
+        public WireRequest this[int index]
         {
-            var walk = Interlocked.Increment(ref _walks);
-            if (walk == 3)
+            get
             {
                 entered.TrySetResult();
                 release.Task.Wait(cancellationToken);
@@ -450,7 +446,13 @@ public sealed class RequestTransitionTableTests : IDisposable
                 {
                     throw new InvalidDataException("Encode failed after admission.");
                 }
+                return items[index];
             }
+        }
+
+        public IEnumerator<WireRequest> GetEnumerator()
+        {
+            Interlocked.Increment(ref _walks);
             return ((IEnumerable<WireRequest>)items).GetEnumerator();
         }
 

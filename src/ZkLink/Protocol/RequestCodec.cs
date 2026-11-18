@@ -4,9 +4,14 @@ namespace ZkLink.Protocol;
 
 internal static class RequestCodec
 {
-    internal static int Measure(int xid, WireRequest request, ProtocolLimits limits)
+    internal static int Measure(
+        int xid,
+        WireRequest request,
+        ProtocolLimits limits,
+        ChrootPath? paths = null
+    )
     {
-        var output = new JuteSizer(limits);
+        var output = new JuteSizer(limits, paths);
         Write(ref output, xid, request, limits);
         return output.WrittenCount;
     }
@@ -24,6 +29,41 @@ internal static class RequestCodec
         {
             throw new InvalidDataException("Request destination is too small.");
         }
+        return WritePacket(destination, xid, request, limits);
+    }
+
+    // The scheduler owns this exact-size buffer and discards it on any preparation error.
+    internal static WireRequest EncodeMeasured(
+        Span<byte> destination,
+        int xid,
+        WireRequest request,
+        ChrootPath paths,
+        ProtocolLimits limits
+    )
+    {
+        var translated = NamespaceTranslator.TranslateMeasured(
+            request,
+            paths,
+            limits,
+            destination.Length
+        );
+        if (WritePacket(destination, xid, translated, limits) != destination.Length)
+        {
+            throw new ArgumentException(
+                "The request size changed during submission.",
+                nameof(request)
+            );
+        }
+        return translated;
+    }
+
+    private static int WritePacket(
+        Span<byte> destination,
+        int xid,
+        WireRequest request,
+        ProtocolLimits limits
+    )
+    {
         var output = new JuteWriter(destination, limits);
         Write(ref output, xid, request, limits);
         return output.WrittenCount;
@@ -208,7 +248,7 @@ internal static class RequestCodec
         where T : IJuteOutput, allows ref struct
     {
         ZNodePath.Validate(path, sequential);
-        output.WriteString(path);
+        output.WritePath(path, sequential);
     }
 
     private static void Paths<T>(ref T output, IReadOnlyList<string?> paths, ProtocolLimits limits)
@@ -218,11 +258,11 @@ internal static class RequestCodec
         {
             throw new InvalidDataException("Too many restore paths.");
         }
+        output.WriteInt32(paths.Count);
         foreach (var path in paths)
         {
-            ZNodePath.Validate(path!);
+            Path(ref output, path!);
         }
-        output.WriteStringVector(paths);
     }
 
     private static void Data<T>(ref T output, ReadOnlyMemory<byte>? data, ProtocolLimits limits)

@@ -133,6 +133,10 @@ public sealed class ConfigurationTests
         foreach (var fixture in ProtocolFixtures.All)
         {
             var actual = NamespaceTranslator.ToServer(fixture.Request, paths);
+            Assert.Equal(
+                RequestCodec.Measure(fixture.Xid, actual, ProtocolFixtures.Limits),
+                NamespaceTranslator.Measure(fixture.Request, paths, ProtocolFixtures.Limits)
+            );
             var path = actual switch
             {
                 PathRequest p => p.Path,

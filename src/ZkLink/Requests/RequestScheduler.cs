@@ -276,18 +276,14 @@ internal sealed class RequestScheduler(
         Exception? failure = null;
         try
         {
-            var translated = NamespaceTranslator.ToServer(request, options.Paths, options.Limits);
             packet = FrameWriter.AllocateFrame(size, options.Limits);
-            if (
-                RequestCodec.Encode(packet.AsSpan(sizeof(int)), 1, translated, options.Limits)
-                != size
-            )
-            {
-                throw new ArgumentException(
-                    "The request size changed during submission.",
-                    nameof(request)
-                );
-            }
+            var translated = RequestCodec.EncodeMeasured(
+                packet.AsSpan(sizeof(int)),
+                1,
+                request,
+                options.Paths,
+                options.Limits
+            );
             shape = CaptureReplyShape(translated);
         }
         catch (Exception error)
