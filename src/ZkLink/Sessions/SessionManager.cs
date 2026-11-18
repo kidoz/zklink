@@ -460,7 +460,7 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
 
     private async Task CloseCoreAsync(long startedAt, CancellationToken cancellationToken)
     {
-        await Task.Yield();
+        await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
         PendingRequest? pending = null;
         Exception? failure = null;
         try

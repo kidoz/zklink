@@ -65,6 +65,44 @@ public sealed class SessionLifecycleTests : IAsyncLifetime
         Assert.Equal(0, client.Manager.Scheduler.OwnedBytes);
     }
 
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T07")]
+    public async Task CloseCompletesIndependentlyOfTheCallersSynchronizationContext()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var peer = Peer();
+        var client = await _fixture
+            .ConnectAsync(peer, cancellationToken: token)
+            .ConfigureAwait(true);
+        var context = new RecordingSynchronizationContext();
+        var previous = SynchronizationContext.Current;
+        Task closing;
+        try
+        {
+            SynchronizationContext.SetSynchronizationContext(context);
+            closing = client.CloseAsync(token);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+        await SessionTestSupport.Bounded(closing).ConfigureAwait(true);
+        Assert.Equal(0, context.Posts);
+        Assert.Equal(ZooKeeperCloseStatus.Acknowledged, client.Session.CloseStatus);
+        Assert.True(peer.IsDisposed);
+    }
+
+    private sealed class RecordingSynchronizationContext : SynchronizationContext
+    {
+        internal int Posts { get; private set; }
+
+        public override void Post(SendOrPostCallback callback, object? state)
+        {
+            Posts++;
+            base.Post(callback, state);
+        }
+    }
+
     [Theory(Timeout = 10000)]
     [InlineData(null, 600)]
     [InlineData(456L, 600)]
