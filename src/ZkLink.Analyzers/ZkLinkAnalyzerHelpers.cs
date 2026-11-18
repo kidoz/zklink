@@ -1,5 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace ZkLink.Analyzers;
 
@@ -32,6 +34,12 @@ internal static class ZkLinkAnalyzerHelpers
             || method.Name == "GetDataAndWatchAsync"
             || method.Name == "GetChildrenAndWatchAsync"
         );
+
+    internal static bool IsDiscard(SyntaxNodeAnalysisContext context, ExpressionSyntax target) =>
+        target is IdentifierNameSyntax identifier
+        && identifier.Identifier.ValueText == "_"
+        && context.SemanticModel.GetOperation(identifier, context.CancellationToken)
+            is IDiscardOperation;
 
     internal static InvocationExpressionSyntax? GetDirectInvocation(ExpressionSyntax expression)
     {

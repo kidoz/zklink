@@ -42,10 +42,7 @@ public sealed class UnobservedAsyncCallAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeDiscardAssignment(SyntaxNodeAnalysisContext context)
     {
         var assignment = (AssignmentExpressionSyntax)context.Node;
-        if (
-            assignment.Left is IdentifierNameSyntax identifier
-            && identifier.Identifier.ValueText == "_"
-        )
+        if (ZkLinkAnalyzerHelpers.IsDiscard(context, assignment.Left))
         {
             ReportIfUnobserved(context, assignment.Right);
         }

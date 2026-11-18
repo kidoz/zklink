@@ -86,6 +86,13 @@ public sealed class WatchAndAsyncAnalyzerTests
                     var pending = client.SyncAsync("/node");
                     await pending;
                 }
+
+                public static async Task Observe(ZooKeeperClient client)
+                {
+                    Task _;
+                    _ = client.SyncAsync("/node");
+                    await _;
+                }
             }
             """,
             new UnobservedAsyncCallAnalyzer()

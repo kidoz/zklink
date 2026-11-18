@@ -3,7 +3,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Operations;
 
 namespace ZkLink.Analyzers;
 
@@ -46,12 +45,7 @@ public sealed class DiscardedWatchAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeDiscardAssignment(SyntaxNodeAnalysisContext context)
     {
         var assignment = (AssignmentExpressionSyntax)context.Node;
-        if (
-            assignment.Left is IdentifierNameSyntax identifier
-            && identifier.Identifier.ValueText == "_"
-            && context.SemanticModel.GetOperation(identifier, context.CancellationToken)
-                is IDiscardOperation
-        )
+        if (ZkLinkAnalyzerHelpers.IsDiscard(context, assignment.Left))
         {
             ReportDiscard(context, assignment.Right);
         }
