@@ -452,7 +452,7 @@ public sealed class TransportSecurityTests
         handshake.WriteBuffer(new byte[16]);
         handshake.WriteBoolean(false);
         await writer
-            .WriteAsync(bytes.AsMemory(0, handshake.WrittenCount), token)
+            .WriteFrameAsync(PeerTests.Frame(bytes[..handshake.WrittenCount]), token)
             .ConfigureAwait(false);
         while (true)
         {
@@ -463,7 +463,7 @@ public sealed class TransportSecurityTests
             var header = input.ReadRequestHeader();
             var path = header.Opcode == 9 ? input.ReadString() : null;
             await writer
-                .WriteAsync(SessionPeer.Packet(header.Xid, path: path), token)
+                .WriteFrameAsync(PeerTests.Frame(SessionPeer.Packet(header.Xid, path: path)), token)
                 .ConfigureAwait(false);
             if (header.Opcode == -11)
             {

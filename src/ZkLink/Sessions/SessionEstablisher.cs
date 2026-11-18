@@ -27,18 +27,18 @@ internal sealed class SessionEstablisher(
         CancellationToken cancellationToken
     )
     {
-        var packet = new byte[45];
+        var packet = FrameWriter.AllocateFrame(45, options.Limits);
         try
         {
             var length =
                 sessionId == 0
                     ? HandshakeCodec.EncodeNew(
-                        packet,
+                        packet.AsSpan(sizeof(int)),
                         checked((int)options.Settings.SessionTimeout.TotalMilliseconds),
                         options.Limits
                     )
                     : HandshakeCodec.Encode(
-                        packet,
+                        packet.AsSpan(sizeof(int)),
                         checked((int)options.Settings.SessionTimeout.TotalMilliseconds),
                         sessionId,
                         lastZxid,
@@ -46,7 +46,7 @@ internal sealed class SessionEstablisher(
                         options.Limits
                     );
             await transport
-                .Writer.WriteAsync(packet.AsMemory(0, length), cancellationToken)
+                .Writer.WriteFrameAsync(packet.AsMemory(0, sizeof(int) + length), cancellationToken)
                 .ConfigureAwait(false);
         }
         finally
@@ -120,12 +120,15 @@ internal sealed class SessionEstablisher(
             foreach (var credentials in options.Authentication)
             {
                 var request = new AuthRequest("digest", credentials);
-                var encoded = new byte[RequestCodec.Measure(-4, request, options.Limits)];
+                var encoded = FrameWriter.AllocateFrame(
+                    RequestCodec.Measure(-4, request, options.Limits),
+                    options.Limits
+                );
                 try
                 {
-                    RequestCodec.Encode(encoded, -4, request, options.Limits);
+                    RequestCodec.Encode(encoded.AsSpan(sizeof(int)), -4, request, options.Limits);
                     await transport
-                        .Writer.WriteAsync(encoded, cancellationToken)
+                        .Writer.WriteFrameAsync(encoded, cancellationToken)
                         .ConfigureAwait(false);
                 }
                 finally
@@ -216,13 +219,19 @@ internal sealed class SessionEstablisher(
         foreach (var batch in batches)
         {
             var translated = NamespaceTranslator.ToServer(batch, options.Paths, options.Limits);
-            var bytes = new byte[
-                RequestCodec.Measure(WatchProtocol.ResetXid, translated, options.Limits)
-            ];
+            var bytes = FrameWriter.AllocateFrame(
+                RequestCodec.Measure(WatchProtocol.ResetXid, translated, options.Limits),
+                options.Limits
+            );
             try
             {
-                RequestCodec.Encode(bytes, WatchProtocol.ResetXid, translated, options.Limits);
-                await transport.Writer.WriteAsync(bytes, token).ConfigureAwait(false);
+                RequestCodec.Encode(
+                    bytes.AsSpan(sizeof(int)),
+                    WatchProtocol.ResetXid,
+                    translated,
+                    options.Limits
+                );
+                await transport.Writer.WriteFrameAsync(bytes, token).ConfigureAwait(false);
             }
             finally
             {

@@ -9,11 +9,16 @@ internal static class SessionTestSupport
 {
     internal static readonly TimeSpan Guard = TimeSpan.FromSeconds(10);
 
-    internal static Task<ReceivedPacket> NextAsync(SessionPeer peer) =>
-        peer
+    internal static async Task<ReceivedPacket> NextAsync(SessionPeer peer)
+    {
+        var packet = await peer
             .Requests.ReadAsync(TestContext.Current.CancellationToken)
             .AsTask()
-            .WaitAsync(Guard, TestContext.Current.CancellationToken);
+            .WaitAsync(Guard, TestContext.Current.CancellationToken)
+            .ConfigureAwait(false);
+        Assert.Equal(1, packet.WriteCalls);
+        return packet;
+    }
 
     internal static Task ReaderWaitingAsync(SessionPeer peer) =>
         peer.ReaderWaitingAsync(TestContext.Current.CancellationToken)

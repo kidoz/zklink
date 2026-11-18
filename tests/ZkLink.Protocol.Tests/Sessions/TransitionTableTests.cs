@@ -247,7 +247,9 @@ public sealed class RequestTransitionTableTests : IDisposable
         var taken = _scheduler.Take(1, TestContext.Current.CancellationToken);
         Assert.Equal(
             -2,
-            System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(taken.Packet.Span)
+            System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(
+                taken.Packet.Span[sizeof(int)..]
+            )
         );
         Assert.Null(taken.Request);
         Assert.True(_scheduler.PingPending);

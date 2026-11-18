@@ -8,7 +8,7 @@ using ZkLink.Transport;
 
 namespace ZkLink.Protocol.Tests.Sessions;
 
-internal sealed record ReceivedPacket(byte[] Bytes, bool Handshake)
+internal sealed record ReceivedPacket(byte[] Bytes, bool Handshake, int WriteCalls)
 {
     internal int Xid => BinaryPrimitives.ReadInt32BigEndian(Bytes);
     internal int Opcode => BinaryPrimitives.ReadInt32BigEndian(Bytes.AsSpan(4));
@@ -22,6 +22,7 @@ internal sealed class SessionPeer : Stream
     private int _decoded;
     private int _packets;
     private int _written;
+    private int _writesSinceLastPacket;
     private int _disposed;
     private readonly Channel<ReceivedPacket> _requests = Channel.CreateBounded<ReceivedPacket>(256);
     private readonly Channel<bool> _readWaits = Channel.CreateBounded<bool>(256);
@@ -129,6 +130,7 @@ internal sealed class SessionPeer : Stream
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
+        _writesSinceLastPacket++;
         var count = FailWriteAt is { } limit
             ? Math.Min(buffer.Length, Math.Max(0, limit - _written))
             : buffer.Length;
@@ -156,7 +158,8 @@ internal sealed class SessionPeer : Stream
             }
             var payload = data.AsSpan(_decoded + 4, length).ToArray();
             _decoded += 4 + length;
-            var request = new ReceivedPacket(payload, _packets++ == 0);
+            var request = new ReceivedPacket(payload, _packets++ == 0, _writesSinceLastPacket);
+            _writesSinceLastPacket = 0;
             if (!_requests.Writer.TryWrite(request))
             {
                 throw new IOException("Test request count bound exceeded.");

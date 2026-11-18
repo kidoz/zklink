@@ -86,12 +86,30 @@ public sealed class FrameTests
 
     [Fact]
     [Trait("Acceptance", "T02")]
-    public async Task WriterEmitsLengthExcludingPrefix()
+    public async Task WriterEmitsLengthAndPayloadInOneWrite()
     {
-        using var stream = new MemoryStream();
-        var writer = new FrameWriter(stream, new ProtocolLimits(maxFrameBytes: Payload.Length));
-        await writer.WriteAsync(Payload, TestContext.Current.CancellationToken);
+        using var stream = new CountingStream();
+        var limits = new ProtocolLimits(maxFrameBytes: Payload.Length);
+        var writer = new FrameWriter(stream, limits);
+        var frame = FrameWriter.AllocateFrame(Payload.Length, limits);
+        Payload.CopyTo(frame, sizeof(int));
+        await writer.WriteFrameAsync(frame, TestContext.Current.CancellationToken);
         Assert.Equal(Frame(Payload), stream.ToArray());
+        Assert.Equal(1, stream.Writes);
+    }
+
+    private sealed class CountingStream : MemoryStream
+    {
+        internal int Writes { get; private set; }
+
+        public override ValueTask WriteAsync(
+            ReadOnlyMemory<byte> buffer,
+            CancellationToken cancellationToken = default
+        )
+        {
+            Writes++;
+            return base.WriteAsync(buffer, cancellationToken);
+        }
     }
 
     [Fact]
@@ -101,12 +119,33 @@ public sealed class FrameTests
         using var stream = new MemoryStream();
         var writer = new FrameWriter(stream, new ProtocolLimits(maxFrameBytes: 1));
         await Assert.ThrowsAsync<InvalidDataException>(() =>
-            writer.WriteAsync(Payload, TestContext.Current.CancellationToken)
+            writer.WriteFrameAsync(Frame(Payload), TestContext.Current.CancellationToken)
         );
         await Assert.ThrowsAsync<InvalidDataException>(() =>
-            writer.WriteAsync(ReadOnlyMemory<byte>.Empty, TestContext.Current.CancellationToken)
+            writer.WriteFrameAsync(
+                ReadOnlyMemory<byte>.Empty,
+                TestContext.Current.CancellationToken
+            )
         );
         Assert.Equal(0, stream.Length);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(int.MaxValue)]
+    [Trait("Acceptance", "T03")]
+    public async Task MismatchedPrefixFailsBeforeAnyStreamWrite(int declaredLength)
+    {
+        using var stream = new CountingStream();
+        var writer = new FrameWriter(stream, Limits);
+        var frame = Frame(Payload);
+        BinaryPrimitives.WriteInt32BigEndian(frame, declaredLength);
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            writer.WriteFrameAsync(frame, TestContext.Current.CancellationToken)
+        );
+        Assert.Equal(0, stream.Writes);
     }
 
     [Fact]
@@ -118,16 +157,16 @@ public sealed class FrameTests
         stream
             .WriteAsync(Arg.Any<ReadOnlyMemory<byte>>(), Arg.Any<CancellationToken>())
             .Returns(_ =>
-                ++calls == 1
-                    ? ValueTask.CompletedTask
-                    : ValueTask.FromException(new IOException("Injected body failure"))
-            );
+            {
+                calls++;
+                return ValueTask.FromException(new IOException("Injected frame failure"));
+            });
 #pragma warning restore CA2012
         var writer = new FrameWriter(stream, Limits);
         await Assert.ThrowsAsync<IOException>(() =>
-            writer.WriteAsync(Payload, TestContext.Current.CancellationToken)
+            writer.WriteFrameAsync(Frame(Payload), TestContext.Current.CancellationToken)
         );
-        Assert.Equal(2, calls);
+        Assert.Equal(1, calls);
     }
 
     [Fact]
@@ -142,7 +181,7 @@ public sealed class FrameTests
         );
         var writer = new FrameWriter(stream, Limits);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            writer.WriteAsync(Payload, cancellation.Token)
+            writer.WriteFrameAsync(Frame(Payload), cancellation.Token)
         );
         Assert.Equal(0, stream.Position);
     }

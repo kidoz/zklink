@@ -210,7 +210,16 @@ internal sealed class RecoveryProxy : IAsyncDisposable
                     {
                         InspectRequest(packet);
                     }
-                    await writer.WriteAsync(packet, token).ConfigureAwait(false);
+                    var frame = FrameWriter.AllocateFrame(packet.Length, limits);
+                    try
+                    {
+                        packet.CopyTo(frame, sizeof(int));
+                        await writer.WriteFrameAsync(frame, token).ConfigureAwait(false);
+                    }
+                    finally
+                    {
+                        CryptographicOperations.ZeroMemory(frame);
+                    }
                     handshake = false;
                 }
                 finally

@@ -68,7 +68,7 @@ internal sealed class RequestScheduler(
     TelemetryState? telemetry = null
 )
 {
-    private static readonly byte[] PingPacket = [255, 255, 255, 254, 0, 0, 0, 11];
+    private static readonly byte[] PingPacket = [0, 0, 0, 8, 255, 255, 255, 254, 0, 0, 0, 11];
     private readonly TelemetryState? _telemetry = telemetry;
     private readonly LinkedList<PendingRequest> _queued = [];
     private readonly Queue<PendingRequest> _sent = [];
@@ -277,8 +277,11 @@ internal sealed class RequestScheduler(
         try
         {
             var translated = NamespaceTranslator.ToServer(request, options.Paths, options.Limits);
-            packet = new byte[size];
-            if (RequestCodec.Encode(packet, 1, translated, options.Limits) != size)
+            packet = FrameWriter.AllocateFrame(size, options.Limits);
+            if (
+                RequestCodec.Encode(packet.AsSpan(sizeof(int)), 1, translated, options.Limits)
+                != size
+            )
             {
                 throw new ArgumentException(
                     "The request size changed during submission.",
@@ -499,9 +502,9 @@ internal sealed class RequestScheduler(
                 Preparing = false,
                 Prepared = true,
                 Shape = new EmptyRequest(ZooKeeperOperation.CloseSession),
-                Packet = new byte[8],
+                Packet = FrameWriter.AllocateFrame(8, options.Limits),
             };
-            RequestCodec.Encode(_close.Packet, 1, _close.Shape, options.Limits);
+            RequestCodec.Encode(_close.Packet.AsSpan(sizeof(int)), 1, _close.Shape, options.Limits);
             work.Set();
             return _close;
         }
@@ -584,7 +587,7 @@ internal sealed class RequestScheduler(
                 pending.Sent = true;
                 pending.Writing = true;
                 _sent.Enqueue(pending);
-                BinaryPrimitives.WriteInt32BigEndian(pending.Packet!, xid);
+                BinaryPrimitives.WriteInt32BigEndian(pending.Packet.AsSpan(sizeof(int)), xid);
                 return (pending, pending.Packet!);
             }
         }

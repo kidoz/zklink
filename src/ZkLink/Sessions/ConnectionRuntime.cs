@@ -152,7 +152,7 @@ internal sealed class ConnectionRuntime(
     private async Task<RuntimeFailure> WriteAsync(CancellationToken cancellationToken)
     {
         Func<ReadOnlyMemory<byte>, Task> write = packet =>
-            transport.Writer.WriteAsync(packet, cancellationToken);
+            transport.Writer.WriteFrameAsync(packet, cancellationToken);
         try
         {
             while (true)

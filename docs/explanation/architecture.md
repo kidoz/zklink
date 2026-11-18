@@ -10,7 +10,8 @@ bounded, and persistent streams report reconnect gaps before application readine
 ## Wire records and public results serve different lifetimes
 
 The internal Jute codec describes bytes: big-endian values, strings, buffers,
-vectors, and records. Framing places a length prefix around a bounded payload.
+vectors, and records. Outgoing frames reserve four bytes before the payload for
+its big-endian length. The writer submits the complete frame in one stream write.
 Those responsibilities do not determine how an application should own a result.
 
 Public result wrappers copy incoming data and collections so a caller's later

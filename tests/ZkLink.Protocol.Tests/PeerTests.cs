@@ -88,7 +88,7 @@ public sealed class PeerTests
         var writer = new FrameWriter(failingPeer, ProtocolFixtures.Limits);
         var request = ProtocolFixtures.Bytes("get-data-request");
         await Assert.ThrowsAsync<IOException>(() =>
-            writer.WriteAsync(request, TestContext.Current.CancellationToken)
+            writer.WriteFrameAsync(Frame(request), TestContext.Current.CancellationToken)
         );
         Assert.Equal(Frame(request)[..7], failingPeer.WrittenBytes);
     }
@@ -117,7 +117,7 @@ public sealed class PeerTests
         using var client = new TcpClient();
         await client.ConnectAsync(IPAddress.Loopback, server.Port, deadline.Token);
         var writer = new FrameWriter(client.GetStream(), limits);
-        await writer.WriteAsync(expected, deadline.Token);
+        await writer.WriteFrameAsync(Frame(expected), deadline.Token);
         var replyReader = new FrameReader(client.GetStream(), limits);
         await Assert.ThrowsAsync<EndOfStreamException>(() => replyReader.ReadAsync(deadline.Token));
         await server.Completion.ConfigureAwait(true);
@@ -137,14 +137,14 @@ public sealed class PeerTests
                     await reader.ReadAsync(token).ConfigureAwait(true)
                 );
                 await writer
-                    .WriteAsync(ProtocolFixtures.Bytes("connect-reply"), token)
+                    .WriteFrameAsync(Frame(ProtocolFixtures.Bytes("connect-reply")), token)
                     .ConfigureAwait(true);
                 Assert.Equal(
                     ProtocolFixtures.Bytes("get-data-request"),
                     await reader.ReadAsync(token).ConfigureAwait(true)
                 );
                 await writer
-                    .WriteAsync(ProtocolFixtures.Bytes("get-data-reply"), token)
+                    .WriteFrameAsync(Frame(ProtocolFixtures.Bytes("get-data-reply")), token)
                     .ConfigureAwait(true);
             },
             TestContext.Current.CancellationToken
@@ -160,7 +160,7 @@ public sealed class PeerTests
         var writer = new FrameWriter(client.GetStream(), limits);
         var connectStorage = new byte[45];
         var connectLength = HandshakeCodec.EncodeNew(connectStorage, 30000, limits);
-        await writer.WriteAsync(connectStorage.AsMemory(0, connectLength), deadline.Token);
+        await writer.WriteFrameAsync(Frame(connectStorage[..connectLength]), deadline.Token);
         using var connected = HandshakeCodec.Decode(
             Assert.IsType<byte[]>(await reader.ReadAsync(deadline.Token)),
             limits
@@ -168,7 +168,7 @@ public sealed class PeerTests
         Assert.True(connected.Accepted);
         var requestStorage = new byte[RequestCodec.Measure(1, ProtocolFixtures.Reads[0], limits)];
         RequestCodec.Encode(requestStorage, 1, ProtocolFixtures.Reads[0], limits);
-        await writer.WriteAsync(requestStorage, deadline.Token);
+        await writer.WriteFrameAsync(Frame(requestStorage), deadline.Token);
         Assert.IsType<DataResult>(
             ReplyCodec
                 .Decode(

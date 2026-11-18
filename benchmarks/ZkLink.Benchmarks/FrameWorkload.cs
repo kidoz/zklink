@@ -8,6 +8,7 @@ namespace ZkLink.Benchmarks;
 internal sealed class FrameWorkload : IDisposable
 {
     private readonly byte[] _payload;
+    private readonly byte[] _frame;
     private readonly MemoryStream _input;
     private readonly MemoryStream _output;
     private readonly FrameReader _reader;
@@ -17,11 +18,11 @@ internal sealed class FrameWorkload : IDisposable
     {
         _payload = new byte[payloadBytes];
         _payload.AsSpan().Fill(42);
-        byte[] frame = new byte[sizeof(int) + payloadBytes];
-        BinaryPrimitives.WriteInt32BigEndian(frame, payloadBytes);
-        _payload.CopyTo(frame, sizeof(int));
-        _input = new MemoryStream(frame, writable: false);
-        _output = new MemoryStream(new byte[frame.Length], writable: true);
+        _frame = new byte[sizeof(int) + payloadBytes];
+        BinaryPrimitives.WriteInt32BigEndian(_frame, payloadBytes);
+        _payload.CopyTo(_frame, sizeof(int));
+        _input = new MemoryStream(_frame, writable: false);
+        _output = new MemoryStream(new byte[_frame.Length], writable: true);
         var limits = new ProtocolLimits();
         _reader = new FrameReader(_input, limits);
         _writer = new FrameWriter(_output, limits);
@@ -36,7 +37,7 @@ internal sealed class FrameWorkload : IDisposable
     internal Task WriteAsync()
     {
         _output.Position = 0;
-        return _writer.WriteAsync(_payload);
+        return _writer.WriteFrameAsync(_frame);
     }
 
     internal async Task ValidateAsync()

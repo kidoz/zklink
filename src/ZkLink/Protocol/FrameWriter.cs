@@ -2,26 +2,38 @@ using System.Buffers.Binary;
 
 namespace ZkLink.Protocol;
 
-// The transport serializes calls and owns payload memory until completion.
+// The transport serializes writes. The caller owns the complete frame until the write finishes.
 internal sealed class FrameWriter(Stream stream, ProtocolLimits limits)
 {
     private readonly Stream _stream = stream ?? throw new ArgumentNullException(nameof(stream));
     private readonly ProtocolLimits _limits =
         limits ?? throw new ArgumentNullException(nameof(limits));
-    private readonly byte[] _prefix = new byte[sizeof(int)];
 
-    internal async Task WriteAsync(
-        ReadOnlyMemory<byte> payload,
-        CancellationToken cancellationToken = default
-    )
+    internal static byte[] AllocateFrame(int payloadLength, ProtocolLimits limits)
     {
-        if (payload.IsEmpty || payload.Length > _limits.MaxFrameBytes)
+        if (payloadLength <= 0 || payloadLength > limits.MaxFrameBytes)
         {
             throw new InvalidDataException("Invalid or excessive frame length.");
         }
-        BinaryPrimitives.WriteInt32BigEndian(_prefix, payload.Length);
-        // Stream.WriteAsync completes the entire supplied memory or throws.
-        await _stream.WriteAsync(_prefix, cancellationToken).ConfigureAwait(false);
-        await _stream.WriteAsync(payload, cancellationToken).ConfigureAwait(false);
+        var frame = new byte[checked(sizeof(int) + payloadLength)];
+        BinaryPrimitives.WriteInt32BigEndian(frame, payloadLength);
+        return frame;
+    }
+
+    internal Task WriteFrameAsync(
+        ReadOnlyMemory<byte> frame,
+        CancellationToken cancellationToken = default
+    )
+    {
+        int payloadLength = frame.Length - sizeof(int);
+        if (
+            payloadLength <= 0
+            || payloadLength > _limits.MaxFrameBytes
+            || BinaryPrimitives.ReadInt32BigEndian(frame.Span) != payloadLength
+        )
+        {
+            throw new InvalidDataException("Invalid or excessive frame length.");
+        }
+        return _stream.WriteAsync(frame, cancellationToken).AsTask();
     }
 }

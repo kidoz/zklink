@@ -32,7 +32,7 @@ client, except that endpoint updates affect future connection attempts.
 | `CloseTimeout` | 5 seconds to obtain acknowledgment before cleanup |
 | `MaxInFlightRequests` | 256; range 1–65,536; canceled sent requests retain their slots |
 | `MaxQueuedRequests` | 1,024; range 1–1,000,000; full queue fails immediately |
-| `MaxPendingRequestBytes` | 32 MiB; range 8 bytes–1 GiB; owned encoded application packets |
+| `MaxPendingRequestBytes` | 32 MiB; range 8 bytes–1 GiB; owned application request payloads, excluding each four-byte frame prefix |
 | `MaxFrameBytes` | 1,048,575, excluding four-byte prefix; range 45 bytes–64 MiB |
 | `MaxDataBytes` | 1,000,000; range 0–64 MiB, additionally constrained by frame size |
 | `MaxCollectionElements` | 100,000; range 1–1,000,000, additionally constrained by frame size |

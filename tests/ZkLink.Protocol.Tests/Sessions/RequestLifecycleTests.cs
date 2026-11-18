@@ -186,7 +186,7 @@ public sealed class RequestLifecycleTests : IDisposable
         Reply(pending);
         await task.ConfigureAwait(true);
         Assert.Equal(expected, packet);
-        Assert.True(_scheduler.OwnedBytes > 0);
+        Assert.Equal(packet.Length - sizeof(int), _scheduler.OwnedBytes);
         _scheduler.WriteFinished(pending);
         Assert.All(packet, value => Assert.Equal(0, value));
         Assert.Equal(0, _scheduler.OwnedBytes);
@@ -209,7 +209,7 @@ public sealed class RequestLifecycleTests : IDisposable
         Assert.Equal(
             -2,
             BinaryPrimitives.ReadInt32BigEndian(
-                _scheduler.Take(1, TestContext.Current.CancellationToken).Packet.Span
+                _scheduler.Take(1, TestContext.Current.CancellationToken).Packet.Span[sizeof(int)..]
             )
         );
         Assert.True(_scheduler.ConsumePing(1));
@@ -266,7 +266,7 @@ public sealed class RequestLifecycleTests : IDisposable
         );
         Array.Fill(data, (byte)9);
         var pending = Take();
-        var reader = new JuteReader(pending.Packet!, _options.Limits);
+        var reader = new JuteReader(pending.Packet.AsSpan(sizeof(int)), _options.Limits);
         reader.ReadRequestHeader();
         Assert.Equal("/a", reader.ReadString());
         Assert.Equal(new byte[] { 1, 2, 3 }, reader.ReadBuffer());
@@ -324,7 +324,7 @@ public sealed class RequestLifecycleTests : IDisposable
         var fourth = Submit(token: TestContext.Current.CancellationToken);
         var p4 = Take();
         Assert.Equal(2, p4.Info.RequestId);
-        Assert.Equal(2, BinaryPrimitives.ReadInt32BigEndian(p4.Packet!));
+        Assert.Equal(2, BinaryPrimitives.ReadInt32BigEndian(p4.Packet.AsSpan(sizeof(int))));
         Reply(p3);
         Reply(p4);
         await Task.WhenAll(third, fourth).ConfigureAwait(true);
@@ -483,7 +483,7 @@ public sealed class RequestLifecycleTests : IDisposable
             1,
             packet =>
             {
-                Assert.Equal(1, BinaryPrimitives.ReadInt32BigEndian(packet.Span));
+                Assert.Equal(1, BinaryPrimitives.ReadInt32BigEndian(packet.Span[sizeof(int)..]));
                 Assert.False(Monitor.IsEntered(_gate));
                 return stop.CancelAsync();
             },
@@ -666,7 +666,7 @@ public sealed class RequestLifecycleTests : IDisposable
         Assert.Equal(
             -2,
             BinaryPrimitives.ReadInt32BigEndian(
-                _scheduler.Take(1, TestContext.Current.CancellationToken).Packet.Span
+                _scheduler.Take(1, TestContext.Current.CancellationToken).Packet.Span[sizeof(int)..]
             )
         );
         _scheduler.ConsumePing(1);
@@ -707,7 +707,7 @@ public sealed class RequestLifecycleTests : IDisposable
         Assert.Equal(
             -2,
             BinaryPrimitives.ReadInt32BigEndian(
-                _scheduler.Take(1, TestContext.Current.CancellationToken).Packet.Span
+                _scheduler.Take(1, TestContext.Current.CancellationToken).Packet.Span[sizeof(int)..]
             )
         );
         Assert.True(_scheduler.ConsumePing(1));
