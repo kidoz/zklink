@@ -345,24 +345,93 @@ public sealed class MultiApiTests : IAsyncLifetime
     }
 
     [Theory(Timeout = 10000)]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ZeroErrorPlaceholderWithoutAResultFaultsTheProtocol(bool readOnly)
+    [InlineData("unexpected member type")]
+    [InlineData("premature terminator")]
+    [InlineData("zero error placeholder")]
+    [Trait("Acceptance", "T18")]
+    public async Task MalformedReadBatchFailsOnlyTheMatchedCall(string defect)
     {
-        Task pending = readOnly
-            ? Client.MultiReadAsync(
-                [ZooKeeperReadOperation.GetData("/node")],
-                TestContext.Current.CancellationToken
-            )
-            : Client.MultiAsync(
-                [ZooKeeperWriteOperation.Check("/node", ZNodeVersion.Any)],
-                TestContext.Current.CancellationToken
-            );
+        var token = TestContext.Current.CancellationToken;
+        var generation = Client.Session.ConnectionGeneration;
+        var pending = Client.MultiReadAsync(
+            [
+                ZooKeeperReadOperation.GetData("/first"),
+                ZooKeeperReadOperation.GetChildren("/second"),
+            ],
+            token
+        );
+        var packet = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        Assert.Equal((int)ZooKeeperOperation.MultiRead, packet.Opcode);
+        var next = Client.SyncAsync("/next", token);
+        var first = new WireMultiMember(
+            (int)ZooKeeperOperation.GetData,
+            0,
+            new DataResult(null, ProtocolFixtures.Stat)
+        );
+        Inject(
+            packet,
+            defect switch
+            {
+                "unexpected member type" => [first, first],
+                "premature terminator" => [first],
+                "zero error placeholder" => [first, new(-1, 0, new ErrorResult(0))],
+                _ => throw new ArgumentOutOfRangeException(nameof(defect)),
+            }
+        );
+        var failure = await Assert
+            .ThrowsAsync<ZooKeeperProtocolException>(() => pending)
+            .ConfigureAwait(true);
+        Assert.Equal(RequestOutcome.Unknown, failure.Outcome);
+        Assert.Equal(packet.Xid, failure.Request.RequestId);
+        Assert.Equal(ZooKeeperOperation.MultiRead, failure.Request.Operation);
+        Assert.Null(failure.ErrorCode);
+
+        var following = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        Assert.Equal((int)ZooKeeperOperation.Sync, following.Opcode);
+        _peer.Reply(following);
+        await next.ConfigureAwait(true);
+        Assert.Equal(ZooKeeperSessionState.Connected, Client.Session.State);
+        Assert.Equal(generation, Client.Session.ConnectionGeneration);
+        await SessionTestSupport.WaitForBytesReleasedAsync(Client).ConfigureAwait(true);
+        Assert.Equal(0, Client.Manager.Scheduler.PendingCount);
+    }
+
+    [Fact(Timeout = 10000)]
+    public async Task ZeroErrorPlaceholderWithoutAWriteResultFaultsTheProtocol()
+    {
+        var pending = Client.MultiAsync(
+            [ZooKeeperWriteOperation.Check("/node", ZNodeVersion.Any)],
+            TestContext.Current.CancellationToken
+        );
         var packet = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
         Inject(packet, [new(-1, 0, new ErrorResult(0))]);
         await SessionTestSupport.Bounded(Client.Manager.Completion).ConfigureAwait(true);
         await Assert.ThrowsAsync<ZooKeeperException>(() => pending).ConfigureAwait(true);
         Assert.Equal(ZooKeeperSessionState.Faulted, Client.Session.State);
+    }
+
+    [Theory(Timeout = 10000)]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExpiryMemberBeforePrematureReadTerminatorStillEndsSession(bool movedFirst)
+    {
+        var operations = new List<ZooKeeperReadOperation>();
+        var members = new List<WireMultiMember>();
+        if (movedFirst)
+        {
+            operations.Add(ZooKeeperReadOperation.GetData("/moved"));
+            int moved = (int)ZooKeeperErrorCode.SessionMoved;
+            members.Add(new(-1, moved, new ErrorResult(moved)));
+        }
+        operations.Add(ZooKeeperReadOperation.GetData("/expired"));
+        operations.Add(ZooKeeperReadOperation.GetData("/missing-result"));
+        int expired = (int)ZooKeeperErrorCode.SessionExpired;
+        members.Add(new(-1, expired, new ErrorResult(expired)));
+        var pending = Client.MultiReadAsync(operations, TestContext.Current.CancellationToken);
+        var packet = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
+        Inject(packet, members);
+        await Assert.ThrowsAsync<ZooKeeperProtocolException>(() => pending).ConfigureAwait(true);
+        Assert.Equal(ZooKeeperSessionState.Expired, Client.Session.State);
     }
 
     [Fact(Timeout = 10000)]

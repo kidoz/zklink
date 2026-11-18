@@ -659,17 +659,12 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                     return new(RuntimeStop.Stopped);
                 }
                 Inbound(value, reply.Header);
-                int errorCode = reply.Header.Error;
-                if (errorCode == 0 && reply.Result is MultiResult multi)
+                int errorCode = reply.Result switch
                 {
-                    errorCode =
-                        multi
-                            .Members.FirstOrDefault(static member =>
-                                member.Error is -112 or -115 or -124 or -118 or -12
-                            )
-                            ?.Error
-                        ?? 0;
-                }
+                    MultiResult multi => multi.MemberSessionError,
+                    InvalidReplyBodyResult invalid => invalid.MemberSessionError,
+                    _ => reply.Header.Error,
+                };
                 RuntimeFailure? result = null;
                 if (errorCode is -112 or -115 or -124)
                 {

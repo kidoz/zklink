@@ -16,6 +16,10 @@ broader security, Native AOT or production qualification. See
 
 ### Fixed
 
+- Fail a read batch with `ZooKeeperProtocolException` when its matched success
+  reply contains an invalid member or terminator. Queued requests can continue
+  on the same connection. An explicit session-expiry error still ends the session.
+
 - Keep watches active and the session connected when the server sends a valid
   watch notification for a path outside the client's chroot.
 

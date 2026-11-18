@@ -58,6 +58,13 @@ Match each read result to its input index. A missing node or denied read can
 produce an error beside successful members. Read batches do **not** provide an
 atomic snapshot or a globally fresh view.
 
+If a complete success reply matches the batch request ID but has an invalid
+body, `MultiReadAsync` throws `ZooKeeperProtocolException` with outcome
+`Unknown`. The caller receives no partial results. For example, an unexpected
+member type or an early terminator fails the batch, and queued requests can
+continue on the same connection. A session-expiry error already decoded from a
+member still ends the session, even if a later member is missing.
+
 ## Rejection and uncertainty
 
 A successful write transaction commits all members. Later members can refer to
@@ -72,8 +79,8 @@ results. Later members may report `RuntimeInconsistency` after the actual failur
 Unknown numeric codes remain inspectable.
 
 An error in the outer reply can lack member diagnostics and uses the ordinary
-request exception. A malformed response faults the connection rather than
-inventing successful members. Session-ending member errors revoke readiness
+request exception. A malformed write transaction reply faults the connection.
+Session-ending member errors revoke readiness
 before the observed result completes; `NoAuth` alone does not end the session.
 
 Cancellation before send reports `NotSent`. Cancellation or missing reply after

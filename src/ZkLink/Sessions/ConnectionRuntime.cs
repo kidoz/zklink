@@ -144,9 +144,16 @@ internal sealed class ConnectionRuntime(
     )
     {
         RequestCodec.ValidateXid(header.Xid, shape.Opcode);
+        int memberSessionError = 0;
         try
         {
-            var result = ReplyCodec.ReadReplyBody(ref input, header, shape, options.Limits);
+            var result = ReplyCodec.ReadReplyBody(
+                ref input,
+                header,
+                shape,
+                options.Limits,
+                out memberSessionError
+            );
             if (header.Error == 0)
             {
                 result = NamespaceTranslator.ToClient(result, shape.Opcode, options.Paths);
@@ -171,10 +178,11 @@ internal sealed class ConnectionRuntime(
                                 or ZooKeeperOperation.GetAllChildrenNumber
                         }
                         or EmptyRequest { Type: ZooKeeperOperation.WhoAmI }
+                        or MultiRequest { ReadOnly: true }
             )
         {
             // The complete frame matched the FIFO head. These calls have no watch to reconcile.
-            return new WireReply(header, new InvalidReplyBodyResult());
+            return new WireReply(header, new InvalidReplyBodyResult(memberSessionError));
         }
     }
 

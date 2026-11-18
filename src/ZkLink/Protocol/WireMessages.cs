@@ -64,7 +64,7 @@ internal abstract record WireResult
     public sealed override string ToString() => "ZooKeeper wire result";
 }
 
-internal sealed record InvalidReplyBodyResult : WireResult;
+internal sealed record InvalidReplyBodyResult(int MemberSessionError = 0) : WireResult;
 
 internal sealed record EmptyResult : WireResult;
 
@@ -84,7 +84,8 @@ internal sealed record IdentityResult(ZooKeeperClientIdentity[] Identities) : Wi
 
 internal sealed record ErrorResult(int Error) : WireResult;
 
-internal sealed record MultiResult(WireMultiMember[] Members) : WireResult;
+internal sealed record MultiResult(WireMultiMember[] Members, int MemberSessionError = 0)
+    : WireResult;
 
 internal sealed record WireMultiMember(int Opcode, int Error, WireResult Result);
 

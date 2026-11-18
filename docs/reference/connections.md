@@ -151,13 +151,14 @@ a globally fresh snapshot or expose node data.
 | Definitive server rejection | `Rejected` |
 | Transmission started and result is missing, or server error is ambiguous | `Unknown` |
 
-For `SyncAsync`, unwatched node reads (`ExistsAsync`, `GetDataAsync`, `GetChildrenAsync`,
+For `MultiReadAsync`, `SyncAsync`, unwatched node reads (`ExistsAsync`, `GetDataAsync`, `GetChildrenAsync`,
 `GetAclAsync`) and auxiliary queries (`GetEphemeralsAsync`,
 `GetAllChildrenNumberAsync`, `WhoAmIAsync`), an invalid body in a complete,
 matched success reply fails only that call with `ZooKeeperProtocolException`
 and outcome `Unknown`. This includes a sync reply that returns a relative path
 or a path outside the configured chroot. Queued requests continue on the same
-connection. An invalid frame length, an incomplete reply header, or a request
+connection unless a read-batch member has already reported a session or connection
+failure. An invalid frame length, an incomplete reply header, or a request
 ID out of order faults the session.
 
 Cancellation throws `ZooKeeperOperationCanceledException`, remains ordinary task

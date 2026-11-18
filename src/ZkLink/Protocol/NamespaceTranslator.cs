@@ -155,16 +155,17 @@ internal static class NamespaceTranslator
             {
                 Values = list.Values.Where(paths.Contains).Select(paths.ToClient).ToArray(),
             },
-            MultiResult multi => new MultiResult(
-                multi
+            MultiResult multi => multi with
+            {
+                Members = multi
                     .Members.Select(member =>
                         member with
                         {
                             Result = ToClient(member.Result, member.Opcode, paths),
                         }
                     )
-                    .ToArray()
-            ),
+                    .ToArray(),
+            },
             _ => result,
         };
 

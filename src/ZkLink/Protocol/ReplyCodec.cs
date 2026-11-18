@@ -31,19 +31,22 @@ internal static class ReplyCodec
         {
             throw new InvalidDataException("Reply xid does not match the expected request.");
         }
-        return new WireReply(header, ReadReplyBody(ref reader, header, request, limits));
+        return new WireReply(header, ReadReplyBody(ref reader, header, request, limits, out _));
     }
 
     internal static WireResult ReadReplyBody(
         ref JuteReader reader,
         ReplyHeader header,
         WireRequest request,
-        ProtocolLimits limits
+        ProtocolLimits limits,
+        out int memberSessionError
     )
     {
+        memberSessionError = 0;
         var result =
             header.Error != 0 ? new ErrorResult(header.Error)
-            : request is MultiRequest multi ? ReadMulti(ref reader, multi, limits)
+            : request is MultiRequest multi
+                ? ReadMulti(ref reader, multi, limits, out memberSessionError)
             : ReadBody(ref reader, request.Opcode, limits);
         reader.EnsureEnd();
         return result;
@@ -115,20 +118,25 @@ internal static class ReplyCodec
     private static MultiResult ReadMulti(
         ref JuteReader reader,
         MultiRequest request,
-        ProtocolLimits limits
+        ProtocolLimits limits,
+        out int memberSessionError
     )
     {
         var count = request.Members.Count;
+        memberSessionError = 0;
+        const int multiHeaderBytes = sizeof(int) + sizeof(byte) + sizeof(int);
+        int availableHeaders = reader.Remaining / multiHeaderBytes;
         if (
             count > limits.MaxCollectionElements
-            || reader.Remaining < 9
-            || count > (reader.Remaining - 9) / 9
+            || (!request.ReadOnly && availableHeaders <= count)
         )
         {
             throw new InvalidDataException("Invalid or excessive expected multi count.");
         }
-        var results = new WireMultiMember[count];
-        for (var i = 0; i < count; i++)
+        // Bound allocation by the number of member headers that fit. Decode the available
+        // prefix so a complete session error survives a missing member or terminator.
+        var results = new WireMultiMember[Math.Min(count, availableHeaders)];
+        for (var i = 0; i < results.Length; i++)
         {
             var type = reader.ReadInt32();
             var done = reader.ReadBoolean();
@@ -144,6 +152,11 @@ internal static class ReplyCodec
                 {
                     throw new InvalidDataException("Inconsistent multi error fields.");
                 }
+                memberSessionError = SelectMemberSessionError(
+                    memberSessionError,
+                    bodyError,
+                    request.ReadOnly
+                );
                 results[i] = new WireMultiMember(type, bodyError, new ErrorResult(bodyError));
                 continue;
             }
@@ -154,7 +167,12 @@ internal static class ReplyCodec
             }
             results[i] = new WireMultiMember(type, 0, ReadBody(ref reader, type, limits));
         }
-        if (reader.ReadInt32() != -1 || !reader.ReadBoolean() || reader.ReadInt32() != -1)
+        if (
+            results.Length != count
+            || reader.ReadInt32() != -1
+            || !reader.ReadBoolean()
+            || reader.ReadInt32() != -1
+        )
         {
             throw new InvalidDataException("Invalid multi terminator or extra member.");
         }
@@ -175,8 +193,24 @@ internal static class ReplyCodec
                 "Write placeholders require an explicit failing member."
             );
         }
-        return new MultiResult(results);
+        return new MultiResult(results, memberSessionError);
     }
+
+    private static int SelectMemberSessionError(int current, int error, bool readOnly) =>
+        (ZooKeeperErrorCode)error switch
+        {
+            ZooKeeperErrorCode.SessionExpired
+            or ZooKeeperErrorCode.AuthFailed
+            or ZooKeeperErrorCode.SessionClosedRequiresSaslAuth
+                when current == 0
+                    || readOnly
+                        && (ZooKeeperErrorCode)current
+                            is ZooKeeperErrorCode.SessionMoved
+                                or ZooKeeperErrorCode.UnknownSession => error,
+            ZooKeeperErrorCode.SessionMoved
+            or ZooKeeperErrorCode.UnknownSession when current == 0 => error,
+            _ => current,
+        };
 
     private static WireAcl[] ReadAcl(ref JuteReader reader)
     {
