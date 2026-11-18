@@ -44,7 +44,7 @@ public sealed class RequestTransitionTableTests : IDisposable
         {
             pending = await AdmittedRequestAsync(admission, TestContext.Current.CancellationToken)
                 .ConfigureAwait(true);
-            AssertRequest(pending, preparing: true, released: false);
+            AssertRequest(pending, RequestPhase.Preparing);
             Assert.True(_scheduler.OwnedBytes > 0);
             PendingRequest? close = null;
             if (detach)
@@ -56,10 +56,10 @@ public sealed class RequestTransitionTableTests : IDisposable
                 close = _scheduler.EnqueueClose();
             }
 
-            AssertRequest(pending, preparing: true, completed: true, released: false);
+            AssertRequest(pending, RequestPhase.CompletingPreparation);
             if (close is not null)
             {
-                AssertRequest(close, prepared: true);
+                AssertRequest(close, RequestPhase.Queued);
                 Assert.Equal((int)ZooKeeperOperation.CloseSession, close.Info.Opcode);
             }
         }
@@ -73,7 +73,7 @@ public sealed class RequestTransitionTableTests : IDisposable
             .ConfigureAwait(true);
         Assert.Equal(RequestOutcome.NotSent, error.Outcome);
         Assert.Null(error.Request.RequestId);
-        AssertRequest(pending!, preparing: false, completed: true, released: true);
+        AssertRequest(pending!, RequestPhase.Released);
         Assert.Equal(0, _scheduler.OwnedBytes);
     }
 
@@ -87,7 +87,7 @@ public sealed class RequestTransitionTableTests : IDisposable
         {
             pending = await AdmittedRequestAsync(admission, TestContext.Current.CancellationToken)
                 .ConfigureAwait(true);
-            AssertRequest(pending, preparing: true, released: false);
+            AssertRequest(pending, RequestPhase.Preparing);
             Assert.True(_scheduler.OwnedBytes > 0);
         }
         finally
@@ -96,7 +96,7 @@ public sealed class RequestTransitionTableTests : IDisposable
         }
 
         await Assert.ThrowsAsync<InvalidDataException>(() => admission.Submit).ConfigureAwait(true);
-        AssertRequest(pending!, preparing: false, completed: true, released: true);
+        AssertRequest(pending!, RequestPhase.Released);
         Assert.Equal(0, _scheduler.OwnedBytes);
         Assert.Equal(0, _scheduler.PendingCount);
     }
@@ -114,14 +114,14 @@ public sealed class RequestTransitionTableTests : IDisposable
             TestContext.Current.CancellationToken
         );
         Assert.NotNull(pending);
-        AssertRequest(pending, prepared: true, sent: true, writing: true);
+        AssertRequest(pending, RequestPhase.Writing, sent: true);
         _scheduler.Detach();
-        AssertRequest(pending, prepared: true, sent: true, writing: true, completed: true);
+        AssertRequest(pending, RequestPhase.CompletingWrite, sent: true);
         Assert.Equal(0, Tombstones(_scheduler));
         release.TrySetResult();
         await writing!.ConfigureAwait(true);
         _scheduler.WriteFinished(pending);
-        AssertRequest(pending, prepared: true, sent: true, completed: true, released: true);
+        AssertRequest(pending, RequestPhase.Released, sent: true);
         Assert.Equal(0, _scheduler.OwnedBytes);
         var error = await Assert.ThrowsAsync<ZooKeeperException>(() => task).ConfigureAwait(true);
         Assert.Equal(RequestOutcome.Unknown, error.Outcome);
@@ -141,27 +141,13 @@ public sealed class RequestTransitionTableTests : IDisposable
         );
         Assert.NotNull(pending);
         await writing!.ConfigureAwait(true);
-        AssertRequest(pending, prepared: true, sent: true, writing: true, tombstone: true);
+        AssertRequest(pending, RequestPhase.Writing, sent: true, tombstone: true);
         Assert.Equal(1, Tombstones(_scheduler));
         _scheduler.Detach();
-        AssertRequest(
-            pending,
-            prepared: true,
-            sent: true,
-            writing: true,
-            completed: true,
-            tombstone: true
-        );
+        AssertRequest(pending, RequestPhase.CompletingWrite, sent: true, tombstone: true);
         Assert.Equal(0, Tombstones(_scheduler));
         _scheduler.WriteFinished(pending);
-        AssertRequest(
-            pending,
-            prepared: true,
-            sent: true,
-            completed: true,
-            released: true,
-            tombstone: true
-        );
+        AssertRequest(pending, RequestPhase.Released, sent: true, tombstone: true);
         Assert.Equal(0, Tombstones(_scheduler));
         Assert.Equal(0, _scheduler.OwnedBytes);
         var error = await Assert
@@ -180,17 +166,10 @@ public sealed class RequestTransitionTableTests : IDisposable
         var task = Submit("/a", stop.Token);
         var pending = Take();
         await stop.CancelAsync().ConfigureAwait(true);
-        AssertRequest(pending, prepared: true, sent: true, tombstone: true);
+        AssertRequest(pending, RequestPhase.AwaitingReply, sent: true, tombstone: true);
         Assert.Equal(1, Tombstones(_scheduler));
         _scheduler.Detach();
-        AssertRequest(
-            pending,
-            prepared: true,
-            sent: true,
-            completed: true,
-            released: true,
-            tombstone: true
-        );
+        AssertRequest(pending, RequestPhase.Released, sent: true, tombstone: true);
         Assert.Equal(0, Tombstones(_scheduler));
         Assert.Equal(0, _scheduler.OwnedBytes);
         var error = await Assert
@@ -213,22 +192,22 @@ public sealed class RequestTransitionTableTests : IDisposable
         );
         var close = _scheduler.EnqueueClose();
         Assert.NotNull(pending);
-        AssertRequest(pending, prepared: true, sent: true, writing: true, tombstone: true);
+        AssertRequest(pending, RequestPhase.Writing, sent: true, tombstone: true);
         Assert.False(pending.Completed);
         Assert.Equal(1, Tombstones(_scheduler));
-        AssertRequest(close, prepared: true);
+        AssertRequest(close, RequestPhase.Queued);
         var error = await Assert.ThrowsAsync<ZooKeeperException>(() => task).ConfigureAwait(true);
         Assert.Equal(RequestOutcome.Unknown, error.Outcome);
         Assert.Equal(pending.Info.RequestId, error.Request.RequestId);
         release.TrySetResult();
         await writing!.ConfigureAwait(true);
         _scheduler.WriteFinished(pending);
-        AssertRequest(pending, prepared: true, sent: true, writing: false, tombstone: true);
+        AssertRequest(pending, RequestPhase.AwaitingReply, sent: true, tombstone: true);
         Assert.False(pending.Completed);
-        Assert.False(pending.Released);
+        Assert.NotEqual(RequestPhase.Released, pending.Phase);
         Assert.True(_scheduler.OwnedBytes > 0);
         Reply(pending);
-        AssertRequest(pending, prepared: true, sent: true, completed: true, released: true);
+        AssertRequest(pending, RequestPhase.Released, sent: true);
         Assert.Equal(0, Tombstones(_scheduler));
     }
 
@@ -293,7 +272,7 @@ public sealed class RequestTransitionTableTests : IDisposable
         Assert.Equal("/queued", second.Info.Path);
         Assert.Equal(3, second.Info.RequestId);
         Assert.Equal(1, taken.Info.RequestId);
-        Assert.True(taken.Writing);
+        Assert.Equal(RequestPhase.Writing, taken.Phase);
         _scheduler.WriteFinished(taken);
         _scheduler.WriteFinished(first);
         _scheduler.WriteFinished(second);
@@ -387,22 +366,39 @@ public sealed class RequestTransitionTableTests : IDisposable
 
     private static void AssertRequest(
         PendingRequest pending,
-        bool preparing = false,
-        bool prepared = false,
+        RequestPhase phase,
         bool sent = false,
-        bool writing = false,
-        bool completed = false,
-        bool released = false,
         bool tombstone = false
     )
     {
-        Assert.Equal(preparing, pending.Preparing);
-        Assert.Equal(prepared, pending.Prepared);
+        Assert.Equal(phase, pending.Phase);
         Assert.Equal(sent, pending.Sent);
-        Assert.Equal(writing, pending.Writing);
-        Assert.Equal(completed, pending.Completed);
-        Assert.Equal(released, pending.Released);
         Assert.Equal(tombstone, pending.Tombstone);
+    }
+
+    [Fact]
+    public void OnlyExplicitRequestPhaseTransitionsAreAllowed()
+    {
+        (RequestPhase, RequestPhase)[] edges =
+        [
+            (RequestPhase.Preparing, RequestPhase.Queued),
+            (RequestPhase.Preparing, RequestPhase.CompletingPreparation),
+            (RequestPhase.Queued, RequestPhase.Writing),
+            (RequestPhase.Queued, RequestPhase.Completed),
+            (RequestPhase.Writing, RequestPhase.AwaitingReply),
+            (RequestPhase.Writing, RequestPhase.CompletingWrite),
+            (RequestPhase.CompletingPreparation, RequestPhase.Completed),
+            (RequestPhase.CompletingWrite, RequestPhase.Completed),
+            (RequestPhase.AwaitingReply, RequestPhase.Completed),
+            (RequestPhase.Completed, RequestPhase.Released),
+        ];
+        foreach (var from in Enum.GetValues<RequestPhase>())
+        {
+            foreach (var to in Enum.GetValues<RequestPhase>())
+            {
+                Assert.Equal(edges.Contains((from, to)), PendingRequest.IsAllowed(from, to));
+            }
+        }
     }
 
     [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_queued")]
@@ -478,7 +474,10 @@ public sealed class WatchTransitionTableTests
         fixture.Reply(exists, (int)ZooKeeperErrorCode.NoNode);
         AssertWatch(exists, active: true, absent: true);
         var suppressed = fixture.Begin("/children", ZooKeeperWatchMode.OneShotChildren);
-        suppressed.Sent.Sent = true;
+        suppressed.Sent.FinishPreparation();
+        suppressed.Sent.BeginWrite(
+            new ZooKeeperRequestInfo(ZooKeeperOperation.Exists, 1, path: suppressed.Watch.Path)
+        );
         lock (fixture.Gate)
         {
             suppressed.Intent.Canceled(suppressed.Sent);

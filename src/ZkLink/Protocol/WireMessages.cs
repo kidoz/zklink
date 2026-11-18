@@ -1,3 +1,5 @@
+using ZkLink.Watches;
+
 namespace ZkLink.Protocol;
 
 // Internal closed request shapes, never public arbitrary opcode bodies.
@@ -11,7 +13,7 @@ internal abstract record WireRequest(int Opcode)
 
 internal sealed record EmptyRequest(ZooKeeperOperation Type) : WireRequest((int)Type);
 
-internal sealed record PingRequest() : WireRequest(11);
+internal sealed record PingRequest() : WireRequest(ControlOpcode.Ping);
 
 internal sealed record PathRequest(ZooKeeperOperation Type, string Path) : WireRequest((int)Type);
 
@@ -45,7 +47,7 @@ internal sealed record WatchRequest(ZooKeeperOperation Type, string Path, int Mo
     : WireRequest((int)Type);
 
 internal sealed record AuthRequest(string Scheme, ReadOnlyMemory<byte> Credentials)
-    : WireRequest(100);
+    : WireRequest(ControlOpcode.Auth);
 
 internal sealed record RestoreRequest(
     long Zxid,
@@ -54,7 +56,12 @@ internal sealed record RestoreRequest(
     IReadOnlyList<string?> Children,
     IReadOnlyList<string?>? Persistent = null,
     IReadOnlyList<string?>? Recursive = null
-) : WireRequest(Persistent is null && Recursive is null ? 101 : 105);
+)
+    : WireRequest(
+        Persistent is null && Recursive is null
+            ? ControlOpcode.SetWatches
+            : ControlOpcode.SetWatches2
+    );
 
 internal sealed record MultiRequest(bool ReadOnly, IReadOnlyList<WireRequest> Members)
     : WireRequest((int)(ReadOnly ? ZooKeeperOperation.MultiRead : ZooKeeperOperation.Multi));
@@ -94,8 +101,12 @@ internal sealed record WireReply(ReplyHeader Header, WireResult Result);
 internal sealed record WireNotification(int Type, int State, string? Path, long? Zxid)
 {
     internal bool IsRecognized =>
-        (Type == -1 || Type is >= 1 and <= 7)
-        && State is -112 or -1 or 0 or 1 or 3 or 4 or 5 or 6 or 7;
+        (
+            Type == WatchProtocol.SessionEvent
+            || Type
+                is >= (int)ZooKeeperWatchEventKind.NodeCreated
+                    and <= (int)ZooKeeperWatchEventKind.PersistentWatchRemoved
+        ) && Enum.IsDefined((KeeperState)State);
 
     public override string ToString() => "ZooKeeper wire notification";
 }

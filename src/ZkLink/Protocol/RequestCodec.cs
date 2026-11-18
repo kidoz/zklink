@@ -71,14 +71,8 @@ internal static class RequestCodec
 
     internal static void ValidateXid(int xid, int opcode)
     {
-        var valid = opcode switch
-        {
-            11 => xid == -2,
-            100 => xid == -4,
-            101 or 105 => xid == -8,
-            _ => xid > 0,
-        };
-        if (!valid)
+        var expected = Xids.ForMeasurement(opcode);
+        if (expected > 0 ? xid <= 0 : xid != expected)
         {
             throw new InvalidDataException("Invalid request xid for opcode.");
         }
@@ -139,7 +133,7 @@ internal static class RequestCodec
                         or ZooKeeperOperation.CreateContainer
                         or ZooKeeperOperation.CreateTtl:
                 ValidateCreate(create);
-                Path(ref output, create.Path, create.Flags is 2 or 3 or 6);
+                Path(ref output, create.Path, CreateFlags.IsSequential(create.Flags));
                 Data(ref output, create.Data, limits);
                 Acl(ref output, create.Acl, limits);
                 output.WriteInt32(create.Flags);
@@ -232,12 +226,12 @@ internal static class RequestCodec
                     }
                     output.WriteInt32(member.Opcode);
                     output.WriteBoolean(false);
-                    output.WriteInt32(-1);
+                    output.WriteInt32(MultiHeader.NoError);
                     WriteBody(ref output, member, limits);
                 }
-                output.WriteInt32(-1);
+                output.WriteInt32(MultiHeader.ErrorOrEnd);
                 output.WriteBoolean(true);
-                output.WriteInt32(-1);
+                output.WriteInt32(MultiHeader.NoError);
                 break;
             default:
                 throw new InvalidDataException("Unsupported request shape or opcode.");
@@ -307,10 +301,24 @@ internal static class RequestCodec
     private static void ValidateCreate(CreateRequest create)
     {
         if (
-            create.Flags is < 0 or > 6
-            || (create.Type == ZooKeeperOperation.CreateContainer && create.Flags != 4)
-            || (create.Flags == 4 && create.Type != ZooKeeperOperation.CreateContainer)
-            || ((create.Flags is 5 or 6) != (create.Type == ZooKeeperOperation.CreateTtl))
+            create.Flags
+                is < (int)CreateMode.Persistent
+                    or > (int)CreateMode.PersistentSequentialWithTtl
+            || (
+                create.Type == ZooKeeperOperation.CreateContainer
+                && create.Flags != (int)CreateMode.Container
+            )
+            || (
+                create.Flags == (int)CreateMode.Container
+                && create.Type != ZooKeeperOperation.CreateContainer
+            )
+            || (
+                (
+                    create.Flags
+                    is (int)CreateMode.PersistentWithTtl
+                        or (int)CreateMode.PersistentSequentialWithTtl
+                ) != (create.Type == ZooKeeperOperation.CreateTtl)
+            )
             || ((create.Type == ZooKeeperOperation.CreateTtl) != create.Ttl.HasValue)
             || create.Ttl is <= 0 or > CreateOptions.MaxTtlMilliseconds
         )

@@ -7,59 +7,6 @@ using ZkLink.Sessions;
 
 namespace ZkLink.Requests;
 
-internal sealed class PendingRequest
-{
-    internal readonly TaskCompletionSource<WireReply> Completion = new(
-        TaskCreationOptions.RunContinuationsAsynchronously
-    );
-
-    internal PendingRequest(
-        RequestScheduler owner,
-        ZooKeeperRequestInfo info,
-        int bytes,
-        long generation,
-        long started,
-        CancellationToken token,
-        bool control = false
-    )
-    {
-        Owner = owner;
-        Info = info;
-        ReservedBytes = bytes;
-        Generation = generation;
-        Started = started;
-        Token = token;
-        Control = control;
-        Task = AwaitAsync(Completion.Task);
-    }
-
-    private static async Task<WireReply> AwaitAsync(Task<WireReply> task) =>
-        await task.ConfigureAwait(false);
-
-    internal Task<WireReply> Task { get; }
-    internal readonly RequestScheduler Owner;
-    internal ZooKeeperRequestInfo Info;
-    internal readonly int ReservedBytes;
-    internal readonly long Generation;
-    internal readonly long Started;
-    internal readonly CancellationToken Token;
-    internal readonly bool Control;
-    internal LinkedListNode<PendingRequest>? Node;
-    internal byte[]? Packet;
-    internal WireRequest? Shape;
-    internal IRequestObserver? Observer;
-    internal bool Preparing = true;
-    internal bool Prepared;
-    internal bool Sent;
-    internal bool Writing;
-    internal bool Completed;
-    internal bool Released;
-    internal bool Tombstone;
-    internal CancellationTokenRegistration Cancellation;
-    internal ITimer? Timer;
-    internal RequestOutcome Outcome => Sent ? RequestOutcome.Unknown : RequestOutcome.NotSent;
-}
-
 internal sealed class RequestScheduler(
     object gate,
     ClientOptionsSnapshot options,
@@ -68,7 +15,16 @@ internal sealed class RequestScheduler(
     TelemetryState? telemetry = null
 )
 {
-    private static readonly byte[] PingPacket = [0, 0, 0, 8, 255, 255, 255, 254, 0, 0, 0, 11];
+    private static readonly byte[] PingPacket = CreatePingPacket();
+
+    private static byte[] CreatePingPacket()
+    {
+        var limits = new ProtocolLimits();
+        var frame = FrameWriter.AllocateFrame(2 * sizeof(int), limits);
+        RequestCodec.Encode(frame.AsSpan(sizeof(int)), Xids.Ping, new PingRequest(), limits);
+        return frame;
+    }
+
     private readonly TelemetryState? _telemetry = telemetry;
     private readonly LinkedList<PendingRequest> _queued = [];
     private readonly Queue<PendingRequest> _sent = [];
@@ -218,7 +174,7 @@ internal sealed class RequestScheduler(
         if (
             request is AuthRequest or RestoreRequest
             || (!watchOperation && request is WatchRequest or ReadRequest { Watch: true })
-            || request.Opcode is 11 or -11
+            || request.Opcode is ControlOpcode.Ping or (int)ZooKeeperOperation.CloseSession
         )
         {
             throw new NotSupportedException(
@@ -292,71 +248,82 @@ internal sealed class RequestScheduler(
         {
             failure = error;
         }
+        FinishPreparation(pending, packet, shape, failure);
+        work.Set();
+        return pending.Task;
+    }
+
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "Timer registration failures are returned to the caller after releasing the reservation."
+    )]
+    private void FinishPreparation(
+        PendingRequest pending,
+        byte[]? packet,
+        WireRequest? shape,
+        Exception? failure
+    )
+    {
         lock (gate)
         {
             using var pressure = new PressureObservation(this);
             pending.Packet = packet;
             pending.Shape = shape;
-            pending.Preparing = false;
             if (--_preparing == 0)
             {
                 _preparersDrained.TrySetResult();
             }
+            if (!pending.Completed && failure is not null)
+            {
+                Finish(pending, failure);
+            }
+            pending.FinishPreparation();
             if (!pending.Completed)
             {
-                if (failure is not null)
+                try
                 {
-                    Finish(pending, failure);
-                }
-                else
-                {
-                    try
+                    pending.Cancellation = pending.Token.UnsafeRegister(
+                        static state =>
+                        {
+                            var pending = (PendingRequest)state!;
+                            pending.Owner.Cancel(pending, false);
+                        },
+                        pending
+                    );
+                    var remaining =
+                        options.Settings.OperationTimeout
+                        - timeProvider.GetElapsedTime(pending.Started);
+                    if (remaining <= TimeSpan.Zero)
                     {
-                        pending.Prepared = true;
-                        pending.Cancellation = cancellationToken.UnsafeRegister(
+                        Cancel(pending, true);
+                    }
+                    else if (!pending.Completed)
+                    {
+                        pending.Timer = timeProvider.CreateTimer(
                             static state =>
                             {
                                 var pending = (PendingRequest)state!;
-                                pending.Owner.Cancel(pending, false);
+                                pending.Owner.Cancel(pending, true);
                             },
-                            pending
+                            pending,
+                            remaining,
+                            Timeout.InfiniteTimeSpan
                         );
-                        var remaining =
-                            options.Settings.OperationTimeout
-                            - timeProvider.GetElapsedTime(started);
-                        if (remaining <= TimeSpan.Zero)
-                        {
-                            Cancel(pending, true);
-                        }
-                        else if (!pending.Completed)
-                        {
-                            pending.Timer = timeProvider.CreateTimer(
-                                static state =>
-                                {
-                                    var pending = (PendingRequest)state!;
-                                    pending.Owner.Cancel(pending, true);
-                                },
-                                pending,
-                                remaining,
-                                Timeout.InfiniteTimeSpan
-                            );
-                        }
-                        if (pending.Completed)
-                        {
-                            pending.Cancellation.Unregister();
-                            pending.Timer?.Dispose();
-                        }
                     }
-                    catch (Exception error)
+                    if (pending.Completed)
                     {
-                        Finish(pending, error);
+                        pending.Cancellation.Unregister();
+                        pending.Timer?.Dispose();
                     }
+                }
+                catch (Exception error)
+                {
+                    Finish(pending, error);
                 }
             }
             Release(pending);
         }
-        work.Set();
-        return pending.Task;
     }
 
     private static async Task<WireReply> CancelledAsync(
@@ -399,7 +366,7 @@ internal sealed class RequestScheduler(
             pending.Observer?.Canceled(pending);
             if (pending.Completion.TrySetException(error) && pending.Sent)
             {
-                pending.Tombstone = true;
+                pending.MarkTombstone();
                 _tombstones++;
             }
             pending.Cancellation.Unregister();
@@ -407,7 +374,7 @@ internal sealed class RequestScheduler(
             if (!pending.Sent)
             {
                 RemoveQueued(pending);
-                pending.Completed = true;
+                pending.Complete();
                 Release(pending);
             }
         }
@@ -477,7 +444,7 @@ internal sealed class RequestScheduler(
                     )
                 )
                 {
-                    pending.Tombstone = true;
+                    pending.MarkTombstone();
                     _tombstones++;
                 }
                 pending.Cancellation.Unregister();
@@ -497,11 +464,10 @@ internal sealed class RequestScheduler(
                 true
             )
             {
-                Preparing = false,
-                Prepared = true,
                 Shape = new EmptyRequest(ZooKeeperOperation.CloseSession),
                 Packet = FrameWriter.AllocateFrame(8, options.Limits),
             };
+            _close.FinishPreparation();
             RequestCodec.Encode(_close.Packet.AsSpan(sizeof(int)), 1, _close.Shape, options.Limits);
             work.Set();
             return _close;
@@ -532,10 +498,7 @@ internal sealed class RequestScheduler(
                     _pingStarted = timeProvider.GetTimestamp();
                     return (null, PingPacket);
                 }
-                if (
-                    pending is null
-                    && _maintenance is { Sent: false, Prepared: true, Completed: false }
-                )
+                if (pending is null && _maintenance is { Phase: RequestPhase.Queued })
                 {
                     pending = _maintenance;
                 }
@@ -544,7 +507,7 @@ internal sealed class RequestScheduler(
                     if (
                         !_accepting
                         || _inFlight >= options.Settings.MaxInFlightRequests
-                        || _queued.First is not { Value.Prepared: true } head
+                        || _queued.First is not { Value.Phase: RequestPhase.Queued } head
                     )
                     {
                         return (null, default);
@@ -571,19 +534,19 @@ internal sealed class RequestScheduler(
                 }
                 // Keep ownership in the queued/control slot if allocation fails.
                 var xid = AllocateXid();
-                pending.Info = new ZooKeeperRequestInfo(
-                    pending.Info.Operation,
-                    xid,
-                    _endpoint,
-                    pending.Info.Path
+                pending.BeginWrite(
+                    new ZooKeeperRequestInfo(
+                        pending.Info.Operation,
+                        xid,
+                        _endpoint,
+                        pending.Info.Path
+                    )
                 );
                 if (!pending.Control)
                 {
                     RemoveQueued(pending);
                     _inFlight++;
                 }
-                pending.Sent = true;
-                pending.Writing = true;
                 _sent.Enqueue(pending);
                 BinaryPrimitives.WriteInt32BigEndian(pending.Packet.AsSpan(sizeof(int)), xid);
                 return (pending, pending.Packet!);
@@ -618,7 +581,7 @@ internal sealed class RequestScheduler(
         lock (gate)
         {
             using var pressure = new PressureObservation(this);
-            pending.Writing = false;
+            pending.FinishWrite();
             Release(pending);
         }
     }
@@ -671,7 +634,7 @@ internal sealed class RequestScheduler(
             _sent.Dequeue();
             if (pending.Tombstone)
             {
-                pending.Tombstone = false;
+                pending.ConsumeTombstone();
                 _tombstones--;
             }
             _xids.Remove(pending.Info.RequestId!.Value);
@@ -679,7 +642,7 @@ internal sealed class RequestScheduler(
             {
                 _inFlight--;
             }
-            pending.Completed = true;
+            pending.Complete();
             pending.Cancellation.Unregister();
             pending.Timer?.Dispose();
             if (reply.Result is InvalidReplyBodyResult)
@@ -689,28 +652,7 @@ internal sealed class RequestScheduler(
             }
             else if (reply.Header.Error != 0)
             {
-                var outcome = reply.Header.Error
-                    is (int)ZooKeeperErrorCode.Unimplemented
-                        or (int)ZooKeeperErrorCode.BadArguments
-                        or (int)ZooKeeperErrorCode.NoNode
-                        or (int)ZooKeeperErrorCode.NoAuth
-                        or (int)ZooKeeperErrorCode.BadVersion
-                        or (int)ZooKeeperErrorCode.NoChildrenForEphemerals
-                        or (int)ZooKeeperErrorCode.NodeExists
-                        or (int)ZooKeeperErrorCode.NotEmpty
-                        or (int)ZooKeeperErrorCode.SessionExpired
-                        or (int)ZooKeeperErrorCode.InvalidCallback
-                        or (int)ZooKeeperErrorCode.InvalidAcl
-                        or (int)ZooKeeperErrorCode.AuthFailed
-                        or (int)ZooKeeperErrorCode.NotReadOnly
-                        or (int)ZooKeeperErrorCode.EphemeralOnLocalSession
-                        or (int)ZooKeeperErrorCode.NoWatcher
-                        or (int)ZooKeeperErrorCode.ReconfigurationDisabled
-                        or (int)ZooKeeperErrorCode.SessionClosedRequiresSaslAuth
-                        or (int)ZooKeeperErrorCode.QuotaExceeded
-                        or (int)ZooKeeperErrorCode.ThrottledOperation
-                    ? RequestOutcome.Rejected
-                    : RequestOutcome.Unknown;
+                var outcome = ErrorClassifier.OutcomeFor(reply.Header.Error);
                 pending.Completion.TrySetException(
                     new ZooKeeperException(pending.Info, outcome, reply.Header.Error)
                 );
@@ -789,7 +731,7 @@ internal sealed class RequestScheduler(
             {
                 pending.Observer?.Abandoned(pending);
                 pending.Observer = null;
-                pending.Completed = true;
+                pending.Complete();
                 pending.Completion.TrySetException(
                     new ZooKeeperException(pending.Info, RequestOutcome.Unknown)
                 );
@@ -816,7 +758,7 @@ internal sealed class RequestScheduler(
         pending.Observer?.Abandoned(pending);
         pending.Observer = null;
         RemoveQueued(pending);
-        pending.Completed = true;
+        pending.Complete();
         pending.Completion.TrySetException(error);
         pending.Cancellation.Unregister();
         pending.Timer?.Dispose();
@@ -840,11 +782,10 @@ internal sealed class RequestScheduler(
     private void Release(PendingRequest pending)
     {
         SessionGate.RequireHeld(gate);
-        if (!pending.Completed || pending.Preparing || pending.Writing || pending.Released)
+        if (!pending.TryRelease())
         {
             return;
         }
-        pending.Released = true;
         if (pending.Packet is not null)
         {
             CryptographicOperations.ZeroMemory(pending.Packet);

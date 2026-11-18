@@ -73,7 +73,7 @@ internal sealed class ConnectionRuntime(
                 cancellationToken.ThrowIfCancellationRequested();
                 var input = new JuteReader(packet, options.Limits);
                 var header = input.ReadReplyHeader();
-                if (header.Xid == -1)
+                if (header.Xid == Xids.Notification)
                 {
                     var stop = owner.Notification(
                         Generation,
@@ -84,11 +84,11 @@ internal sealed class ConnectionRuntime(
                         return Stop(value);
                     }
                 }
-                else if (header.Xid == -2)
+                else if (header.Xid == Xids.Ping)
                 {
                     var acknowledgment = ReplyCodec.Decode(
                         packet,
-                        -2,
+                        Xids.Ping,
                         new PingRequest(),
                         options.Limits
                     );

@@ -8,7 +8,10 @@ public abstract class ZooKeeperWriteOperation
 {
     private ZooKeeperWriteOperation(string path, WireRequest request)
     {
-        ZNodePath.Validate(path, request is CreateRequest { Flags: 2 or 3 or 6 });
+        ZNodePath.Validate(
+            path,
+            request is CreateRequest create && CreateFlags.IsSequential(create.Flags)
+        );
         Path = path;
         Request = request;
     }

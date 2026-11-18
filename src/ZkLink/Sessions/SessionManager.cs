@@ -1,4 +1,3 @@
-using System.Net.Sockets;
 using System.Security.Cryptography;
 using ZkLink.Configuration;
 using ZkLink.Diagnostics;
@@ -163,383 +162,6 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
         CancellationToken token
     ) => Scheduler.Submit(request, info, token);
 
-    [System.Diagnostics.CodeAnalysis.SuppressMessage(
-        "Reliability",
-        "CA2000",
-        Justification = "Per-attempt deadline and linked sources are using declarations and are disposed on every exit from their loop scope."
-    )]
-    private async Task RunAsync()
-    {
-        var initialStarted = _time.GetTimestamp();
-        var failures = 0;
-        ZooKeeperConnectionException lastFailure = new(ZooKeeperConnectionFailure.Unreachable);
-        try
-        {
-            while (!_stop.IsCancellationRequested)
-            {
-                var budget = ConnectionBudget(initialStarted);
-                if (budget <= TimeSpan.Zero)
-                {
-                    lock (_gate)
-                    {
-                        if (
-                            _sessionId == 0
-                            || (
-                                !_initialReady.Task.IsCompletedSuccessfully
-                                && InitialConnectRemaining(initialStarted) <= TimeSpan.Zero
-                            )
-                        )
-                        {
-                            _terminalCause = new ZooKeeperConnectionException(
-                                lastFailure.Failure == ZooKeeperConnectionFailure.Unreachable
-                                    ? ZooKeeperConnectionFailure.Timeout
-                                    : lastFailure.Failure,
-                                lastFailure.Endpoint,
-                                lastFailure.ErrorCode,
-                                lastFailure.TlsFailureReason,
-                                lastFailure.SocketError
-                            );
-                            PublishTerminal(ZooKeeperSessionState.Faulted);
-                        }
-                        else
-                        {
-                            _terminalCause = new ZooKeeperSessionException(
-                                ZooKeeperSessionState.Lost
-                            );
-                            PublishTerminal(ZooKeeperSessionState.Lost);
-                        }
-                    }
-                    break;
-                }
-                lock (_gate)
-                {
-                    if (_closing || IsTerminal(Session.State))
-                    {
-                        break;
-                    }
-                    PublishState(ZooKeeperSessionState.Connecting);
-                }
-                if (_stop.IsCancellationRequested || IsTerminal(Session.State))
-                {
-                    break;
-                }
-                (var endpoint, var last) = _endpoints.Next();
-                var attemptBudget =
-                    budget < _options.Settings.ConnectAttemptTimeout
-                        ? budget
-                        : _options.Settings.ConnectAttemptTimeout;
-                var transportDeadline = new TransportDeadline(_time, attemptBudget);
-                using var deadline = new CancellationTokenSource(attemptBudget, _time);
-                using var attempt = CancellationTokenSource.CreateLinkedTokenSource(
-                    _stop.Token,
-                    deadline.Token
-                );
-                TransportConnection? transport = null;
-                var handshakeAccepted = false;
-                try
-                {
-                    if (_sessionId != 0)
-                        ZooKeeperTelemetry.Reconnect();
-                    var transportSpan = ZooKeeperTelemetry.Begin(
-                        _time,
-                        TelemetryKind.TransportConnect
-                    );
-                    transport = await ZooKeeperTelemetry
-                        .ObserveAsync(
-                            _connector.ConnectAsync(
-                                endpoint,
-                                _options,
-                                transportDeadline,
-                                attempt.Token
-                            ),
-                            transportSpan
-                        )
-                        .ConfigureAwait(false);
-                    var restoredZxid = await new SessionEstablisher(
-                        this,
-                        transport,
-                        _options,
-                        _time,
-                        _sessionId,
-                        _lastZxid,
-                        _password
-                    )
-                        .RunAsync(
-                            () =>
-                            {
-                                handshakeAccepted = true;
-                                // The endpoint-attempt limit ends at handshake acceptance;
-                                // the initial total deadline still includes authentication.
-                                if (_initialReady.Task.IsCompletedSuccessfully)
-                                {
-                                    deadline.CancelAfter(Timeout.InfiniteTimeSpan);
-                                }
-                                else
-                                {
-                                    var remaining = InitialConnectRemaining(initialStarted);
-                                    if (remaining > TimeSpan.Zero)
-                                    {
-                                        deadline.CancelAfter(remaining);
-                                    }
-                                    else
-                                    {
-                                        deadline.Cancel();
-                                    }
-                                }
-                            },
-                            attempt.Token
-                        )
-                        .ConfigureAwait(false);
-                    var runtime = new ConnectionRuntime(
-                        this,
-                        transport,
-                        Scheduler,
-                        _options,
-                        _time,
-                        _work,
-                        _generation,
-                        _negotiated!.Value
-                    );
-                    lock (_gate)
-                    {
-                        attempt.Token.ThrowIfCancellationRequested();
-                        if (
-                            !_initialReady.Task.IsCompletedSuccessfully
-                            && InitialConnectRemaining(initialStarted) <= TimeSpan.Zero
-                        )
-                        {
-                            throw new OperationCanceledException(attempt.Token);
-                        }
-                        if (_closing || IsTerminal(Session.State))
-                        {
-                            break;
-                        }
-                        // Commit restoration and readiness under one gate so disposal
-                        // cannot fall between clearing the snapshot and becoming Connected.
-                        // Partial attempts must not advance the watermark of watches
-                        // whose reset batch has not yet been acknowledged.
-                        _lastZxid = restoredZxid;
-                        _watches.Restored();
-                        _active = runtime;
-                        PublishState(ZooKeeperSessionState.Connected);
-                        if (!_watches.Reconnected())
-                        {
-                            FaultOverflow();
-                            break;
-                        }
-                        Scheduler.Attach(_generation, endpoint);
-                        _connectionReady.TrySetResult();
-                        _initialReady.TrySetResult();
-                    }
-                    failures = 0;
-                    var outcome = await runtime.RunAsync(_stop.Token).ConfigureAwait(false);
-                    if (
-                        outcome.Kind
-                        is RuntimeStop.CloseAcknowledged
-                            or RuntimeStop.Expired
-                            or RuntimeStop.AuthFailed
-                            or RuntimeStop.Protocol
-                            or RuntimeStop.Lost
-                    )
-                    {
-                        break;
-                    }
-                }
-                catch (OperationCanceledException) when (_stop.IsCancellationRequested)
-                {
-                    break;
-                }
-                catch (OperationCanceledException error)
-                {
-                    if (
-                        error.InnerException is ZooKeeperConnectionException
-                        {
-                            Failure: ZooKeeperConnectionFailure.Tls
-                        } tlsFailure
-                    )
-                    {
-                        lastFailure = tlsFailure;
-                    }
-                    else if (lastFailure.Failure != ZooKeeperConnectionFailure.Tls)
-                    {
-                        lastFailure = new(ZooKeeperConnectionFailure.Timeout, endpoint);
-                    }
-                }
-                catch (InvalidDataException) when (!handshakeAccepted)
-                {
-                    lastFailure = new ZooKeeperConnectionException(
-                        ZooKeeperConnectionFailure.Protocol,
-                        endpoint
-                    );
-                }
-                catch (ZooKeeperConnectionException error)
-                    when (!handshakeAccepted && error.Failure == ZooKeeperConnectionFailure.Protocol
-                    )
-                {
-                    lastFailure = error;
-                }
-                catch (ZooKeeperConnectionException error)
-                {
-                    if (
-                        lastFailure.Failure != ZooKeeperConnectionFailure.Tls
-                        || error.Failure
-                            is not (
-                                ZooKeeperConnectionFailure.Unreachable
-                                or ZooKeeperConnectionFailure.Timeout
-                            )
-                    )
-                    {
-                        lastFailure = error;
-                    }
-                    if (
-                        error.Failure
-                        is ZooKeeperConnectionFailure.SessionRejected
-                            or ZooKeeperConnectionFailure.Authentication
-                            or ZooKeeperConnectionFailure.Protocol
-                    )
-                    {
-                        lock (_gate)
-                        {
-                            _terminalCode = error.ErrorCode;
-                            _terminalCause = error;
-                            var state =
-                                error.Failure == ZooKeeperConnectionFailure.Authentication
-                                    ? ZooKeeperSessionState.AuthFailed
-                                : error.Failure == ZooKeeperConnectionFailure.SessionRejected
-                                && _sessionId != 0
-                                    ? ZooKeeperSessionState.Expired
-                                : ZooKeeperSessionState.Faulted;
-                            _serverExpired = state == ZooKeeperSessionState.Expired;
-                            if (
-                                _initialReady.Task.IsCompletedSuccessfully
-                                && state
-                                    is ZooKeeperSessionState.Expired
-                                        or ZooKeeperSessionState.AuthFailed
-                            )
-                                _terminalCause = new ZooKeeperSessionException(
-                                    state,
-                                    _terminalCode
-                                );
-                            PublishTerminal(state);
-                        }
-                        break;
-                    }
-                }
-                catch (InvalidDataException)
-                {
-                    lock (_gate)
-                    {
-                        _terminalCause = new ZooKeeperConnectionException(
-                            ZooKeeperConnectionFailure.Protocol,
-                            endpoint
-                        );
-                        PublishTerminal(ZooKeeperSessionState.Faulted);
-                    }
-                    break;
-                }
-                catch (IOException)
-                {
-                    if (lastFailure.Failure != ZooKeeperConnectionFailure.Tls)
-                    {
-                        lastFailure = new(ZooKeeperConnectionFailure.Unreachable, endpoint);
-                    }
-                }
-                catch (SocketException)
-                {
-                    if (lastFailure.Failure != ZooKeeperConnectionFailure.Tls)
-                    {
-                        lastFailure = new(ZooKeeperConnectionFailure.Unreachable, endpoint);
-                    }
-                }
-                finally
-                {
-                    lock (_gate)
-                    {
-                        _active = null;
-                        Scheduler.StopAdmission();
-                    }
-                    if (transport is not null)
-                    {
-                        await transport.DisposeAsync().ConfigureAwait(false);
-                    }
-                }
-                if (_stop.IsCancellationRequested || _closing || IsTerminal(Session.State))
-                {
-                    break;
-                }
-                lock (_gate)
-                {
-                    if (_sessionId != 0)
-                    {
-                        PublishState(ZooKeeperSessionState.Disconnected);
-                        if (_connectionReady.Task.IsCompleted)
-                        {
-                            _connectionReady = NewSignal();
-                        }
-                    }
-                    DetachRequests();
-                }
-                if (last)
-                {
-                    var remaining = ConnectionBudget(initialStarted);
-                    if (remaining > TimeSpan.Zero)
-                    {
-                        await Task.Delay(_random.Backoff(failures++, remaining), _time, _stop.Token)
-                            .ConfigureAwait(false);
-                    }
-                }
-            }
-        }
-        catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
-        catch (Exception error)
-            when (error is InvalidOperationException or OverflowException or ObjectDisposedException
-            )
-        {
-            lock (_gate)
-            {
-                _terminalCause = new ZooKeeperSessionException(ZooKeeperSessionState.Faulted);
-                PublishTerminal(ZooKeeperSessionState.Faulted);
-            }
-        }
-        finally
-        {
-            lock (_gate)
-            {
-                Scheduler.StopAdmission();
-                DetachRequests();
-                _watches.Finish(_terminalCause);
-                if (!_closing && !IsTerminal(Session.State))
-                {
-                    _closeStatus = ZooKeeperCloseStatus.Unacknowledged;
-                    PublishState(ZooKeeperSessionState.Closed);
-                    _states.Finish(Session, null);
-                }
-                if (!_initialReady.Task.IsCompleted)
-                {
-                    _initialReady.TrySetException(
-                        _terminalCause as ZooKeeperConnectionException
-                            ?? new ZooKeeperConnectionException(
-                                ZooKeeperConnectionFailure.Unreachable
-                            )
-                    );
-                }
-                _ = _initialReady.Task.Exception;
-                if (IsTerminal(Session.State))
-                {
-                    _connectionReady.TrySetException(
-                        _terminalCause
-                            ?? new ZooKeeperSessionException(Session.State, _terminalCode)
-                    );
-                    _ = _connectionReady.Task.Exception;
-                }
-            }
-            await Scheduler.DrainPreparersAsync().ConfigureAwait(false);
-            await _cancelCompletion.ConfigureAwait(false);
-            CryptographicOperations.ZeroMemory(_password);
-            _options.Dispose();
-        }
-    }
-
     private TimeSpan InitialConnectRemaining(long started) =>
         _options.Settings.InitialConnectTimeout - _time.GetElapsedTime(started);
 
@@ -597,6 +219,19 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
         }
     }
 
+    private static RuntimeFailure? ToRuntimeFailure(
+        ZooKeeperConnectionFailure? impact,
+        int? error = null
+    ) =>
+        impact switch
+        {
+            null => null,
+            ZooKeeperConnectionFailure.SessionRejected => new(RuntimeStop.Expired, error),
+            ZooKeeperConnectionFailure.Authentication => new(RuntimeStop.AuthFailed, error),
+            ZooKeeperConnectionFailure.Unreachable => new(RuntimeStop.Disconnected, error),
+            _ => new(RuntimeStop.Protocol, error),
+        };
+
     internal RuntimeFailure? PingReply(long value, ReplyHeader acknowledgment)
     {
         lock (_gate)
@@ -608,21 +243,14 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                     return new(RuntimeStop.Stopped);
                 }
                 Inbound(value, null);
-                if (acknowledgment.Error == 0)
-                {
-                    return null;
-                }
-                var failure = new RuntimeFailure(
-                    acknowledgment.Error switch
-                    {
-                        -112 => RuntimeStop.Expired,
-                        -115 or -124 => RuntimeStop.AuthFailed,
-                        -4 or -7 or -12 or -118 or -122 => RuntimeStop.Disconnected,
-                        _ => RuntimeStop.Protocol,
-                    },
+                var failure = ToRuntimeFailure(
+                    ErrorClassifier.ConnectionImpact(acknowledgment.Error, ReplyPhase.Ping),
                     acknowledgment.Error
                 );
-                TransportStopped(value, failure);
+                if (failure.HasValue)
+                {
+                    TransportStopped(value, failure.Value);
+                }
                 return failure;
             }
             catch (InvalidDataException)
@@ -653,13 +281,12 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                     InvalidReplyBodyResult invalid => invalid.MemberSessionError,
                     _ => reply.Header.Error,
                 };
-                RuntimeFailure? result = null;
-                if (errorCode is -112 or -115 or -124)
+                var result = ToRuntimeFailure(
+                    ErrorClassifier.ConnectionImpact(errorCode, ReplyPhase.Application),
+                    errorCode
+                );
+                if (result is { Kind: RuntimeStop.Expired or RuntimeStop.AuthFailed })
                 {
-                    result = new RuntimeFailure(
-                        errorCode == -112 ? RuntimeStop.Expired : RuntimeStop.AuthFailed,
-                        errorCode
-                    );
                     _terminalCode = errorCode;
                     _serverExpired = result.Value.Kind == RuntimeStop.Expired;
                     _terminalCause = new ZooKeeperSessionException(
@@ -675,7 +302,7 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                         detach: false
                     );
                 }
-                if (errorCode is -118 or -12)
+                if (result is { Kind: RuntimeStop.Disconnected })
                 {
                     Scheduler.StopAdmission();
                     if (!_closing)
@@ -686,7 +313,6 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
                             _connectionReady = NewSignal();
                         }
                     }
-                    result = new(RuntimeStop.Disconnected, errorCode);
                 }
                 if (pending.Info.Operation == ZooKeeperOperation.CloseSession && errorCode == 0)
                 {
@@ -753,14 +379,7 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
             else
             {
                 Inbound(value, null);
-                result = notification.State switch
-                {
-                    3 => null,
-                    0 => new(RuntimeStop.Disconnected),
-                    -112 => new(RuntimeStop.Expired),
-                    4 => new(RuntimeStop.AuthFailed),
-                    _ => new(RuntimeStop.Protocol),
-                };
+                result = ToRuntimeFailure(ErrorClassifier.NotificationImpact(notification.State));
             }
             if (result is { } failure)
             {

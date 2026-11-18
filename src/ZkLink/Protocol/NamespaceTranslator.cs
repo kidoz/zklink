@@ -21,13 +21,7 @@ internal static class NamespaceTranslator
 
     internal static int Measure(WireRequest request, ChrootPath paths, ProtocolLimits limits)
     {
-        var xid = request.Opcode switch
-        {
-            11 => -2,
-            100 => -4,
-            101 or 105 => -8,
-            _ => 1,
-        };
+        var xid = Xids.ForMeasurement(request.Opcode);
         return RequestCodec.Measure(xid, request, limits, paths);
     }
 
@@ -69,7 +63,7 @@ internal static class NamespaceTranslator
                 SetDataRequest p => p with { Path = Path(p.Path) },
                 CreateRequest p => p with
                 {
-                    Path = Path(p.Path, p.Flags is 2 or 3 or 6),
+                    Path = Path(p.Path, CreateFlags.IsSequential(p.Flags)),
                     Acl = Acl(p.Acl),
                 },
                 SetAclRequest p => p with { Path = Path(p.Path), Acl = Acl(p.Acl) },
@@ -151,7 +145,7 @@ internal static class NamespaceTranslator
         result switch
         {
             PathResult p => p with { Path = paths.ToClient(p.Path) },
-            StringsResult list when opcode == 103 => list with
+            StringsResult list when opcode == (int)ZooKeeperOperation.GetEphemerals => list with
             {
                 Values = list.Values.Where(paths.Contains).Select(paths.ToClient).ToArray(),
             },

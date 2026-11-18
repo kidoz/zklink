@@ -59,7 +59,7 @@ internal static class ReplyCodec
     {
         var reader = new JuteReader(payload, limits);
         var header = reader.ReadReplyHeader();
-        if (header.Xid != -1 || header.Error != 0)
+        if (header.Xid != Xids.Notification || header.Error != 0)
         {
             throw new InvalidDataException("Invalid notification header.");
         }
@@ -78,18 +78,41 @@ internal static class ReplyCodec
     private static WireResult ReadBody(ref JuteReader reader, int opcode, ProtocolLimits limits) =>
         opcode switch
         {
-            1 or 9 => new PathResult(ReadPath(ref reader)),
-            15 or 19 or 21 => new PathResult(ReadPath(ref reader), reader.ReadStat()),
-            3 or 5 or 7 => new StatResult(reader.ReadStat()),
-            4 => new DataResult(reader.ReadBuffer(limits.MaxDataBytes), reader.ReadStat()),
-            6 => new AclResult(ReadAcl(ref reader), reader.ReadStat()),
-            8 => new StringsResult(ReadChildren(ref reader)),
-            103 => new StringsResult(ReadPaths(ref reader)),
-            12 => new StringsResult(ReadChildren(ref reader), reader.ReadStat()),
-            104 => ReadCount(ref reader),
-            107 => ReadIdentities(ref reader),
+            (int)ZooKeeperOperation.Create or (int)ZooKeeperOperation.Sync => new PathResult(
+                ReadPath(ref reader)
+            ),
+            (int)ZooKeeperOperation.CreateWithStat
+            or (int)ZooKeeperOperation.CreateContainer
+            or (int)ZooKeeperOperation.CreateTtl => new PathResult(
+                ReadPath(ref reader),
+                reader.ReadStat()
+            ),
+            (int)ZooKeeperOperation.Exists
+            or (int)ZooKeeperOperation.SetData
+            or (int)ZooKeeperOperation.SetAcl => new StatResult(reader.ReadStat()),
+            (int)ZooKeeperOperation.GetData => new DataResult(
+                reader.ReadBuffer(limits.MaxDataBytes),
+                reader.ReadStat()
+            ),
+            (int)ZooKeeperOperation.GetAcl => new AclResult(ReadAcl(ref reader), reader.ReadStat()),
+            (int)ZooKeeperOperation.GetChildrenNames => new StringsResult(ReadChildren(ref reader)),
+            (int)ZooKeeperOperation.GetEphemerals => new StringsResult(ReadPaths(ref reader)),
+            (int)ZooKeeperOperation.GetChildren => new StringsResult(
+                ReadChildren(ref reader),
+                reader.ReadStat()
+            ),
+            (int)ZooKeeperOperation.GetAllChildrenNumber => ReadCount(ref reader),
+            (int)ZooKeeperOperation.WhoAmI => ReadIdentities(ref reader),
             (int)ZooKeeperOperation.AddWatch => ReadWatchAcknowledgment(ref reader),
-            2 or 11 or 13 or 17 or 18 or 100 or 101 or 105 or -11 => new EmptyResult(),
+            (int)ZooKeeperOperation.Delete
+            or ControlOpcode.Ping
+            or (int)ZooKeeperOperation.Check
+            or (int)ZooKeeperOperation.CheckWatches
+            or (int)ZooKeeperOperation.RemoveWatches
+            or ControlOpcode.Auth
+            or ControlOpcode.SetWatches
+            or ControlOpcode.SetWatches2
+            or (int)ZooKeeperOperation.CloseSession => new EmptyResult(),
             _ => throw new InvalidDataException("Unsupported response shape or opcode."),
         };
 
@@ -139,19 +162,39 @@ internal static class ReplyCodec
             {
                 throw new InvalidDataException("Premature multi terminator.");
             }
-            if (type == -1)
+            if (type == MultiHeader.ErrorOrEnd)
             {
                 var bodyError = reader.ReadInt32();
                 if (bodyError != error)
                 {
                     throw new InvalidDataException("Inconsistent multi error fields.");
                 }
-                memberSessionError = SelectMemberSessionError(memberSessionError, bodyError);
+                memberSessionError = ErrorClassifier.SelectMemberSessionError(
+                    memberSessionError,
+                    bodyError
+                );
                 results[i] = new WireMultiMember(type, bodyError, new ErrorResult(bodyError));
                 continue;
             }
-            var expected = request.Members[i].Opcode is 19 or 21 ? 15 : request.Members[i].Opcode;
-            if (type != expected || error != 0 || type is not (1 or 2 or 4 or 5 or 8 or 13 or 15))
+            var expected = request.Members[i].Opcode
+                is (int)ZooKeeperOperation.CreateContainer
+                    or (int)ZooKeeperOperation.CreateTtl
+                ? (int)ZooKeeperOperation.CreateWithStat
+                : request.Members[i].Opcode;
+            if (
+                type != expected
+                || error != 0
+                || type
+                    is not (
+                        (int)ZooKeeperOperation.Create
+                        or (int)ZooKeeperOperation.Delete
+                        or (int)ZooKeeperOperation.GetData
+                        or (int)ZooKeeperOperation.SetData
+                        or (int)ZooKeeperOperation.GetChildrenNames
+                        or (int)ZooKeeperOperation.Check
+                        or (int)ZooKeeperOperation.CreateWithStat
+                    )
+            )
             {
                 throw new InvalidDataException("Unexpected multi result shape.");
             }
@@ -159,9 +202,9 @@ internal static class ReplyCodec
         }
         if (
             results.Length != count
-            || reader.ReadInt32() != -1
+            || reader.ReadInt32() != MultiHeader.ErrorOrEnd
             || !reader.ReadBoolean()
-            || reader.ReadInt32() != -1
+            || reader.ReadInt32() != MultiHeader.NoError
         )
         {
             throw new InvalidDataException("Invalid multi terminator or extra member.");
@@ -185,21 +228,6 @@ internal static class ReplyCodec
         }
         return new MultiResult(results, memberSessionError);
     }
-
-    private static int SelectMemberSessionError(int current, int error) =>
-        (ZooKeeperErrorCode)error switch
-        {
-            ZooKeeperErrorCode.SessionExpired
-            or ZooKeeperErrorCode.AuthFailed
-            or ZooKeeperErrorCode.SessionClosedRequiresSaslAuth
-                when current == 0
-                    || (ZooKeeperErrorCode)current
-                        is ZooKeeperErrorCode.SessionMoved
-                            or ZooKeeperErrorCode.UnknownSession => error,
-            ZooKeeperErrorCode.SessionMoved
-            or ZooKeeperErrorCode.UnknownSession when current == 0 => error,
-            _ => current,
-        };
 
     private static WireAcl[] ReadAcl(ref JuteReader reader)
     {

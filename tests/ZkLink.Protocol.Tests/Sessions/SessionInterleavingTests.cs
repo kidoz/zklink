@@ -290,27 +290,28 @@ public sealed class SessionInterleavingTests
             var writing = 0;
             foreach (var pending in Snapshot())
             {
-                if (pending.Sent)
+                var phase = pending.Phase;
+                if (
+                    phase
+                    is RequestPhase.Preparing
+                        or RequestPhase.Queued
+                        or RequestPhase.CompletingPreparation
+                )
                 {
-                    Assert.True(pending.Prepared, sequence);
-                    Assert.False(pending.Preparing, sequence);
+                    Assert.False(pending.Sent, sequence);
                 }
-                if (pending.Tombstone)
+                if (phase is RequestPhase.Writing or RequestPhase.CompletingWrite)
+                {
+                    Assert.True(pending.Sent, sequence);
+                    writing++;
+                }
+                if (phase == RequestPhase.AwaitingReply || pending.Tombstone)
                 {
                     Assert.True(pending.Sent, sequence);
                 }
-                if (pending.Released)
+                if (phase == RequestPhase.Released)
                 {
                     Assert.True(pending.Completed, sequence);
-                    Assert.False(pending.Preparing, sequence);
-                    Assert.False(pending.Writing, sequence);
-                }
-                Assert.False(pending.Preparing && pending.Prepared, sequence);
-                Assert.False(pending.Preparing && pending.Sent, sequence);
-                Assert.False(pending.Released && pending.Writing, sequence);
-                if (pending.Writing)
-                {
-                    writing++;
                 }
             }
             Assert.True(writing <= 1, sequence);
@@ -380,9 +381,12 @@ public sealed class SessionInterleavingTests
 
         private async Task CompleteWriteAsync(CancellationToken token)
         {
-            var writing = Snapshot().Single(static pending => pending.Writing);
+            var writing = Snapshot()
+                .Single(static pending =>
+                    pending.Phase is RequestPhase.Writing or RequestPhase.CompletingWrite
+                );
             peer.ReleaseHeldWrite();
-            while (writing.Writing)
+            while (writing.Phase is RequestPhase.Writing or RequestPhase.CompletingWrite)
             {
                 token.ThrowIfCancellationRequested();
                 await Task.Yield();
