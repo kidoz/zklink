@@ -1,3 +1,5 @@
+using ZkLink.Protocol;
+
 namespace ZkLink;
 
 /// <summary>Immutable create settings with explicit ACLs and a discrete mode.</summary>
@@ -38,17 +40,17 @@ public sealed class CreateOptions
             );
         }
         ArgumentNullException.ThrowIfNull(acl);
-        if (acl.Count == 0)
-        {
-            throw new ArgumentException(
-                "Create requires at least one explicit ACL entry.",
-                nameof(acl)
-            );
-        }
         Acl = Snapshot.List(acl);
+        WireAcl = Snapshot.Map(
+            Acl,
+            ProtocolLimits.AbsoluteMaxCollectionElements,
+            static entry => new WireAcl((int)entry.Permissions, entry.Scheme, entry.Id)
+        );
         Mode = mode;
         Ttl = ttl;
     }
+
+    internal WireAcl[] WireAcl { get; }
 
     /// <summary>Gets the explicit ACL snapshot.</summary>
     public IReadOnlyList<ZooKeeperAcl> Acl { get; }

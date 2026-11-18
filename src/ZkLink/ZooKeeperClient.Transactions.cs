@@ -1,4 +1,3 @@
-using System.Collections;
 using ZkLink.Protocol;
 
 namespace ZkLink;
@@ -15,8 +14,9 @@ public sealed partial class ZooKeeperClient
             _session.Submit(
                 new MultiRequest(
                     false,
-                    new OperationView<ZooKeeperWriteOperation>(
+                    Snapshot.Map(
                         operations,
+                        _session.MaxInputElements,
                         op => ValidateCreateFeatures(op.Request)
                     )
                 ),
@@ -35,7 +35,7 @@ public sealed partial class ZooKeeperClient
             _session.Submit(
                 new MultiRequest(
                     true,
-                    new OperationView<ZooKeeperReadOperation>(operations, static op => op.Request)
+                    Snapshot.Map(operations, _session.MaxInputElements, static op => op.Request)
                 ),
                 new ZooKeeperRequestInfo(ZooKeeperOperation.MultiRead),
                 cancellationToken
@@ -83,45 +83,5 @@ public sealed partial class ZooKeeperClient
             };
         }
         return Array.AsReadOnly(results);
-    }
-
-    // A view permits whole-batch measurement before the scheduler reserves bytes and copies inputs.
-    private sealed class OperationView<T> : IReadOnlyList<WireRequest>
-        where T : class
-    {
-        private readonly IReadOnlyList<T> _operations;
-        private readonly Func<T, WireRequest> _request;
-
-        internal OperationView(IReadOnlyList<T> operations, Func<T, WireRequest> request)
-        {
-            ArgumentNullException.ThrowIfNull(operations);
-            Count = operations.Count;
-            if (Count <= 0)
-            {
-                throw new ArgumentException(
-                    "A transaction requires at least one operation.",
-                    nameof(operations)
-                );
-            }
-            _operations = operations;
-            _request = request;
-        }
-
-        public int Count { get; }
-        public WireRequest this[int index] =>
-            _request(
-                _operations[index]
-                    ?? throw new ArgumentException("Transaction members cannot be null.")
-            );
-
-        public IEnumerator<WireRequest> GetEnumerator()
-        {
-            for (var i = 0; i < Count; i++)
-            {
-                yield return this[i];
-            }
-        }
-
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

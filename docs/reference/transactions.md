@@ -26,8 +26,8 @@ Factories retain supplied data memory. Keep the operation list and data stable
 until the submission method returns its task. The invocation synchronously
 validates the full batch, measures its encoded size, reserves capacity,
 translates paths and encodes the packet. Afterwards, changing the input list or data cannot
-alter the submitted transaction. No entire intermediate member list or payload
-copy is allocated before byte admission. If the encoded length differs from
+alter the submitted transaction. Each caller-supplied operation or ACL entry is read once into a bounded list.
+Payload bytes are copied after byte admission. If the encoded length differs from
 the byte reservation, the client releases the reservation and fails the call
 before assigning an xid or sending a frame.
 

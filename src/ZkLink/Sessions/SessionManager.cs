@@ -67,6 +67,10 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
         Scheduler = new RequestScheduler(_gate, _options, _time, _work, Telemetry);
     }
 
+    // Each multi header or ACL entry consumes at least nine wire bytes.
+    internal int MaxInputElements =>
+        Math.Min(_options.Limits.MaxCollectionElements, _options.Limits.MaxFrameBytes / 9);
+
     internal Task Completion => _run;
     internal RequestScheduler Scheduler { get; }
     internal ZooKeeperSessionSnapshot Session => _states.Current;

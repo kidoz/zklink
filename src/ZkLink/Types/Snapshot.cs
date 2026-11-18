@@ -22,6 +22,40 @@ internal static class Snapshot
         return new ReadOnlyMemory<byte>(bytes.ToArray());
     }
 
+    internal static TResult[] Map<T, TResult>(
+        IReadOnlyList<T> source,
+        int limit,
+        Func<T, TResult> convert
+    )
+        where T : class
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var count = source.Count;
+        if (count <= 0)
+        {
+            throw new ArgumentException(
+                "The collection must contain at least one entry.",
+                nameof(source)
+            );
+        }
+        if (count > limit)
+        {
+            throw new InvalidDataException("The collection exceeds the configured request limit.");
+        }
+        var result = new TResult[count];
+        for (var i = 0; i < count; i++)
+        {
+            result[i] = convert(
+                source[i]
+                    ?? throw new ArgumentException(
+                        "Collection entries cannot be null.",
+                        nameof(source)
+                    )
+            );
+        }
+        return result;
+    }
+
     internal static ReadOnlyCollection<T> List<T>(
         IReadOnlyList<T> source,
         int maxCount = ProtocolLimits.AbsoluteMaxCollectionElements

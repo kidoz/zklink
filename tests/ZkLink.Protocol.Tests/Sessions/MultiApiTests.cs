@@ -37,10 +37,7 @@ public sealed class MultiApiTests : IAsyncLifetime
     [InlineData(true, false)]
     [InlineData(true, true)]
     [Trait("Acceptance", "T18")]
-    public async Task InputThatChangesSizeAfterMeasurementReleasesCapacityWithoutSending(
-        bool setAcl,
-        bool grows
-    )
+    public async Task SubmissionReadsEachCallerEntryOnce(bool setAcl, bool grows)
     {
         var token = TestContext.Current.CancellationToken;
         var first = grows ? "/a" : "/longer-path";
@@ -57,7 +54,7 @@ public sealed class MultiApiTests : IAsyncLifetime
                 );
             submission = Client.SetAclAsync("/a", entries, ZNodeVersion.Any, token);
             _ = entries.Received(1).Count;
-            _ = entries.Received(2)[0];
+            _ = entries.Received(1)[0];
         }
         else
         {
@@ -70,21 +67,19 @@ public sealed class MultiApiTests : IAsyncLifetime
                 );
             submission = Client.MultiAsync(operations, token);
             _ = operations.Received(1).Count;
-            _ = operations.Received(2)[0];
+            _ = operations.Received(1)[0];
         }
 
-        var next = Client.ExistsAsync("/next", token);
         var packet = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(true);
-        Assert.Equal((int)ZooKeeperOperation.Exists, packet.Opcode);
-        Assert.Equal(1, packet.Xid);
-        _peer.Reply(packet, -101);
-        Assert.Null(await next.ConfigureAwait(true));
-        await Assert
-            .ThrowsAsync(
-                grows ? typeof(InvalidDataException) : typeof(ArgumentException),
-                () => submission
-            )
+        Assert.Equal(
+            (int)(setAcl ? ZooKeeperOperation.SetAcl : ZooKeeperOperation.Multi),
+            packet.Opcode
+        );
+        _peer.Reply(packet, (int)ZooKeeperErrorCode.NoAuth);
+        var failure = await Assert
+            .ThrowsAnyAsync<ZooKeeperException>(() => submission)
             .ConfigureAwait(true);
+        Assert.Equal(ZooKeeperErrorCode.NoAuth, failure.KnownErrorCode);
         Assert.Equal(0, Client.Manager.Scheduler.PendingCount);
         Assert.Equal(0, Client.Manager.Scheduler.OwnedBytes);
     }

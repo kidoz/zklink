@@ -1,4 +1,3 @@
-using System.Collections;
 using ZkLink.Protocol;
 
 namespace ZkLink;
@@ -94,7 +93,7 @@ public sealed partial class ZooKeeperClient
             operation,
             path,
             data,
-            new PublicAclView(options.Acl),
+            options.WireAcl,
             (int)options.Mode,
             options.Ttl?.Ticks / TimeSpan.TicksPerMillisecond
         );
@@ -175,7 +174,15 @@ public sealed partial class ZooKeeperClient
     ) =>
         ReadStatAsync(
             SubmitNode(
-                new SetAclRequest(path, new PublicAclView(acl), aclVersion.Value),
+                new SetAclRequest(
+                    path,
+                    Snapshot.Map(
+                        acl,
+                        _session.MaxInputElements,
+                        static entry => new WireAcl((int)entry.Permissions, entry.Scheme, entry.Id)
+                    ),
+                    aclVersion.Value
+                ),
                 ZooKeeperOperation.SetAcl,
                 path,
                 cancellationToken
@@ -256,42 +263,4 @@ public sealed partial class ZooKeeperClient
             stat.NumChildren,
             stat.Pzxid
         );
-
-    // Measurement visits caller ACLs without first allocating an entire wire list. The scheduler
-    // reserves its byte budget, encodes synchronously, then retains independent reply metadata.
-    private sealed class PublicAclView : IReadOnlyList<WireAcl>
-    {
-        private readonly IReadOnlyList<ZooKeeperAcl> _entries;
-
-        internal PublicAclView(IReadOnlyList<ZooKeeperAcl> acl)
-        {
-            ArgumentNullException.ThrowIfNull(acl);
-            Count = acl.Count;
-            if (Count <= 0)
-                throw new ArgumentException(
-                    "At least one explicit ACL entry is required.",
-                    nameof(acl)
-                );
-            _entries = acl;
-        }
-
-        public int Count { get; }
-        public WireAcl this[int index]
-        {
-            get
-            {
-                ZooKeeperAcl entry =
-                    _entries[index] ?? throw new ArgumentException("ACL entries cannot be null.");
-                return new WireAcl((int)entry.Permissions, entry.Scheme, entry.Id);
-            }
-        }
-
-        public IEnumerator<WireAcl> GetEnumerator()
-        {
-            for (var i = 0; i < Count; i++)
-                yield return this[i];
-        }
-
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-    }
 }
