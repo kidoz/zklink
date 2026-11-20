@@ -5,7 +5,7 @@
     <EnableAotAnalyzer>true</EnableAotAnalyzer>
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     <IsPackable Condition="'$(ZkLinkTestAccess)' != 'true'">true</IsPackable>
-    <VersionPrefix>1.1.1</VersionPrefix>
+    <VersionPrefix>1.2.0</VersionPrefix>
     <PackageId>ZkLink.Extensions.DependencyInjection</PackageId>
     <PackageTags>zookeeper;dependency-injection;hosting;dotnet</PackageTags>
     <PackageProjectUrl>https://github.com/kidoz/zklink</PackageProjectUrl>

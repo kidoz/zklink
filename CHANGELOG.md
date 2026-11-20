@@ -9,6 +9,34 @@ broader security, Native AOT or production qualification. See
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-20
+
+### Added
+
+- Report a safe category when a TLS credentials provider fails through
+  `ZooKeeperConnectionException.ProviderFailureReason`. The category
+  distinguishes a callback exception, a null return, a canceled wait and an
+  earlier invocation that is still running, while the TLS failure reason
+  remains `ProviderFailed`.
+
+### Changed
+
+- Space DI session replacements under the `Recreate` terminal policy with
+  cancellable full jitter. The initial cap is 100 milliseconds; it doubles for
+  short-lived sessions up to two seconds and resets after a session lasts at
+  least two seconds. Shutdown cancels the delay.
+
+### Fixed
+
+- Fail only the matched application request when a success reply body is
+  invalid, leaving the session and queued requests available. The call reports
+  `ZooKeeperProtocolException` with outcome `Unknown`. A close acknowledgment
+  still requires an empty body; trailing data faults the session and leaves
+  the close unacknowledged.
+
+- Publish a safe terminal fault when the session loop fails with an unexpected
+  exception instead of ending without notifying callers or completing cleanup.
+
 ## [1.1.1] - 2026-11-18
 
 ### Fixed

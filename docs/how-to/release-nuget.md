@@ -27,13 +27,13 @@ Set the same `VersionPrefix` in all three projects under `src/`, add a dated ver
 Run candidate verification for that tag if it has no successful candidate yet:
 
 ```bash
-gh workflow run release-candidate.yml --ref v1.1.1 -f version=1.1.1
+gh workflow run release-candidate.yml --ref v1.2.0 -f version=1.2.0
 ```
 
 After it succeeds, dispatch the release workflow from main:
 
 ```bash
-gh workflow run release.yml --ref main -f release_tag=v1.1.1 -f publish=true
+gh workflow run release.yml --ref main -f release_tag=v1.2.0 -f publish=true
 ```
 
 The workflow selects the most recent successful core candidate run for the
