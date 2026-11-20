@@ -47,8 +47,9 @@ The factory overload accepts a `ZkLinkTerminalPolicy`. The default `Fail`
 keeps the terminal client available for inspection. `StopApplication` requests
 graceful host shutdown. `Recreate` invokes the options factory again to start
 a new ZooKeeper session. Read the accessor again to obtain the replacement and
-rebuild watches, ephemerals and coordination state as appropriate. A failed
-replacement requests host shutdown. Ordinary disconnections use the core
+rebuild watches, ephemerals and coordination state as appropriate. Replacement attempts use full jitter with a 100 ms initial cap. The cap doubles
+for short-lived sessions up to two seconds and resets after a session lasts
+at least two seconds. Shutdown cancels the delay. A failed replacement requests host shutdown. Ordinary disconnections use the core
 client’s same-session recovery.
 
 Hosts using Microsoft health checks can add

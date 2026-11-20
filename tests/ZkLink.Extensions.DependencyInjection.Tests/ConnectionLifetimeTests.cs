@@ -202,6 +202,63 @@ public sealed class ConnectionLifetimeTests
             .ConnectAsync(null!, TestContext.Current.CancellationToken);
     }
 
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T40")]
+    public async Task RapidTerminalSessionsWaitBetweenReplacementsAndShutdownCancelsTheWait()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var timers = System.Threading.Channels.Channel.CreateBounded<(TimeSpan Due, Action Fire)>(
+            2
+        );
+        var time = Substitute.For<TimeProvider>();
+        time.TimestampFrequency.Returns(TimeSpan.TicksPerSecond);
+        time.CreateTimer(
+                Arg.Any<TimerCallback>(),
+                Arg.Any<object?>(),
+                Arg.Any<TimeSpan>(),
+                Arg.Any<TimeSpan>()
+            )
+            .Returns(call =>
+            {
+                var callback = call.Arg<TimerCallback>();
+                var state = call[1];
+                Assert.True(
+                    timers.Writer.TryWrite((call.ArgAt<TimeSpan>(2), () => callback(state)))
+                );
+                return Substitute.For<ITimer>();
+            });
+        var first = Substitute.For<IZkLinkConnection>();
+        var second = Substitute.For<IZkLinkConnection>();
+        first.Completion.Returns(Task.CompletedTask);
+        second.Completion.Returns(Task.CompletedTask);
+        first.State.Returns(ZooKeeperSessionState.Expired);
+        second.State.Returns(ZooKeeperSessionState.Expired);
+        var factory = Substitute.For<IZkLinkConnectionFactory>();
+        var options = CreateOptions();
+        factory.ConnectAsync(options, Arg.Any<CancellationToken>()).Returns(first, second);
+        var application = Substitute.For<IHostApplicationLifetime>();
+        var host = new ZkLinkConnectionHost(
+            () => options,
+            factory,
+            ZkLinkTerminalPolicy.Recreate,
+            application,
+            time
+        );
+        await using var lifetime = host.ConfigureAwait(true);
+        await host.StartAsync(token);
+        var firstDelay = await timers.Reader.ReadAsync(token);
+        Assert.InRange(firstDelay.Due.TotalMilliseconds, 1, 100);
+        await factory.Received(1).ConnectAsync(options, Arg.Any<CancellationToken>());
+        firstDelay.Fire();
+        var secondDelay = await timers.Reader.ReadAsync(token);
+        Assert.InRange(secondDelay.Due.TotalMilliseconds, 1, 200);
+        await host.StopAsync(token);
+        await factory.Received(2).ConnectAsync(options, Arg.Any<CancellationToken>());
+        await first.Received(1).DisposeAsync();
+        await second.Received(1).DisposeAsync();
+        application.DidNotReceive().StopApplication();
+    }
+
     [Theory(Timeout = 10000)]
     [InlineData(ZkLinkTerminalPolicy.StopApplication)]
     [InlineData(ZkLinkTerminalPolicy.Recreate)]

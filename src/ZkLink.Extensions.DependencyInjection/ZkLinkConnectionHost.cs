@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Hosting;
+using ZkLink.Sessions;
 
 namespace ZkLink.Extensions.DependencyInjection;
 
@@ -6,7 +7,8 @@ internal sealed class ZkLinkConnectionHost(
     Func<ZooKeeperClientOptions> optionsFactory,
     IZkLinkConnectionFactory connectionFactory,
     ZkLinkTerminalPolicy terminalPolicy = ZkLinkTerminalPolicy.Fail,
-    IHostApplicationLifetime? application = null
+    IHostApplicationLifetime? application = null,
+    TimeProvider? timeProvider = null
 ) : IHostedService, IAsyncDisposable
 {
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
@@ -71,10 +73,14 @@ internal sealed class ZkLinkConnectionHost(
         CancellationToken token
     )
     {
+        var time = timeProvider ?? TimeProvider.System;
+        var random = new SessionRandom(Random.Shared);
+        var replacementRounds = 0;
         try
         {
             while (true)
             {
+                var started = time.GetTimestamp();
                 await current
                     .Completion.WaitAsync(token)
                     .ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
@@ -95,6 +101,17 @@ internal sealed class ZkLinkConnectionHost(
                 {
                     break;
                 }
+                if (time.GetElapsedTime(started) >= SessionRandom.MaxBackoff)
+                {
+                    replacementRounds = 0;
+                }
+                var delay = random.Backoff(replacementRounds, SessionRandom.MaxBackoff);
+                replacementRounds = Math.Min(
+                    replacementRounds + 1,
+                    SessionRandom.MaxBackoffExponent
+                );
+                await Task.Delay(delay, time, token).ConfigureAwait(false);
+                token.ThrowIfCancellationRequested();
                 var next = await connectionFactory
                     .ConnectAsync(optionsFactory(), token)
                     .ConfigureAwait(false);

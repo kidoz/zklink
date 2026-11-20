@@ -53,7 +53,9 @@ The factory overload accepts a terminal policy. The default `Fail` keeps the
 terminal client available for inspection. `StopApplication` requests graceful
 host shutdown. `Recreate` calls the factory again to establish a new session.
 Read the accessor again to get its new client. Watches, ephemerals and locks
-belong to the previous session. A failed replacement requests host shutdown.
+belong to the previous session. Replacement attempts use full jitter with a 100 ms initial cap. The cap doubles
+for short-lived sessions up to two seconds and resets after a session lasts
+at least two seconds. Shutdown cancels the delay. A failed replacement requests host shutdown.
 
 See the [connection reference](../reference/connections.md) for lifecycle and close details.
 The [Native AOT verification guide](verify-native-aot.md) describes packed-package
