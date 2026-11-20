@@ -366,6 +366,72 @@ public sealed class SessionLifecycleTests : IAsyncLifetime
 
     [Fact(Timeout = 10000)]
     [Trait("Acceptance", "T14")]
+    public async Task MalformedSuccessBodiesFailOnlyTheirMatchedApplicationRequests()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var peer = Peer();
+        peer.ReplyApplications = false;
+        var client = await _fixture
+            .ConnectAsync(peer, cancellationToken: token)
+            .ConfigureAwait(true);
+        await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
+        var operations = ProtocolFixtures
+            .All.Where(f => f.Xid > 0 && f.Request.Opcode != (int)ZooKeeperOperation.CloseSession)
+            .DistinctBy(f => f.Request.Opcode)
+            .ToArray();
+        Assert.Equal(
+            Enum.GetValues<ZooKeeperOperation>().Except([ZooKeeperOperation.CloseSession]).Order(),
+            operations.Select(f => (ZooKeeperOperation)f.Request.Opcode).Order()
+        );
+        foreach (var fixture in operations)
+        {
+            var operation = (ZooKeeperOperation)fixture.Request.Opcode;
+            var pending = client.Manager.Scheduler.Submit(
+                fixture.Request,
+                new ZooKeeperRequestInfo(operation),
+                token,
+                watchOperation: fixture.Request is WatchRequest or ReadRequest { Watch: true }
+            );
+            var sent = await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
+            Assert.Equal(fixture.Request.Opcode, sent.Opcode);
+            peer.Inject([.. SessionPeer.Packet(sent.Xid), 0]);
+            var error = await Assert
+                .ThrowsAsync<ZooKeeperProtocolException>(() => pending)
+                .ConfigureAwait(true);
+            Assert.Equal(operation, error.Request.Operation);
+            Assert.Equal(RequestOutcome.Unknown, error.Outcome);
+        }
+        peer.ReplyApplications = true;
+        await client.SyncAsync("/ready", token).ConfigureAwait(true);
+        Assert.Equal(1, client.Session.ConnectionGeneration);
+    }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T14")]
+    public async Task TrailingCloseDataFaultsSessionAndLeavesCloseUnacknowledged()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var peer = Peer();
+        peer.ReplyClose = false;
+        var client = await _fixture
+            .ConnectAsync(peer, cancellationToken: token)
+            .ConfigureAwait(true);
+        await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
+        var close = client.CloseAsync(token);
+        var sent = await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
+        Assert.Equal((int)ZooKeeperOperation.CloseSession, sent.Opcode);
+        peer.Inject([.. SessionPeer.Packet(sent.Xid), 0]);
+        var error = await Assert
+            .ThrowsAsync<ZooKeeperCloseException>(() => close)
+            .ConfigureAwait(true);
+        Assert.Equal(RequestOutcome.Unknown, error.Outcome);
+        Assert.False(error.CloseAcknowledged);
+        Assert.Equal(ZooKeeperSessionState.Faulted, client.Session.State);
+        Assert.Equal(ZooKeeperCloseStatus.Unacknowledged, client.Session.CloseStatus);
+    }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T14")]
     public async Task UnacknowledgedCloseTimesOutAfterCleanupAndPreservesItsFirstResult()
     {
         var peer = Peer();

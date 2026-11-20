@@ -194,6 +194,8 @@ no persistent reconnect-gap event.
 
 `CloseAsync` stops admission, ends outstanding caller waits consistently, sends
 `closeSession` when possible and awaits acknowledgment within its deadline.
+A close acknowledgment requires a matched success reply with an empty body.
+Trailing data faults the session and leaves the close unacknowledged.
 Success records `Acknowledged`; already confirmed expiry needs no close packet
 and records `SessionExpired`. Otherwise close throws `ZooKeeperCloseException`
 or cancellation after local cleanup, recording `Unacknowledged`. Repeated calls

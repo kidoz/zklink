@@ -160,32 +160,12 @@ internal sealed class ConnectionRuntime(
             }
             return new WireReply(header, result);
         }
+        // Positive xids belong to matched requests. Close is the one such reply
+        // that must validate completely before it can acknowledge ending the session.
         catch (InvalidDataException)
             when (header.Error == 0
-                && shape
-                    is ReadRequest
-                        {
-                            Type: ZooKeeperOperation.Exists
-                                or ZooKeeperOperation.GetData
-                                or ZooKeeperOperation.GetChildren
-                        }
-                        or PathRequest
-                        {
-                            Type: ZooKeeperOperation.GetAcl
-                                or ZooKeeperOperation.Sync
-                                or ZooKeeperOperation.GetEphemerals
-                                or ZooKeeperOperation.GetAllChildrenNumber
-                        }
-                        or EmptyRequest { Type: ZooKeeperOperation.WhoAmI }
-                        or CreateRequest
-                        or SetDataRequest
-                        or SetAclRequest
-                        or VersionRequest { Type: ZooKeeperOperation.Delete }
-                        or WatchRequest
-                        {
-                            Type: ZooKeeperOperation.AddWatch or ZooKeeperOperation.RemoveWatches
-                        }
-                        or MultiRequest
+                && header.Xid > 0
+                && shape.Opcode != (int)ZooKeeperOperation.CloseSession
             )
         {
             return new WireReply(header, new InvalidReplyBodyResult(memberSessionError));
