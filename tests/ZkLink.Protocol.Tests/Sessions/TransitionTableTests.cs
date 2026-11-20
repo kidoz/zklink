@@ -38,7 +38,7 @@ public sealed class RequestTransitionTableTests : IDisposable
     [Trait("Acceptance", "T11")]
     public async Task EncodeWindowFinishCompletesBeforeTheReservationIsReleased(bool detach)
     {
-        var admission = StartAdmittedSubmit(failEncode: false);
+        var admission = StartAdmittedSubmit();
         PendingRequest? pending = null;
         try
         {
@@ -77,11 +77,17 @@ public sealed class RequestTransitionTableTests : IDisposable
         Assert.Equal(0, _scheduler.OwnedBytes);
     }
 
-    [Fact(Timeout = 10000)]
+    [Theory(Timeout = 10000)]
+    [InlineData(true)]
+    [InlineData(false)]
     [Trait("Acceptance", "T11")]
-    public async Task EncodeFailureAfterReservationReleasesBytesWithoutPreparing()
+    public async Task EncodeFailureAfterReservationReleasesBytesBeforeSending(
+        bool shrinkAfterAdmission
+    )
     {
-        var admission = StartAdmittedSubmit(failEncode: true);
+        var admission = StartAdmittedSubmit(
+            shrinkAfterAdmission ? PreparationResult.Shorter : PreparationResult.Throws
+        );
         PendingRequest? pending = null;
         try
         {
@@ -95,7 +101,21 @@ public sealed class RequestTransitionTableTests : IDisposable
             admission.Release.TrySetResult();
         }
 
-        await Assert.ThrowsAsync<InvalidDataException>(() => admission.Submit).ConfigureAwait(true);
+        if (shrinkAfterAdmission)
+        {
+            var error = await Assert
+                .ThrowsAsync<ArgumentException>(() => admission.Submit)
+                .ConfigureAwait(true);
+            Assert.Equal("request", error.ParamName);
+        }
+        else
+        {
+            await Assert
+                .ThrowsAsync<InvalidDataException>(() => admission.Submit)
+                .ConfigureAwait(true);
+        }
+        Assert.Equal(RequestOutcome.NotSent, pending!.Outcome);
+        Assert.Null(pending.Info.RequestId);
         AssertRequest(pending!, RequestPhase.Released);
         Assert.Equal(0, _scheduler.OwnedBytes);
         Assert.Equal(0, _scheduler.PendingCount);
@@ -306,7 +326,16 @@ public sealed class RequestTransitionTableTests : IDisposable
         return Queued(_scheduler).First!.Value;
     }
 
-    private AdmittedSubmit StartAdmittedSubmit(bool failEncode)
+    private enum PreparationResult
+    {
+        Original,
+        Shorter,
+        Throws,
+    }
+
+    private AdmittedSubmit StartAdmittedSubmit(
+        PreparationResult result = PreparationResult.Original
+    )
     {
         // Admission measures by enumerating. Translation snapshots by index after reservation.
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -315,7 +344,7 @@ public sealed class RequestTransitionTableTests : IDisposable
             [new VersionRequest(ZooKeeperOperation.Delete, "/a", -1)],
             entered,
             release,
-            failEncode,
+            result,
             TestContext.Current.CancellationToken
         );
         var submit = Task.Run(
@@ -424,7 +453,7 @@ public sealed class RequestTransitionTableTests : IDisposable
         WireRequest[] items,
         TaskCompletionSource entered,
         TaskCompletionSource release,
-        bool failEncode,
+        PreparationResult result,
         CancellationToken cancellationToken
     ) : IReadOnlyList<WireRequest>
     {
@@ -438,11 +467,18 @@ public sealed class RequestTransitionTableTests : IDisposable
             {
                 entered.TrySetResult();
                 release.Task.Wait(cancellationToken);
-                if (failEncode)
+                return result switch
                 {
-                    throw new InvalidDataException("Encode failed after admission.");
-                }
-                return items[index];
+                    PreparationResult.Shorter => new VersionRequest(
+                        ZooKeeperOperation.Delete,
+                        "/",
+                        -1
+                    ),
+                    PreparationResult.Throws => throw new InvalidDataException(
+                        "Encode failed after admission."
+                    ),
+                    _ => items[index],
+                };
             }
         }
 
