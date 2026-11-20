@@ -41,8 +41,8 @@ Pass a factory to resolve application services when the host starts, for example
 The options belong to this registration. Applications that inject
 `ZooKeeperClientOptions` directly must register their own instance. Keep input
 credentials and certificates valid until the host captures them. A replacement
-factory must supply valid credentials each time it runs. Startup waits for
-readiness within `InitialConnectTimeout` and propagates connection failures.
+factory must supply valid credentials each time it runs. Startup uses `InitialConnectTimeout` for connection readiness and propagates failures.
+Native TLS cleanup can delay completion beyond that deadline.
 
 Applications using Microsoft health checks can register
 `services.AddHealthChecks().AddCheck<ZkLinkHealthCheck>("zookeeper")`.

@@ -37,8 +37,8 @@ instance. Keep application-owned authentication objects and certificates alive
 until startup has captured them. A factory used for session replacement must
 supply valid credentials on each invocation.
 
-Startup waits for connection readiness within `InitialConnectTimeout` and
-propagates connection failures. Register ZkLink before dependent services for
+Startup uses `InitialConnectTimeout` for connection readiness and propagates failures.
+Native TLS cleanup can delay completion beyond that deadline. Register ZkLink before dependent services for
 sequential startup. Concurrent startup requires an application readiness barrier.
 During shutdown the accessor becomes unavailable, the host waits for any pending
 replacement to finish cleanup, and graceful shutdown requests acknowledged close.

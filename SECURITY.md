@@ -1,5 +1,7 @@
 # Reporting a security issue
 
+Security fixes target the latest stable release of each package. Reports affecting older versions are welcome.
+
 Include the affected package and version when reporting a security issue in ZkLink, ZkLink.Extensions.DependencyInjection, or ZkLink.Analyzers.
 
 Send a private report to the package maintainers using the [ZkLink NuGet Contact Owners form](https://www.nuget.org/packages/ZkLink/ContactOwners). Sign in to NuGet to use the form. If GitHub displays **Report a vulnerability** on the [repository security page](https://github.com/kidoz/zklink/security), that form also accepts private reports.
