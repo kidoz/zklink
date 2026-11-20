@@ -16,6 +16,11 @@ NuGet credentials through GitHub OIDC in the `nuget` environment.
 
 ## Publish a version
 
+Before preparing a new DI release, move declarations from the previous public
+release into `PublicAPI.Shipped.txt` and set `PackageValidationBaselineVersion`
+to that published version. Keep new declarations in `PublicAPI.Unshipped.txt`
+while the candidate is under review.
+
 Set the same `VersionPrefix` in all three projects under `src/`, add a dated version section to
 `CHANGELOG.md`, and tag the committed release source as `vMAJOR.MINOR.PATCH`.
 
