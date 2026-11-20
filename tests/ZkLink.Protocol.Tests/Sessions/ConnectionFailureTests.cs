@@ -1,4 +1,8 @@
+using NSubstitute;
+using ZkLink.Configuration;
 using ZkLink.Protocol;
+using ZkLink.Sessions;
+using ZkLink.Transport;
 
 namespace ZkLink.Protocol.Tests.Sessions;
 
@@ -571,6 +575,51 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
             .ConfigureAwait(true);
 
         Assert.Equal(ZooKeeperConnectionFailure.Tls, error.Failure);
+    }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T08")]
+    public async Task UnexpectedReconnectFailurePublishesFaultedAndCompletesTheLoop()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var connector = Substitute.For<ITransportConnector>();
+        var peer = Peer();
+        var options = ClientOptionsSnapshot.Capture(SessionFixture.Options(connection: "one,two"));
+        connector
+            .ConnectAsync(
+                Arg.Any<ZooKeeperEndpoint>(),
+                Arg.Any<ClientOptionsSnapshot>(),
+                Arg.Any<TransportDeadline>(),
+                Arg.Any<CancellationToken>()
+            )
+            .Returns(
+                call =>
+                    Task.FromResult(
+                        new TransportConnection(peer, call.Arg<ZooKeeperEndpoint>(), options.Limits)
+                    ),
+                _ =>
+                    Task.FromException<TransportConnection>(
+                        new FormatException("private diagnostic")
+                    )
+            );
+        var client = await ZooKeeperClient
+            .ConnectCoreAsync(
+                options,
+                _fixture.Time,
+                connector,
+                new SessionRandom(new Random(1)),
+                token
+            )
+            .ConfigureAwait(true);
+        await using var lifetime = client.ConfigureAwait(true);
+        peer.Drop();
+        await client.Manager.Completion.WaitAsync(token).ConfigureAwait(true);
+        Assert.Equal(ZooKeeperSessionState.Faulted, client.Session.State);
+        var error = await Assert
+            .ThrowsAsync<ZooKeeperSessionException>(() => client.WaitForConnectionAsync(token))
+            .ConfigureAwait(true);
+        Assert.Equal(ZooKeeperSessionState.Faulted, error.State);
+        Assert.DoesNotContain("private diagnostic", error.ToString(), StringComparison.Ordinal);
     }
 
     private sealed class TlsThenAddressFailureConnector(bool timedOut)

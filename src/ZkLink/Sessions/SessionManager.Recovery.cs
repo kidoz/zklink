@@ -17,6 +17,11 @@ internal sealed partial class SessionManager
         );
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Design",
+        "CA1031",
+        Justification = "The session loop owns terminal notification and cleanup. Unexpected failures end the session without exposing exception details."
+    )]
     private async Task RunAsync()
     {
         var series = new ConnectionSeries(_time.GetTimestamp());
@@ -60,12 +65,15 @@ internal sealed partial class SessionManager
             }
         }
         catch (OperationCanceledException) when (_stop.IsCancellationRequested) { }
-        catch (Exception error) when (error is InvalidOperationException or OverflowException)
+        catch (Exception)
         {
             lock (_gate)
             {
-                _terminalCause = new ZooKeeperSessionException(ZooKeeperSessionState.Faulted);
-                PublishTerminal(ZooKeeperSessionState.Faulted);
+                if (!IsTerminal(Session.State))
+                {
+                    _terminalCause = new ZooKeeperSessionException(ZooKeeperSessionState.Faulted);
+                    PublishTerminal(ZooKeeperSessionState.Faulted);
+                }
             }
         }
         finally
