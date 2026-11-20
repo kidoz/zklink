@@ -359,7 +359,8 @@ internal sealed partial class SessionManager
                     series.LastFailure.Endpoint,
                     series.LastFailure.ErrorCode,
                     series.LastFailure.TlsFailureReason,
-                    series.LastFailure.SocketError
+                    series.LastFailure.SocketError,
+                    series.LastFailure.ProviderFailureReason
                 );
                 PublishTerminal(ZooKeeperSessionState.Faulted);
             }

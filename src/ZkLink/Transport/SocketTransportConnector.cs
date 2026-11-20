@@ -257,33 +257,40 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
     )
     {
         token.ThrowIfCancellationRequested();
-        var failure = new ZooKeeperConnectionException(
-            ZooKeeperConnectionFailure.Tls,
-            endpoint,
-            null,
-            ZooKeeperTlsFailureReason.ProviderFailed,
-            null
-        );
+        ZooKeeperConnectionException Failure(ZooKeeperTlsProviderFailureReason reason) =>
+            new(
+                ZooKeeperConnectionFailure.Tls,
+                endpoint,
+                null,
+                ZooKeeperTlsFailureReason.ProviderFailed,
+                null,
+                reason
+            );
         if (Interlocked.Exchange(ref _providerBusy, 1) != 0)
         {
-            throw failure;
+            throw Failure(ZooKeeperTlsProviderFailureReason.AlreadyRunning);
         }
         // Bound outstanding application callbacks even when the provider ignores its token.
         var pending = Task.Run(async () => await provider(token).ConfigureAwait(false), token);
         bool detached = false;
+        ZooKeeperTlsCredentials? snapshot;
         try
         {
-            return await pending.WaitAsync(token).ConfigureAwait(false) ?? throw failure;
+            snapshot = await pending.WaitAsync(token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
             detached = true;
             _ = DisposeLateCredentialsAsync(pending);
-            throw new OperationCanceledException(null, failure, token);
+            throw new OperationCanceledException(
+                null,
+                Failure(ZooKeeperTlsProviderFailureReason.Canceled),
+                token
+            );
         }
         catch (Exception)
         {
-            throw failure;
+            throw Failure(ZooKeeperTlsProviderFailureReason.Threw);
         }
         finally
         {
@@ -292,6 +299,7 @@ internal sealed class SocketTransportConnector(IHostResolver resolver, SessionRa
                 Volatile.Write(ref _providerBusy, 0);
             }
         }
+        return snapshot ?? throw Failure(ZooKeeperTlsProviderFailureReason.ReturnedNull);
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage(

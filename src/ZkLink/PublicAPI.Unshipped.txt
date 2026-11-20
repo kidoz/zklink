@@ -21,3 +21,9 @@ ZkLink.ZooKeeperTlsCredentials.Dispose() -> void
 ZkLink.ZooKeeperConnectionException.TlsFailureReason.get -> ZkLink.ZooKeeperTlsFailureReason?
 ZkLink.ZooKeeperConnectionException.SocketError.get -> System.Net.Sockets.SocketError?
 static ZkLink.ZooKeeperTlsOptions.RequiredWithProvider(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<ZkLink.ZooKeeperTlsCredentials!>>! credentialsProvider, System.Security.Cryptography.X509Certificates.X509RevocationMode revocationMode = System.Security.Cryptography.X509Certificates.X509RevocationMode.Online, string? serverName = null) -> ZkLink.ZooKeeperTlsOptions!
+ZkLink.ZooKeeperConnectionException.ProviderFailureReason.get -> ZkLink.ZooKeeperTlsProviderFailureReason?
+ZkLink.ZooKeeperTlsProviderFailureReason
+ZkLink.ZooKeeperTlsProviderFailureReason.Threw = 0 -> ZkLink.ZooKeeperTlsProviderFailureReason
+ZkLink.ZooKeeperTlsProviderFailureReason.ReturnedNull = 1 -> ZkLink.ZooKeeperTlsProviderFailureReason
+ZkLink.ZooKeeperTlsProviderFailureReason.Canceled = 2 -> ZkLink.ZooKeeperTlsProviderFailureReason
+ZkLink.ZooKeeperTlsProviderFailureReason.AlreadyRunning = 3 -> ZkLink.ZooKeeperTlsProviderFailureReason

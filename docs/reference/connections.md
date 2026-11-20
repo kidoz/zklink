@@ -4,7 +4,8 @@ The connection methods on `ZooKeeperClient` are `ConnectAsync`, `Session`,
 `SubscribeStateChanges`, `WaitForConnectionAsync`, `UpdateEndpointsAsync`,
 `SyncAsync`, `CloseAsync` and `DisposeAsync`. Network methods return `Task` and
 accept a final `CancellationToken`. Exact declarations are in the
-[released API baseline](../../src/ZkLink/PublicAPI.Shipped.txt).
+[shipped declarations](../../src/ZkLink/PublicAPI.Shipped.txt) and
+[additional declarations](../../src/ZkLink/PublicAPI.Unshipped.txt).
 
 Node CRUD, children/stat and ACL methods are described in the [node reference](nodes.md).
 Session ephemerals, descendant counts and identities are described in the
@@ -221,10 +222,15 @@ and trust roots together on every endpoint attempt. Return a fresh
 copies their handles. The driver disposes the returned snapshot after the
 attempt, and the application retains ownership of the originals. The provider
 receives the attempt cancellation token. At most one provider call is
-outstanding per client. TLS session resumption is disabled for this mode so
+outstanding per client. Honor cancellation promptly. If a provider never returns,
+later attempts on that client cannot reload credentials. After correcting the
+provider, create a new client to resume service with a new session.
+TLS session resumption is disabled for this mode so
 each connection authenticates with the selected credentials.
 
 Connection exceptions expose `TlsFailureReason` and `SocketError` when the
-platform provides them. Request exception messages include the operation,
+platform provides them. For `TlsFailureReason.ProviderFailed`, inspect
+`ProviderFailureReason` to distinguish a callback exception, a null return,
+a canceled wait, or a previous invocation still running. Request exception messages include the operation,
 outcome and available server code. Paths and endpoints remain available as
 explicit properties.

@@ -41,6 +41,8 @@ public sealed class ZooKeeperTlsOptions
     ) => new(true, revocationMode, clientCertificate, trustRoots, serverName);
 
     /// <summary>Requires TLS and fetches a fresh credential snapshot for each endpoint attempt.</summary>
+    /// <remarks>Honor the attempt cancellation token. Only one callback can run per client.
+    /// A callback that never completes prevents credential reload until a new client is created.</remarks>
     public static ZooKeeperTlsOptions RequiredWithProvider(
         Func<CancellationToken, ValueTask<ZooKeeperTlsCredentials>> credentialsProvider,
         X509RevocationMode revocationMode = X509RevocationMode.Online,

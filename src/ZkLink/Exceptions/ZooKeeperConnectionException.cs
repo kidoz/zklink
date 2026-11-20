@@ -18,7 +18,8 @@ public sealed class ZooKeeperConnectionException : IOException
         ZooKeeperEndpoint? endpoint,
         int? errorCode,
         ZooKeeperTlsFailureReason? tlsFailureReason,
-        SocketError? socketError
+        SocketError? socketError,
+        ZooKeeperTlsProviderFailureReason? providerFailureReason = null
     )
         : base(FormatMessage(failure, errorCode, tlsFailureReason, socketError))
     {
@@ -32,6 +33,7 @@ public sealed class ZooKeeperConnectionException : IOException
         }
         TlsFailureReason = tlsFailureReason;
         SocketError = socketError;
+        ProviderFailureReason = providerFailureReason;
         Failure = failure;
         Endpoint = endpoint;
         ErrorCode = errorCode;
@@ -57,6 +59,9 @@ public sealed class ZooKeeperConnectionException : IOException
 
     /// <summary>Gets the platform or provider TLS failure category when available.</summary>
     public ZooKeeperTlsFailureReason? TlsFailureReason { get; }
+
+    /// <summary>Gets the credential provider failure category when TLS credential loading failed.</summary>
+    public ZooKeeperTlsProviderFailureReason? ProviderFailureReason { get; }
 
     /// <summary>Gets the socket failure code when available.</summary>
     public SocketError? SocketError { get; }

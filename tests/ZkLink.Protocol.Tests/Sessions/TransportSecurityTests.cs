@@ -183,12 +183,122 @@ public sealed class TransportSecurityTests
             .ThrowsAsync<ZooKeeperConnectionException>(() => connection)
             .ConfigureAwait(true);
         Assert.Equal(ZooKeeperTlsFailureReason.ProviderFailed, error.TlsFailureReason);
+        Assert.NotNull(error.ProviderFailureReason);
+        if (timeout)
+        {
+            Assert.Equal(ZooKeeperTlsProviderFailureReason.Canceled, error.ProviderFailureReason);
+        }
         Assert.DoesNotContain(
             "private provider diagnostics",
             error.ToString(),
             StringComparison.Ordinal
         );
         provider.TrySetCanceled(token);
+    }
+
+    [Theory(Timeout = 10000)]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task CredentialProviderFailureReportsOnlySafeDetails(bool returnsNull)
+    {
+        using var options = ClientOptionsSnapshot.Capture(
+            new ZooKeeperClientOptions
+            {
+                ConnectionString = "zk.test",
+                Tls = ZooKeeperTlsOptions.RequiredWithProvider(_ =>
+                    returnsNull
+                        ? ValueTask.FromResult<ZooKeeperTlsCredentials>(null!)
+                        : throw new FormatException("private provider diagnostics")
+                ),
+            }
+        );
+        var connector = new SocketTransportConnector(Resolver(), new SessionRandom(Random.Shared));
+        var error = await Assert
+            .ThrowsAsync<ZooKeeperConnectionException>(() =>
+                connector.ConnectAsync(
+                    new ZooKeeperEndpoint("zk.test", 2181),
+                    options,
+                    new TransportDeadline(TimeProvider.System, TimeSpan.FromSeconds(1)),
+                    TestContext.Current.CancellationToken
+                )
+            )
+            .ConfigureAwait(true);
+        Assert.Equal(ZooKeeperTlsFailureReason.ProviderFailed, error.TlsFailureReason);
+        Assert.Equal(
+            returnsNull
+                ? ZooKeeperTlsProviderFailureReason.ReturnedNull
+                : ZooKeeperTlsProviderFailureReason.Threw,
+            error.ProviderFailureReason
+        );
+        Assert.Null(error.InnerException);
+        Assert.DoesNotContain(
+            "private provider diagnostics",
+            error.ToString(),
+            StringComparison.Ordinal
+        );
+    }
+
+    [Fact(Timeout = 10000)]
+    public async Task CanceledCredentialWaitKeepsOneOutstandingProvider()
+    {
+        var token = TestContext.Current.CancellationToken;
+        using var attempt = CancellationTokenSource.CreateLinkedTokenSource(token);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource<ZooKeeperTlsCredentials>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        int calls = 0;
+        using var options = ClientOptionsSnapshot.Capture(
+            new ZooKeeperClientOptions
+            {
+                ConnectionString = "zk.test",
+                Tls = ZooKeeperTlsOptions.RequiredWithProvider(_ =>
+                {
+                    Interlocked.Increment(ref calls);
+                    entered.TrySetResult();
+                    return new ValueTask<ZooKeeperTlsCredentials>(release.Task);
+                }),
+            }
+        );
+        var connector = new SocketTransportConnector(Resolver(), new SessionRandom(Random.Shared));
+        var endpoint = new ZooKeeperEndpoint("zk.test", 2181);
+        var deadline = new TransportDeadline(TimeProvider.System, TimeSpan.FromSeconds(1));
+        try
+        {
+            var cancellation = CancelWhenStartedAsync();
+            var canceled = await Assert
+                .ThrowsAsync<OperationCanceledException>(() =>
+                    connector.ConnectAsync(endpoint, options, deadline, attempt.Token)
+                )
+                .ConfigureAwait(true);
+            await cancellation.ConfigureAwait(true);
+            Assert.Equal(
+                ZooKeeperTlsProviderFailureReason.Canceled,
+                Assert
+                    .IsType<ZooKeeperConnectionException>(canceled.InnerException)
+                    .ProviderFailureReason
+            );
+            var busy = await Assert
+                .ThrowsAsync<ZooKeeperConnectionException>(() =>
+                    connector.ConnectAsync(endpoint, options, deadline, token)
+                )
+                .ConfigureAwait(true);
+            Assert.Equal(
+                ZooKeeperTlsProviderFailureReason.AlreadyRunning,
+                busy.ProviderFailureReason
+            );
+            Assert.Equal(1, Volatile.Read(ref calls));
+        }
+        finally
+        {
+            release.TrySetCanceled(token);
+        }
+
+        async Task CancelWhenStartedAsync()
+        {
+            await entered.Task.WaitAsync(token).ConfigureAwait(true);
+            await attempt.CancelAsync().ConfigureAwait(true);
+        }
     }
 
     [Theory(Timeout = 10000)]

@@ -19,8 +19,9 @@ below provide constructor validation and XML documentation.
 [connection reference](connections.md) for their behavior and defaults.
 
 `ZooKeeperConnectionException` reports a safe `ZooKeeperConnectionFailure`,
-optional endpoint and server code during establishment. Its `TlsFailureReason` and
-`SocketError` properties carry more detail when available. `ZooKeeperSessionException`
+optional endpoint and server code during establishment. `TlsFailureReason` and
+`SocketError` carry transport details. With `ProviderFailed`, the additional
+`ProviderFailureReason` property identifies the credential callback outcome. `ZooKeeperSessionException`
 reports session state and optional server code. `ZooKeeperEventOverflowException`
 reports a watch-budget fault, an overflowing state subscription, or a rejected
 subscription at the active-reader limit. For a state subscription, its `State`
