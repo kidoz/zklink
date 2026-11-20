@@ -77,6 +77,7 @@ internal ref struct JuteReader
         return count;
     }
 
+#if ZKLINK_TEST_ACCESS
     internal string?[]? ReadStringVector(bool allowNull = false)
     {
         var count = ReadVectorCount(sizeof(int), allowNull);
@@ -91,6 +92,7 @@ internal ref struct JuteReader
         }
         return values;
     }
+#endif
 
     internal WireStat ReadStat() =>
         new(
@@ -107,7 +109,9 @@ internal ref struct JuteReader
             ReadInt64()
         );
 
+#if ZKLINK_TEST_ACCESS
     internal RequestHeader ReadRequestHeader() => new(ReadInt32(), ReadInt32());
+#endif
 
     internal ReplyHeader ReadReplyHeader() => new(ReadInt32(), ReadInt64(), ReadInt32());
 

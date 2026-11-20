@@ -14,8 +14,8 @@ internal ref struct JuteWriter : IJuteOutput
     internal JuteWriter(Span<byte> destination, ProtocolLimits limits)
     {
         ArgumentNullException.ThrowIfNull(limits);
-        _destination = destination[..Math.Min(destination.Length, limits.MaxFrameBytes)];
         _limits = limits;
+        _destination = destination[..Math.Min(destination.Length, _limits.MaxFrameBytes)];
     }
 
     internal readonly int WrittenCount => _position;
@@ -60,6 +60,7 @@ internal ref struct JuteWriter : IJuteOutput
 
     public void WriteNullBuffer() => WriteInt32(-1);
 
+#if ZKLINK_TEST_ACCESS
     public void WriteStringVector(IReadOnlyList<string?>? values, bool allowNull = false)
     {
         if (values is null)
@@ -83,6 +84,7 @@ internal ref struct JuteWriter : IJuteOutput
             WriteString(value);
         }
     }
+#endif
 
     public void WriteStat(WireStat stat)
     {
@@ -100,6 +102,7 @@ internal ref struct JuteWriter : IJuteOutput
         WriteInt64(stat.Pzxid);
     }
 
+#if ZKLINK_TEST_ACCESS
     internal void WriteRequestHeader(RequestHeader header)
     {
         WriteInt32(header.Xid);
@@ -112,6 +115,7 @@ internal ref struct JuteWriter : IJuteOutput
         WriteInt64(header.Zxid);
         WriteInt32(header.Error);
     }
+#endif
 
     private readonly void EnsureCapacity(long count)
     {
