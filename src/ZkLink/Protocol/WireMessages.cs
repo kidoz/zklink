@@ -5,9 +5,6 @@ namespace ZkLink.Protocol;
 // Internal closed request shapes, never public arbitrary opcode bodies.
 internal abstract record WireRequest(int Opcode)
 {
-    private protected WireRequest()
-        : this(0) { }
-
     public sealed override string ToString() => "ZooKeeper wire request";
 }
 

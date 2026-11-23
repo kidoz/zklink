@@ -162,12 +162,4 @@ internal static class NamespaceTranslator
             },
             _ => result,
         };
-
-    internal static WireNotification ToClient(WireNotification notification, ChrootPath paths) =>
-        notification.Path is null
-            ? notification
-            : notification with
-            {
-                Path = paths.ToClient(notification.Path),
-            };
 }

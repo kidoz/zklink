@@ -219,12 +219,10 @@ public sealed class ConfigurationTests
         Assert.Equal(3, filtered.Values.Length);
         Assert.Equal("/", filtered.Values[0]);
         Assert.Equal("/node2", filtered.Values[2]);
-        var notification = NamespaceTranslator.ToClient(
-            new WireNotification(3, 3, "/app/node", 12),
-            paths
-        );
-        Assert.Equal("/node", notification.Path);
-        Assert.Equal(12, notification.Zxid);
+        // The watch dispatcher translates notifications through this runtime path.
+        Assert.Equal("/node", paths.ToClientIfContained("/app/node"));
+        Assert.Null(paths.ToClientIfContained("/app2/node"));
+        Assert.Null(paths.ToClientIfContained("/other"));
         var multi = new MultiResult([
             new(15, 0, new PathResult("/app/node", ProtocolFixtures.Stat)),
             new(-1, -103, new ErrorResult(-103)),
