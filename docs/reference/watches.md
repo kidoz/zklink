@@ -47,7 +47,9 @@ See [Watch repeated changes](../tutorials/watch-repeated-changes.md).
 `CompatibilityProfile` defaults to `ZooKeeper38`, an operator assertion about
 all endpoints. This profile permits multiple handles of the same persistent
 mode at one path, but rejects mixing different persistent modes or a one-shot
-registration at that exact path with `NotSupportedException`. Separate paths,
+registration at that exact path: with `NotSupportedException` while the other
+registration is active or pending, or with `ZooKeeperBackpressureException` while
+an earlier registration there is still being removed or restored. Separate paths,
 including an ancestor recursive watch and a descendant one-shot watch, work
 together. ZooKeeper 3.8 stores only one mode per connection/path, so mixing
 would silently overwrite a registration.
@@ -84,9 +86,12 @@ establishes a new watch. State changes use `SubscribeStateChanges` and do not
 consume one-shot watches.
 
 `ZooKeeperWatchEvent` contains getter-only `RegistrationId`, `Kind`, `Path`,
-nullable `Zxid`, and `ConnectionGeneration`. Kinds include node creation, deletion,
-data/child changes, data/child/persistent watch removal, and local
-`ReconnectedWithGap`. A persistent removal notification ends the affected stream. `None` is an unspecified value and is not emitted.
+nullable `Zxid`, and `ConnectionGeneration`. Kinds include node creation,
+deletion, data/child changes and the local `ReconnectedWithGap`. The three
+`WatchRemoved` kinds are reserved: the supported ZooKeeper 3.8.7 and 3.9.6
+servers do not send them, so a stream never ends because of one.
+Server-confirmed removal is reported by `RemoveAsync` as a
+`ZooKeeperWatchRemovalResult`. `None` is an unspecified value and is not emitted.
 Null zxid means no server zxid is available, including for a local gap. Notifications do not advance
 the session's ordinary-reply watermark. Default handle/event formatting omits
 path values. Chroot is applied to registration, removal and restoration, then

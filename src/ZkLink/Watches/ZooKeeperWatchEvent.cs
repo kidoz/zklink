@@ -18,13 +18,13 @@ public enum ZooKeeperWatchEventKind
     /// <summary>The node's child list changed.</summary>
     NodeChildrenChanged = 4,
 
-    /// <summary>The server removed a data or existence watch.</summary>
+    /// <summary>Reserved for a removed data or existence watch. The supported ZooKeeper 3.8.7 and 3.9.6 servers do not send this event.</summary>
     DataWatchRemoved = 5,
 
-    /// <summary>The server removed a child watch.</summary>
+    /// <summary>Reserved for a removed child watch. The supported ZooKeeper 3.8.7 and 3.9.6 servers do not send this event.</summary>
     ChildWatchRemoved = 6,
 
-    /// <summary>A persistent server watch was removed.</summary>
+    /// <summary>Reserved for a removed persistent watch. The supported ZooKeeper 3.8.7 and 3.9.6 servers do not send this event; server-confirmed removal is reported by <see cref="ZooKeeperWatch.RemoveAsync"/>.</summary>
     PersistentWatchRemoved = 7,
 
     /// <summary>The session reconnected; reread or resnapshot because missed changes cannot be reconstructed.</summary>
