@@ -63,14 +63,17 @@ public sealed class FrameTests
             await Assert.ThrowsAsync<EndOfStreamException>(() =>
                 reader.ReadAsync(TestContext.Current.CancellationToken)
             );
+            if (length > sizeof(int))
+            {
+                Assert.Equal(Payload.Length, stream.BodyBuffer.Length);
+                Assert.False(stream.BodyBuffer.Span.ContainsAnyExcept((byte)0));
+            }
         }
     }
 
     [Theory]
     [InlineData(-1)]
     [InlineData(0)]
-    [InlineData(int.MaxValue)]
-    [InlineData(ProtocolLimits.DefaultMaxFrameBytes + 1)]
     [Trait("Acceptance", "T03")]
     public async Task InvalidFrameLengthDoesNotReadBody(int length)
     {
@@ -82,6 +85,36 @@ public sealed class FrameTests
             reader.ReadAsync(TestContext.Current.CancellationToken)
         );
         Assert.Equal(4, stream.Position);
+    }
+
+    [Theory]
+    [InlineData(ProtocolLimits.DefaultMaxFrameBytes + 1)]
+    [InlineData(int.MaxValue)]
+    [Trait("Acceptance", "T03")]
+    public async Task OverLimitFrameLengthIsTransportLossWithoutReadingBody(int length)
+    {
+        var bytes = new byte[8];
+        BinaryPrimitives.WriteInt32BigEndian(bytes, length);
+        using var stream = new MemoryStream(bytes);
+        var reader = new FrameReader(stream, Limits);
+        var error = await Assert.ThrowsAsync<FrameLimitException>(() =>
+            reader.ReadAsync(TestContext.Current.CancellationToken)
+        );
+        // Readers already treat IOException as transport loss, never as a protocol fault.
+        Assert.IsAssignableFrom<IOException>(error);
+        Assert.Equal(length, error.DeclaredLength);
+        Assert.Equal(4, stream.Position);
+    }
+
+    [Fact]
+    [Trait("Acceptance", "T03")]
+    public async Task FrameAtTheConfiguredLimitIsReadInFull()
+    {
+        var payload = new byte[ProtocolLimits.DefaultMaxFrameBytes];
+        using var stream = new MemoryStream(Frame(payload));
+        var reader = new FrameReader(stream, Limits);
+        Assert.Equal(payload, await reader.ReadAsync(TestContext.Current.CancellationToken));
+        Assert.Null(await reader.ReadAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -192,11 +225,17 @@ public sealed class FrameTests
         int maxChunk = int.MaxValue
     ) : MemoryStream(bytes)
     {
+        internal ReadOnlyMemory<byte> BodyBuffer { get; private set; }
+
         public override ValueTask<int> ReadAsync(
             Memory<byte> buffer,
             CancellationToken cancellationToken = default
         )
         {
+            if (Position == sizeof(int))
+            {
+                BodyBuffer = buffer;
+            }
             var count = Math.Min(buffer.Length, maxChunk);
             if (Position < split)
             {

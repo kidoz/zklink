@@ -1,6 +1,7 @@
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using ZkLink.Diagnostics;
+using ZkLink.Protocol;
 using ZkLink.Transport;
 
 namespace ZkLink.Sessions;
@@ -183,6 +184,11 @@ internal sealed partial class SessionManager
         catch (OperationCanceledException) when (_stop.IsCancellationRequested)
         {
             return false;
+        }
+        catch (FrameLimitException error)
+        {
+            ZooKeeperTelemetry.RejectOversizedFrame();
+            return HandleAttemptFailure(series, endpoint, handshakeAccepted, error);
         }
         catch (Exception error)
             when (error

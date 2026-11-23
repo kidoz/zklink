@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Security.Cryptography;
 
 namespace ZkLink.Protocol;
 
@@ -21,13 +22,27 @@ internal sealed class FrameReader(Stream stream, ProtocolLimits limits)
             .ReadExactlyAsync(_prefix.AsMemory(firstRead), cancellationToken)
             .ConfigureAwait(false);
         var length = BinaryPrimitives.ReadInt32BigEndian(_prefix);
-        if (length <= 0 || length > _limits.MaxFrameBytes)
+        if (length <= 0)
         {
-            throw new InvalidDataException("Invalid or excessive frame length.");
+            throw new InvalidDataException("Invalid frame length.");
+        }
+        // A well-formed frame can exceed the local capacity, for example a large
+        // child list or multi reply. That is transport loss, not invalid protocol.
+        if (length > _limits.MaxFrameBytes)
+        {
+            throw new FrameLimitException(length, _limits.MaxFrameBytes);
         }
         // Validate before allocating. Result ownership transfers to the decoder.
         var payload = new byte[length];
-        await _stream.ReadExactlyAsync(payload, cancellationToken).ConfigureAwait(false);
-        return payload;
+        try
+        {
+            await _stream.ReadExactlyAsync(payload, cancellationToken).ConfigureAwait(false);
+            return payload;
+        }
+        catch
+        {
+            CryptographicOperations.ZeroMemory(payload);
+            throw;
+        }
     }
 }

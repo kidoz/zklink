@@ -34,7 +34,7 @@ once per endpoint attempt. Endpoint updates apply to future connection attempts.
 | `MaxInFlightRequests` | 256; range 1–65,536; canceled sent requests retain their slots |
 | `MaxQueuedRequests` | 1,024; range 1–1,000,000; full queue fails immediately |
 | `MaxPendingRequestBytes` | 32 MiB; range 8 bytes–1 GiB; owned application request payloads, excluding each four-byte frame prefix |
-| `MaxFrameBytes` | 1,048,575, excluding four-byte prefix; range 45 bytes–64 MiB |
+| `MaxFrameBytes` | 1,048,575, excluding four-byte prefix; range 45 bytes–64 MiB; a longer reply frame is treated as transport loss |
 | `MaxDataBytes` | 1,000,000; range 0–64 MiB, additionally constrained by frame size |
 | `MaxCollectionElements` | 100,000; range 1–1,000,000, additionally constrained by frame size |
 | `MaxWatches` | 10,000 owned logical handles and bounded cleanup metadata; range 1–1,000,000 |
@@ -163,8 +163,16 @@ matched success reply fails only that call with `ZooKeeperProtocolException`
 and outcome `Unknown`. This includes a create or sync reply that returns a
 relative path or a path outside the configured chroot. Queued requests continue
 on the same connection unless a batch member has already reported a session or
-connection failure. An invalid frame length, an incomplete reply header, or a request
-ID out of order faults the session.
+connection failure. A non-positive frame length, an incomplete reply header, or a
+request ID out of order faults the session.
+
+A frame longer than `MaxFrameBytes` is a local capacity limit, not a protocol
+error. The client reads no body, treats the transport as lost and reconnects with
+the same session; in-flight requests complete with `Unknown`. The untagged
+`zklink.protocol.oversized_frames` counter records each such frame. A large child
+list or read batch can exceed the default, so raise `MaxFrameBytes` or request
+smaller results. Retrying the same read without one of those changes disconnects
+the session again.
 
 Cancellation throws `ZooKeeperOperationCanceledException`, remains ordinary task
 cancellation and preserves the outcome. Deadlines throw `ZooKeeperTimeoutException`.

@@ -391,6 +391,46 @@ public sealed class TelemetryTests
 
     [Fact(Timeout = TestTimeoutMilliseconds)]
     [Trait("Acceptance", "T34")]
+    public async Task OverLimitReplyFrameIsCountedOnce()
+    {
+        const string counter = "zklink.protocol.oversized_frames";
+        var token = TestContext.Current.CancellationToken;
+        using var capture = new TelemetryCapture();
+        using var first = new SessionPeer { ReplyApplications = false };
+        using var second = new SessionPeer();
+        var fixture = new SessionFixture();
+        await using var lifetime = fixture.ConfigureAwait(true);
+        var client = await fixture
+            .ConnectAsync(
+                first,
+                SessionFixture.Options(connection: "127.0.0.1:2181,127.0.0.2:2181"),
+                token
+            )
+            .ConfigureAwait(true);
+        await SessionTestSupport.NextAsync(first).ConfigureAwait(true);
+        await ZooKeeperTelemetry.FlushAsync(token).ConfigureAwait(true);
+        capture.Reset();
+        capture.Collect();
+        double before = capture.Value(counter);
+
+        var pending = client.SyncAsync(SecretPath, token);
+        await SessionTestSupport.NextAsync(first).ConfigureAwait(true);
+        fixture.Connector.Add(second);
+        var prefix = new byte[sizeof(int)];
+        BinaryPrimitives.WriteInt32BigEndian(prefix, ProtocolLimits.DefaultMaxFrameBytes + 1);
+        first.InjectRaw(prefix);
+        await Assert.ThrowsAsync<ZooKeeperException>(() => pending).ConfigureAwait(true);
+        await SessionTestSupport.NextAsync(second).ConfigureAwait(true);
+        await SessionTestSupport.Bounded(client.WaitForConnectionAsync(token)).ConfigureAwait(true);
+        await ZooKeeperTelemetry.FlushAsync(token).ConfigureAwait(true);
+        capture.Collect();
+        Assert.Equal(before + 1, capture.Value(counter));
+        Assert.Equal(ZooKeeperSessionState.Connected, client.Session.State);
+        capture.AssertRedacted(SecretPath, SecretData, "private-endpoint-marker");
+    }
+
+    [Fact(Timeout = TestTimeoutMilliseconds)]
+    [Trait("Acceptance", "T34")]
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "Reliability",
         "CA2000",

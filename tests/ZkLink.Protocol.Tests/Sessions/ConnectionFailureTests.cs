@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using NSubstitute;
 using ZkLink.Configuration;
 using ZkLink.Protocol;
@@ -446,6 +447,85 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
         Assert.Equal(ZooKeeperSessionState.Faulted, client.Session.State);
         Assert.Equal(0, client.Manager.Scheduler.OwnedBytes);
         Assert.True(peer.IsDisposed);
+    }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T03")]
+    [Trait("Acceptance", "T08")]
+    public async Task OverLimitReplyIsTransportLossAndRecoversTheSameSession()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var first = Peer();
+        first.ReplyApplications = false;
+        var second = Peer();
+        var client = await _fixture
+            .ConnectAsync(
+                first,
+                SessionFixture.Options(connection: "127.0.0.1:2181,127.0.0.2:2181"),
+                token
+            )
+            .ConfigureAwait(true);
+        await SessionTestSupport.NextAsync(first).ConfigureAwait(true);
+        var observer = new StateObserver(client);
+        await using var observerLifetime = observer.ConfigureAwait(true);
+        var pending = client.SyncAsync("/large-reply", token);
+        await SessionTestSupport.NextAsync(first).ConfigureAwait(true);
+        _fixture.Connector.Add(second);
+        var prefix = new byte[sizeof(int)];
+        BinaryPrimitives.WriteInt32BigEndian(prefix, ProtocolLimits.DefaultMaxFrameBytes + 1);
+        first.InjectRaw(prefix);
+        var error = await Assert
+            .ThrowsAsync<ZooKeeperException>(() => pending)
+            .ConfigureAwait(true);
+        Assert.Equal(RequestOutcome.Unknown, error.Outcome);
+        await observer.WaitAsync(ZooKeeperSessionState.Disconnected).ConfigureAwait(true);
+        await SessionTestSupport.Bounded(client.WaitForConnectionAsync(token)).ConfigureAwait(true);
+        Assert.Equal(ZooKeeperSessionState.Connected, client.Session.State);
+        Assert.Equal(123, client.Session.SessionId);
+        Assert.Equal(2, client.Session.ConnectionGeneration);
+        Assert.False(client.Manager.Completion.IsCompleted);
+        Assert.Equal(0, client.Manager.Scheduler.OwnedBytes);
+        Assert.True(first.IsDisposed);
+    }
+
+    [Fact(Timeout = 10000)]
+    [Trait("Acceptance", "T03")]
+    [Trait("Acceptance", "T08")]
+    public async Task OverLimitFrameDuringAuthenticationReplayRetriesTheSameSession()
+    {
+        var token = TestContext.Current.CancellationToken;
+        using var credentials = ZooKeeperAuthentication.Digest("user", "disposable");
+        var first = Peer();
+        var second = Peer();
+        var third = Peer();
+        second.ReplyAuth = false;
+        var client = await _fixture
+            .ConnectAsync(
+                first,
+                SessionFixture.Options(
+                    connection: "127.0.0.1,127.0.0.2,127.0.0.3",
+                    authentication: [credentials]
+                ),
+                token
+            )
+            .ConfigureAwait(true);
+        await SessionTestSupport.NextAsync(first).ConfigureAwait(true);
+        await SessionTestSupport.NextAsync(first).ConfigureAwait(true);
+        _fixture.Connector.Add(second);
+        _fixture.Connector.Add(third);
+        first.Drop();
+        await SessionTestSupport.NextAsync(second).ConfigureAwait(true);
+        var replay = await SessionTestSupport.NextAsync(second).ConfigureAwait(true);
+        Assert.Equal(Xids.Auth, replay.Xid);
+        var prefix = new byte[sizeof(int)];
+        BinaryPrimitives.WriteInt32BigEndian(prefix, ProtocolLimits.DefaultMaxFrameBytes + 1);
+        second.InjectRaw(prefix);
+        await SessionTestSupport.Bounded(client.WaitForConnectionAsync(token)).ConfigureAwait(true);
+        Assert.Equal(ZooKeeperSessionState.Connected, client.Session.State);
+        Assert.Equal(123, client.Session.SessionId);
+        Assert.Equal(3, client.Session.ConnectionGeneration);
+        Assert.False(client.Manager.Completion.IsCompleted);
+        Assert.True(second.IsDisposed);
     }
 
     [Fact(Timeout = 10000)]

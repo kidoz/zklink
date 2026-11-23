@@ -110,6 +110,9 @@ internal sealed class SessionPeer : Stream
 
     internal void Inject(byte[] payload) => _incoming.Enqueue(PeerTests.Frame(payload));
 
+    // Enqueues exact bytes, so a test can send a prefix without its frame body.
+    internal void InjectRaw(params byte[][] chunks) => _incoming.Enqueue(chunks);
+
     internal void HandshakeReply()
     {
         var bytes = new byte[64];

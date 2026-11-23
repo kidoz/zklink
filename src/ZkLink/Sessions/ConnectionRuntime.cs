@@ -1,6 +1,8 @@
 using System.Buffers.Binary;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using ZkLink.Configuration;
+using ZkLink.Diagnostics;
 using ZkLink.Protocol;
 using ZkLink.Requests;
 using ZkLink.Transport;
@@ -122,6 +124,11 @@ internal sealed class ConnectionRuntime(
         catch (InvalidDataException)
         {
             return Stop(new(RuntimeStop.Protocol));
+        }
+        catch (FrameLimitException)
+        {
+            ZooKeeperTelemetry.RejectOversizedFrame();
+            return Stop(new(RuntimeStop.Disconnected));
         }
         catch (IOException)
         {
