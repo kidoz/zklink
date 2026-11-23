@@ -667,6 +667,41 @@ public sealed class TelemetryTests
         Assert.True(HasTag(activity, "error", "Server"));
     }
 
+    [Fact]
+    [Trait("Acceptance", "T34")]
+    public void FreezingAnUnsentCloseUpdatesOutstandingRequestsImmediately()
+    {
+        const string gauge = "zklink.requests.outstanding";
+        using var capture = new TelemetryCapture();
+        using var options = ClientOptionsSnapshot.Capture(SessionFixture.Options());
+        var scheduler = new RequestScheduler(
+            new object(),
+            options,
+            new ManualTimeProvider(),
+            new AsyncPulse(),
+            new TelemetryState()
+        );
+        scheduler.Attach(1, new ZooKeeperEndpoint("one"));
+        try
+        {
+            capture.Collect();
+            double before = capture.Value(gauge);
+            var close = scheduler.EnqueueClose();
+            capture.Collect();
+            Assert.Equal(before + 1, capture.Value(gauge));
+
+            var frozen = scheduler.FreezeClose(close);
+
+            Assert.Equal(RequestOutcome.NotSent, frozen.Outcome);
+            capture.Collect();
+            Assert.Equal(before, capture.Value(gauge));
+        }
+        finally
+        {
+            scheduler.Detach();
+        }
+    }
+
     private static bool HasTag(CapturedActivity activity, string key, string value) =>
         activity.Tags.Any(tag => tag.Key == key && Equals(tag.Value, value));
 

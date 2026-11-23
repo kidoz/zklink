@@ -560,6 +560,7 @@ internal sealed class RequestScheduler(
     {
         lock (gate)
         {
+            using var pressure = new PressureObservation(this);
             if (pending is null)
             {
                 return (
