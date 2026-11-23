@@ -9,6 +9,68 @@ broader security, Native AOT or production qualification. See
 
 ## [Unreleased]
 
+### Added
+
+- Count inbound frames whose declared length exceeds `MaxFrameBytes` in the
+  untagged `zklink.protocol.oversized_frames` counter.
+
+- Count sessions that end `Faulted` in `zklink.session.faults`, tagged by the
+  finite cause `Protocol`, `Connection`, `Overflow` or `Unexpected`. An
+  unexpected session-loop failure is now visible without exporting exception
+  type or text.
+
+- Document the exceptions each public client method can throw.
+
+- Publish advisory bucket boundaries, from 0.5 ms to 30 s, on the five duration
+  histograms for consumers that honor `InstrumentAdvice`.
+
+### Changed
+
+- Treat an inbound frame longer than `MaxFrameBytes` as transport loss instead
+  of a protocol fault. The session reconnects with the same identity and
+  in-flight requests complete with `Unknown`. Raise `MaxFrameBytes` or request
+  smaller results; retrying the same read disconnects the session again.
+
+- Finish graceful host shutdown in `ZkLink.Extensions.DependencyInjection` when
+  the session is not connected or the server does not acknowledge the close. The
+  host records the unacknowledged outcome as a trace warning and releases the
+  connection; session ephemerals may remain until the server expires the
+  session. Cancelling the stop token and other close failures still propagate.
+
+- Record `SessionExpired` (`-112`) as the terminal error code when the server
+  rejects the handshake of a resumed session. An initial handshake rejection
+  still reports no expiry.
+
+- Clear each inbound frame once its reply is handled, so znode data does not
+  remain in memory after the call completes.
+
+- Categorize a connection-attempt deadline as `Timeout` instead of
+  `Connection`, a TLS failure that raced that deadline as `Tls` instead of
+  `Cancelled`, and a reply carrying a server error code as `Server` instead of
+  `Other` in lifecycle and operation traces.
+
+- Describe the three `WatchRemoved` event kinds as reserved. The supported
+  ZooKeeper 3.8.7 and 3.9.6 servers do not send them; server-confirmed removal
+  is reported by `RemoveAsync`.
+
+- Validate core and DI packages against the published 1.2.0 baseline and record
+  the core API released through 1.2.0 in `PublicAPI.Shipped.txt`. The analyzer
+  release tracking now lists the rules shipped in 1.0.1 and 1.1.0.
+
+- Require each release tag to point to a commit contained in `main`.
+
+### Fixed
+
+- Point the install instructions at the published 1.2.0 packages and regenerate
+  the third-party notices from the tracked lock files.
+
+- Update the outstanding-request gauge as soon as an unsent close is frozen,
+  instead of at the next scheduler change.
+
+- Refresh stale documentation: the hosted evidence for the fault, expiry and
+  security matrices, command tables, navigation footers, the benchmark case
+  count and the reference index.
+
 ## [1.2.0] - 2026-11-20
 
 ### Added
