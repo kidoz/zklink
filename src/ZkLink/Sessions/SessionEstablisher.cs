@@ -62,9 +62,12 @@ internal sealed class SessionEstablisher(
             using var handshake = HandshakeCodec.Decode(response, options.Limits);
             if (!handshake.Accepted)
             {
+                // A resumed session the server no longer holds is confirmed expiry;
+                // an initial handshake carries no session to expire.
                 throw new ZooKeeperConnectionException(
                     ZooKeeperConnectionFailure.SessionRejected,
-                    transport.Endpoint
+                    transport.Endpoint,
+                    sessionId != 0 ? (int)ZooKeeperErrorCode.SessionExpired : null
                 );
             }
             negotiated = owner.AcceptHandshake(handshake);

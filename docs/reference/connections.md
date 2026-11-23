@@ -58,7 +58,9 @@ authentication and watch restoration are also terminal.
 The client accepts server-negotiated session timeouts from **100 milliseconds
 through 1 hour**, inclusive. A positive timeout outside this range triggers
 endpoint failover. A nonpositive timeout signals session rejection on initial
-connection or expiry during recovery.
+connection or expiry during recovery. During recovery the terminal state is
+`Expired` with error code `SessionExpired` (`-112`); an initial rejection claims
+no expiry.
 
 After the handshake is accepted, authentication and watch restoration use the
 negotiated inbound liveness timers. Valid replies refresh those timers, so a

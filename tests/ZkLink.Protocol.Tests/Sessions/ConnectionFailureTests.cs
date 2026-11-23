@@ -46,6 +46,8 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
             )
             .ConfigureAwait(true);
         Assert.Equal(ZooKeeperConnectionFailure.SessionRejected, error.Failure);
+        // An initial handshake has no owned session, so no expiry is claimed.
+        Assert.Null(error.ErrorCode);
         Assert.True(peer.IsDisposed);
         Assert.Equal(1, _fixture.Connector.Attempts.Reader.Count);
     }
@@ -100,6 +102,15 @@ public sealed class ConnectionFailureTests : IAsyncLifetime
         Assert.Equal(ZooKeeperSessionState.Expired, client.Session.State);
         Assert.Equal(1, client.Session.ConnectionGeneration);
         Assert.Equal(2, _fixture.Connector.Attempts.Reader.Count);
+        // A rejected resume carries no wire error; the driver records confirmed expiry.
+        Assert.Equal((int)ZooKeeperErrorCode.SessionExpired, client.Session.ErrorCode);
+        var error = await Assert
+            .ThrowsAsync<ZooKeeperSessionException>(() =>
+                client.WaitForConnectionAsync(TestContext.Current.CancellationToken)
+            )
+            .ConfigureAwait(true);
+        Assert.Equal(ZooKeeperSessionState.Expired, error.State);
+        Assert.Equal((int)ZooKeeperErrorCode.SessionExpired, error.ErrorCode);
     }
 
     [Fact(Timeout = 10000)]
