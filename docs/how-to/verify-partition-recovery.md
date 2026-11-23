@@ -104,7 +104,9 @@ managed diagnostic output.
 
 Local checks cover both directions and outcomes on both pinned versions with a macOS arm64
 client. CI selects partition cases independently from server-outage cases;
-remote execution remains unobserved. The fixture uses plaintext with the explicit
+the hosted job passed in
+[candidate run 44317716440](https://github.com/kidoz/zklink/actions/runs/44317716440).
+The fixture uses plaintext with the explicit
 development digest override.
 [Peer isolation](verify-peer-partition-recovery.md) has its own check.
 Broader network faults, secure connections under this fault and sustained load

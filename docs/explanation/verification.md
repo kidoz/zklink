@@ -107,15 +107,17 @@ the original four-second initial connection budget while another authenticated
 client repeatedly makes progress. Timing labels distinguish certificate loading,
 option capture, connection completion and disposal. Earlier intermittent timeouts
 remain unexplained; passing bounded rounds does not establish a root-cause fix or
-qualify sustained failure traffic. CI includes the command; remote results have
-not yet been observed.
+qualify sustained failure traffic. CI includes the command; the hosted job passed
+in [candidate run 44317716440](https://github.com/kidoz/zklink/actions/runs/44317716440).
 
 The runner removes its generated private stores separately from retained logs.
 macOS uses temporary platform key storage for imported test certificates; every
 handle is disposed. Revocation is disabled only for the private test CA, which
 has no revocation service. These results establish client TLS behavior on the
 observed macOS arm64 platform, without qualifying revocation, rotation, quorum
-TLS, SASL, Native AOT or other client operating systems. See
+TLS, SASL or other client operating systems. Native TLS/mTLS on the four
+advertised RIDs is recorded separately in
+[Current capabilities](../reference/current-capabilities.md). See
 [Verify secure connections](../how-to/verify-secure-connections.md).
 
 ## Telemetry listeners verify observable behavior

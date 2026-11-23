@@ -64,5 +64,8 @@ reported as a pass or as full production qualification.
 The [production evidence validator](../../dev/verify-release-evidence.py) retains
 its strict six-hour-per-version and repeated-measurement requirements for a full
 qualification report. See [release readiness](../reference/release-readiness.md)
-for the remaining qualification scope. DI-specific Native AOT and full cross-platform qualification remain separate;
-publication does not claim those unverified scopes.
+for the remaining qualification scope. The DI host is covered by the native
+candidate checks listed in
+[Current capabilities](../reference/current-capabilities.md); full
+cross-platform qualification remains separate, and publication does not claim
+unverified scopes.

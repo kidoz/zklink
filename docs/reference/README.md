@@ -28,5 +28,9 @@ Look up the repository's current code, tooling, and verification scope.
   and reconnect restoration.
 - [Supporting public types](public-types.md) — models, options, failure metadata,
   and watch-removal values currently defined in namespace `ZkLink`.
+- [Capability evidence through 1 November](capability-history.md) — chronological
+  observations retained before the current summary.
+- [Release qualification history](release-qualification-history.md) — publication
+  and qualification records for earlier releases.
 
 [Documentation home](../README.md)

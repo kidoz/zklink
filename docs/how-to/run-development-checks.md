@@ -14,6 +14,9 @@ dotnet test --project tests/ZkLink.Tests -c Release --no-build --no-restore
 dotnet test --project tests/ZkLink.Protocol.Tests -c Release --no-build --no-restore
 dotnet test --project tests/ZkLink.Extensions.DependencyInjection.Tests -c Release --no-build --no-restore
 dotnet test --project tests/ZkLink.Analyzers.Tests -c Release --no-build --no-restore
+dotnet test --project tests/ZkLink.FaultTests -c Release --no-build --no-restore --filter-trait Fixture=ProxyUnit
+dotnet test --project tests/ZkLink.IntegrationTests -c Release --no-build --no-restore --filter-class '*WatchReconnectProxyTests'
+dotnet test --project tests/ZkLink.FaultTests -c Release --no-build --no-restore --filter-trait Fixture=SoakUnit
 bash dev/test-analyzers-package.sh
 ```
 

@@ -73,7 +73,8 @@ Local checks passed on both versions with a macOS arm64 client. A deliberate
 test abort after stopping the follower additionally verified restoration and
 cleanup; that expected failure is recorded separately from passing checks.
 The [CI workflow](../../.github/workflows/build.yml) defines separate follower and
-leader fault jobs; remote execution remains unobserved.
+leader fault jobs; both passed in hosted
+[candidate run 44317716440](https://github.com/kidoz/zklink/actions/runs/44317716440).
 
 This check uses plaintext client connections with the explicit development
 digest override. Leader recovery is checked separately by `just zk-leader-faults`.

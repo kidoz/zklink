@@ -10,7 +10,7 @@ existing bounded scheduler. Sent requests are never replayed automatically.
 | `GetAllChildrenNumberAsync(path)` | `int` count of all descendants, excluding the queried node |
 | `WhoAmIAsync()` | `IReadOnlyList<ZooKeeperClientIdentity>` of server-reported identities, with getter-only `Scheme` and `User` |
 
-Exact nullable signatures are in the [API baseline](../../src/ZkLink/PublicAPI.Unshipped.txt).
+Exact nullable signatures are in the [API baseline](../../src/ZkLink/PublicAPI.Shipped.txt).
 
 ## Ephemeral queries and chroot
 

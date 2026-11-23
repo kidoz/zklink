@@ -6,7 +6,7 @@ authenticate, sync a path and close with acknowledgment, use node/ACL operations
 and typed transactions, and
 query session ephemerals, descendant counts and authenticated identities.
 One-shot watched reads and persistent/recursive subscriptions with reconnect
-gap reporting are available. Core 0.1.0 is published; see
+gap reporting are available. Core, DI and analyzers are published at 1.2.0; see
 [Production release readiness](reference/release-readiness.md) for the remaining
 requirements before a production-qualified release.
 

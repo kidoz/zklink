@@ -86,8 +86,8 @@ abort also verifies rollback without counting as a passing recovery case.
 The printed artifact directory retains per-version and per-outage selection,
 versions, configuration, initial/final roles, test timelines, server logs and
 cleanup results. Credentials, paths, session passwords and payloads are excluded
-from managed test output. CI includes a separate quorum job; remote execution
-requires its own observed evidence.
+from managed test output. CI includes a separate quorum job; it passed in hosted
+[candidate run 44317716440](https://github.com/kidoz/zklink/actions/runs/44317716440).
 
 The fixture uses plaintext with the development digest override.
 [One-way client-traffic loss](verify-partition-recovery.md) and

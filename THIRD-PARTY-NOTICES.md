@@ -1,11 +1,27 @@
 # Third-party dependency inventory
 
-Snapshot: 2026-10-28. The core library has **no third-party runtime dependencies**. No source from another driver was copied. The project is [MIT-licensed](LICENSE); package publication remains pending, and this inventory does not relicense upstream material.
+Snapshot: 2026-11-23, generated from the twelve tracked `packages.lock.json` files. The core library has **no third-party runtime dependencies**. No source from another driver was copied. The project is [MIT-licensed](LICENSE); `ZkLink`, `ZkLink.Extensions.DependencyInjection` and `ZkLink.Analyzers` are published on NuGet.org, and this inventory does not relicense upstream material.
 
-The resolved dependency graphs and integrity hashes are in the project `packages.lock.json` files. License expressions below were read from the restored NuGet package manifests. NuGet packages retain their upstream license/notice files in the package cache; they are not redistributed by this source change.
+The resolved dependency graphs and integrity hashes are in the project `packages.lock.json` files. License expressions below were read from the restored NuGet package manifests. NuGet packages retain their upstream license/notice files in the package cache; they are not redistributed inside the ZkLink packages.
 
 | Dependency | Pinned version | Scope | License |
 | --- | --- | --- | --- |
+| Microsoft.CodeAnalysis.PublicApiAnalyzers | 5.6.0 | Build analyzer for core and dependency injection; private assets | MIT |
+| Microsoft.NET.ILLink.Tasks | 10.0.15 | SDK-selected trim/AOT build analysis for core and dependency injection; private assets | MIT |
+| Microsoft.Extensions.DependencyInjection.Abstractions, Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions, Microsoft.Extensions.Hosting.Abstractions | 10.0.14 | Direct dependencies of the published dependency-injection package | MIT |
+| Microsoft.Extensions.Configuration.Abstractions, Diagnostics.Abstractions, FileProviders.Abstractions, Logging.Abstractions, Options, Primitives | 10.0.14 | Transitive dependencies of the dependency-injection package | MIT |
+| Microsoft.Extensions.Hosting | 10.0.14 | Dependency-injection tests only | MIT |
+| Microsoft.Extensions.Configuration, Configuration.Binder, Configuration.CommandLine, Configuration.EnvironmentVariables, Configuration.FileExtensions, Configuration.Json, Configuration.UserSecrets, DependencyInjection, Diagnostics, FileProviders.Physical, FileSystemGlobbing, Logging, Logging.Configuration, Logging.Console, Logging.Debug, Logging.EventLog, Logging.EventSource, Options.ConfigurationExtensions, System.Diagnostics.EventLog | 10.0.14 | Transitive dependency-injection tests only | MIT |
+| Microsoft.CodeAnalysis.Analyzers, Microsoft.CodeAnalysis.CSharp | 5.9.0 | Analyzer build and tests; private assets | MIT |
+| Microsoft.CodeAnalysis.Common | 5.9.0 | Transitive analyzer build and tests | MIT |
+| Microsoft.CodeAnalysis.Analyzers | 5.9.0-1.26328.17 | Central transitive version for analyzer tests | MIT |
+| NETStandard.Library | 2.0.3 | Analyzer target build only | MIT |
+| Microsoft.NETCore.Platforms | 1.1.0 | Transitive analyzer target build only | MIT |
+| System.Buffers, System.Numerics.Vectors | 4.6.1 | Transitive analyzer build | MIT |
+| System.Memory, System.Threading.Tasks.Extensions | 4.6.3 | Transitive analyzer build | MIT |
+| System.Collections.Immutable, System.Reflection.Metadata | 10.0.1 | Transitive analyzer build | MIT |
+| System.Runtime.CompilerServices.Unsafe | 6.1.2 | Transitive analyzer build | MIT |
+| System.Text.Encoding.CodePages | 8.0.0 | Transitive analyzer build | MIT |
 | BenchmarkDotNet, BenchmarkDotNet.Annotations | 0.15.8 | Benchmark executable only | MIT |
 | CommandLineParser | 2.9.1 | Transitive benchmark tooling | MIT |
 | Gee.External.Capstone | 2.3.0 | Transitive benchmark tooling | MIT |
@@ -22,28 +38,14 @@ The resolved dependency graphs and integrity hashes are in the project `packages
 | System.CodeDom, System.Management | 9.0.5 | Transitive benchmark tooling | MIT |
 | System.Reflection.TypeExtensions | 4.7.0 | Transitive benchmark tooling | MIT |
 | CSharpier | 1.3.0 | Local formatting tool | MIT |
-| Microsoft.CodeAnalysis.PublicApiAnalyzers | 5.6.0 | Build analyzer only; private assets | MIT |
-| Microsoft.NET.ILLink.Tasks | 10.0.14 | SDK-selected trim/AOT build analysis; private assets | MIT |
-| Microsoft.DotNet.ILCompiler, runtime-specific compiler and Microsoft.NETCore.App.Runtime.NativeAOT packs | 10.0.14 | Native test consumers and their SDK-selected compiler/runtime only | MIT; upstream third-party notices retained with native artifacts |
-| Microsoft.CodeAnalysis.Analyzers, Microsoft.CodeAnalysis.CSharp | 5.9.0 | ZkLink analyzer build/tests; private assets | MIT |
-| Microsoft.CodeAnalysis.Common | 5.9.0 | Transitive analyzer build/tests | MIT |
-| NETStandard.Library | 2.0.3 | Analyzer target build only | MIT |
-| Microsoft.NETCore.Platforms | 1.1.0 | Transitive analyzer target build only | MIT |
-| System.Buffers, System.Numerics.Vectors | 4.6.1 | Transitive analyzer build/tests | MIT |
-| System.Memory, System.Threading.Tasks.Extensions | 4.6.3 | Transitive analyzer build/tests | MIT |
-| System.Collections.Immutable, System.Reflection.Metadata | 10.0.1 | Transitive analyzer build/tests | MIT |
-| System.Runtime.CompilerServices.Unsafe | 6.1.2 | Transitive analyzer build/tests | MIT |
-| System.Text.Encoding.CodePages | 8.0.0 | Transitive analyzer build/tests | MIT |
-| Microsoft.Extensions.DependencyInjection.Abstractions | 10.0.14 | Dependency-injection integration only | MIT |
-| Microsoft.Extensions.Hosting.Abstractions | 10.0.14 | Dependency-injection integration only | MIT |
-| Microsoft.Extensions.Hosting | 10.0.14 | Dependency-injection tests only | MIT |
-| Microsoft.Extensions.Configuration.Abstractions, Diagnostics.Abstractions, FileProviders.Abstractions, Logging.Abstractions, Options, Primitives | 10.0.14 | Transitive dependency-injection integration | MIT |
-| Other Microsoft.Extensions hosting/configuration/logging packages, System.Diagnostics.DiagnosticSource, System.Diagnostics.EventLog, System.Text.Json | 10.0.14 | Transitive dependency-injection tests only | MIT |
+| Microsoft.DotNet.ILCompiler, runtime-specific compiler and Microsoft.NETCore.App.Runtime.NativeAOT packs | Selected by the pinned SDK at publish time; no tracked lock file | Native test consumers and their SDK-selected compiler/runtime only | MIT; upstream third-party notices retained with native artifacts |
 | NSubstitute | 6.2.0 | Test only | BSD-3-Clause |
 | Castle.Core | 5.1.1 | Transitive test only | Apache-2.0 |
 | xunit.v3.mtp-v2, xunit.v3.assert, xunit.v3.common, xunit.v3.core.mtp-v2, xunit.v3.extensibility.core, xunit.v3.runner.common, xunit.v3.runner.inproc.console | 4.0.2 | Test only | Apache-2.0 |
 | xunit.analyzers | 2.2.0 | Test analyzer | Apache-2.0 |
 | Microsoft.Testing.Platform, Microsoft.Testing.Platform.MSBuild, Microsoft.Testing.Extensions.Telemetry, Microsoft.Testing.Extensions.TrxReport.Abstractions | 2.5.1 | Transitive test only | MIT |
+| Microsoft.Testing.Extensions.CodeCoverage | 18.12.0 | Protocol test coverage only | MIT |
+| Microsoft.DiaSymReader, Mono.Cecil, Microsoft.Extensions.DependencyModel | 2.2.10, 0.11.6, 10.0.10 | Transitive protocol test coverage tooling only | MIT |
 | Microsoft.ApplicationInsights | 2.23.0 | Transitive test only | MIT |
 | Microsoft.Bcl.AsyncInterfaces, System.Diagnostics.EventLog | 6.0.0 | Transitive test only | MIT |
 | Microsoft.Win32.Registry | 5.0.0 | Transitive test only | MIT |

@@ -67,8 +67,9 @@ Local checks cover both pinned versions with a macOS arm64 client.
 [Quorum loss](verify-quorum-recovery.md),
 [one-way client-traffic loss](verify-partition-recovery.md) and
 [peer isolation](verify-peer-partition-recovery.md) have separate commands.
-Remote CI, other network faults, forced expiry,
-observer endpoints, secure outages and sustained load require separate evidence. The fixture uses plaintext
+The leader, quorum, partition, peer, expiry and observer jobs passed in hosted
+[candidate run 44317716440](https://github.com/kidoz/zklink/actions/runs/44317716440).
+Other network faults, secure outages and sustained load require separate evidence. The fixture uses plaintext
 with the explicit development digest override. A valid session is preserved in
 this bounded test; it does not promise indefinite preservation during an outage.
 

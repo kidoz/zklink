@@ -20,8 +20,7 @@ python dev/prepare-core-package.py
 
 The command builds a uniquely versioned `<VersionPrefix>-local.*` candidate and companion
 symbol package under `artifacts/packages/run.*/feed/`. It never publishes them.
-Missing prerequisites and failed checks return a nonzero exit code. To inspect a
-specific release candidate, use `python dev/prepare-core-package.py 0.1.0`. A plain
+Missing prerequisites and failed checks return a nonzero exit code. A plain
 `dotnet pack src/ZkLink -c Release` uses the core project's version and omits the
 consumer checks.
 
@@ -30,11 +29,11 @@ documentation, package README, MIT license and third-party notices. Unexpected
 assets and runtime package dependencies are rejected. Assembly references must
 belong to the installed .NET runtime. SDK package validation and the existing
 public API analyzer run during the build. The SDK also compares the package
-against published **0.1.0**, including public parameter names and attributes.
+against the published **1.2.0** baseline, including public parameter names and attributes.
 The validator excludes the compiler-generated async iterator attribute because
 it names a private state machine. Public method signatures are still checked.
-Compatible API additions are allowed. The core's shipped declaration baseline
-still records the initial 0.1.0 release.
+Compatible API additions are allowed. The [shipped declarations](../../src/ZkLink/PublicAPI.Shipped.txt)
+record the core API released through 1.2.0.
 
 The build uses a fresh package cache and the public NuGet feed for the released
 baseline. This is a build-time download; it adds no runtime package dependency.
@@ -43,10 +42,8 @@ candidate bytes, then checks that altered copies with a removed member or rename
 parameter are rejected. Local candidate versions preserve the project's numeric
 version prefix so their assembly version can pass the released baseline check.
 
-The current review found the same 401 public declaration entries as 0.1.0, with
-no additions or removals. The intentional TLS download-timeout and cancellation
-changes are described in the [connection reference](../reference/connections.md).
-API comparison does not establish behavioral compatibility or release readiness.
+Behavioral compatibility and release readiness require separate checks. The
+[connection reference](../reference/connections.md) describes runtime behavior.
 See Microsoft's [baseline validator](https://learn.microsoft.com/dotnet/fundamentals/apicompat/package-validation/baseline-version-validator)
 and [parameter-name and attribute rules](https://learn.microsoft.com/dotnet/core/project-sdk/msbuild-props#package-validation-properties).
 
@@ -79,8 +76,8 @@ just package-check
 ```
 
 This command first runs the same package inspection, then starts its live
-fixtures. `bash dev/test-core-package.sh 0.1.0` verifies a specific release
-candidate. The release workflow publishes the exact package and symbols that
+fixtures. To verify a release candidate, pass its version to
+`dev/test-core-package.sh`. The release workflow publishes the exact package and symbols that
 this complete command verifies. Failed fixture cleanup returns a nonzero exit
 code.
 

@@ -25,7 +25,7 @@ every lifecycle command. To use 3.8.7, replace `3.9.6` with `3.8.7` throughout.
 
 The ports bind to loopback and use plaintext. TLS/mTLS fixtures are available separately through
 [Verify secure connections](verify-secure-connections.md); authentication-required
-server fixtures remain open. Image pins and environment variables are listed in
+fixtures have their own check in `just zk-authentication`. Image pins and environment variables are listed in
 the [development reference](../reference/development.md#zookeeper-fixture-settings).
 
 ## Preserve logs and remove the fixture

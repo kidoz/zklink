@@ -2,8 +2,10 @@
 
 The connection methods on `ZooKeeperClient` are `ConnectAsync`, `Session`,
 `SubscribeStateChanges`, `WaitForConnectionAsync`, `UpdateEndpointsAsync`,
-`SyncAsync`, `CloseAsync` and `DisposeAsync`. Network methods return `Task` and
-accept a final `CancellationToken`. Exact declarations are in the
+`SyncAsync`, `CloseAsync` and `DisposeAsync`. Network methods are asynchronous:
+`DisposeAsync` returns `ValueTask` and `UpdateEndpointsAsync` completes
+synchronously, while the others return `Task` and accept a final
+`CancellationToken`. Exact declarations are in the
 [shipped declarations](../../src/ZkLink/PublicAPI.Shipped.txt) and
 [additional declarations](../../src/ZkLink/PublicAPI.Unshipped.txt).
 
@@ -98,8 +100,9 @@ stores depend on the platform. Local loopback evidence currently covers macOS
 arm64 with ephemeral roots and revocation disabled for those test certificates;
 the dedicated live matrix additionally verifies client TLS/mTLS, certificate
 rejection, digest/X.509 ACL distinctions and secure reconnect on both pinned
-versions. Other client platforms, deployment revocation services, production PKI rotation and quorum TLS
-remain unqualified. See [Verify secure connections](../how-to/verify-secure-connections.md).
+versions. Native TLS/mTLS checks on the four advertised RIDs are recorded in
+[Current capabilities](current-capabilities.md). Deployment revocation services,
+production PKI rotation and quorum TLS remain unqualified. See [Verify secure connections](../how-to/verify-secure-connections.md).
 
 `ZooKeeperAuthentication.Digest(user, password)` owns UTF-8 `user:password` bytes,
 rejects colons in the username and limits the encoded credential to 1,000,000
@@ -222,8 +225,6 @@ The driver preserves a server `NotEmpty` response as `Rejected`, without an
 automatic delete retry. See Apache's
 [consistency guarantees](https://zookeeper.apache.org/doc/r3.9.6/zookeeperInternals.html).
 
-[Reference](README.md) · [Documentation home](../README.md)
-
 ### Rotating TLS credentials
 
 Use `ZooKeeperTlsOptions.RequiredWithProvider` to select a client certificate
@@ -244,3 +245,5 @@ platform provides them. For `TlsFailureReason.ProviderFailed`, inspect
 a canceled wait, or a previous invocation still running. Request exception messages include the operation,
 outcome and available server code. Paths and endpoints remain available as
 explicit properties.
+
+[Reference](README.md) · [Documentation home](../README.md)

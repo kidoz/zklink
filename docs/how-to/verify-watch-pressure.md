@@ -87,8 +87,8 @@ The fixture uses plaintext with the explicit development digest override.
 
 Local checks cover both versions with a macOS arm64 client. The
 [CI workflow](../../.github/workflows/build.yml) selects pressure tests separately
-from operation, server-outage and network-partition cases; remote execution
-remains unobserved. These bounded rounds establish resource-counter and capacity
+from operation, server-outage and network-partition cases; the hosted job passed
+in [candidate run 44317716440](https://github.com/kidoz/zklink/actions/runs/44317716440). These bounded rounds establish resource-counter and capacity
 behavior. Long-running soak, retained heap/RSS, thread/socket growth, secure
 pressure tests and broader load qualification require separate evidence.
 

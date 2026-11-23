@@ -79,8 +79,10 @@ The plaintext port is solely a no-downgrade negative control. The expired server
 uses internal plaintext readiness so certificate rejection is distinguishable
 from a stopped server. Quorum traffic between containers is plaintext: this
 fixture verifies client TLS, without qualifying quorum TLS, revocation services,
-certificate rotation, SASL, Native AOT or production security. Remote CI and
-other client operating systems require their own observed results.
+certificate rotation, SASL or production security. The live TLS/mTLS job passed
+on Linux in [candidate run 44317716440](https://github.com/kidoz/zklink/actions/runs/44317716440);
+native TLS/mTLS on the four advertised RIDs is recorded in
+[Current capabilities](../reference/current-capabilities.md).
 
 ## Required authentication policies
 
@@ -195,7 +197,7 @@ See the [connection reference](../reference/connections.md) and
 [verification explanation](../explanation/verification.md) for client policy and
 what these checks establish.
 
-[How-to guides](README.md) · [Documentation home](../README.md)
-
 For local rotation verification, run the protocol test
 `ReconnectRotatesBothCertificateAndRootWhileResumingTheSession`. Its two TLS handshakes require distinct client certificates and trust roots and verify the resumed session ID.
+
+[How-to guides](README.md) · [Documentation home](../README.md)

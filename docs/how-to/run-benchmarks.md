@@ -7,7 +7,7 @@ server-free measurements.
 just bench
 ```
 
-The default runs all twenty cases with BenchmarkDotNet's `Short` job. Choose a
+The default runs all twenty-two cases with BenchmarkDotNet's `Short` job. Choose a
 filter or a longer measurement job with its console arguments:
 
 ```sh

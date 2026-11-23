@@ -1,9 +1,10 @@
 # Current capabilities
 
-Reviewed against repository records and the public NuGet feed on **18 November
-2026**. The documented public release is **1.1.1** for `ZkLink`,
-`ZkLink.Extensions.DependencyInjection` and `ZkLink.Analyzers`. See the
-[changelog](../../CHANGELOG.md) for changes and [production release
+Reviewed against repository records and the public NuGet feed on **23 November
+2026**. The latest public release is **1.2.0** for `ZkLink`,
+`ZkLink.Extensions.DependencyInjection` and `ZkLink.Analyzers`. The run links on
+this page record the 1.1.1 candidate; the changes since then are in the
+[changelog](../../CHANGELOG.md). See [production release
 readiness](release-readiness.md) for open qualification requirements. No full
 production qualification is claimed.
 

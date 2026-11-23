@@ -89,8 +89,9 @@ fixture. Earlier follower probes exercised both cleanup paths as well. These
 expected failures are recorded separately from passing cases.
 
 The [CI workflow](../../.github/workflows/build.yml) selects this command separately
-from server stops and one-way client-frame loss. Remote execution remains
-unobserved. Asymmetric peer traffic loss, simultaneous network faults, host firewall faults,
+from server stops and one-way client-frame loss. The hosted job passed in
+[candidate run 44317716440](https://github.com/kidoz/zklink/actions/runs/44317716440).
+Asymmetric peer traffic loss, simultaneous network faults, host firewall faults,
 observers, quorum TLS and sustained load require separate evidence.
 
 [How-to guides](README.md) · [Documentation home](../README.md)

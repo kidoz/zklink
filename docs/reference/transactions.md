@@ -106,8 +106,10 @@ Controlled peers cover input capture, size rejection, outer/member errors,
 cancellation and malformed placeholders. The Gradle-managed Apache oracle checks
 the existing multi wire fixtures in both directions. Run `just zk-operations-matrix`
 for live checks and the sample on all six nodes. These are plaintext tests;
-broader fault, secure-server, Native AOT and release qualification remain open.
-
-[Reference](README.md) · [Documentation home](../README.md)
+secure-server transactions are covered by `just zk-security-matrix`. Broader
+fault and release qualification remain open; native evidence for the four
+advertised RIDs is recorded in [Current capabilities](current-capabilities.md).
 
 The write `Create` and `SetData` factories accept `byte[]?` as well as `ReadOnlyMemory<byte>?`, preserving null array variables separately from empty arrays. These descriptors borrow data until `MultiAsync` returns its Task; the array overloads do not copy before batch admission.
+
+[Reference](README.md) · [Documentation home](../README.md)

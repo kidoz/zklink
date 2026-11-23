@@ -11,7 +11,7 @@
 | Dependency versions | Central versions and per-project lock files | [Directory.Packages.props](../../Directory.Packages.props) |
 | Test runner | Microsoft.Testing.Platform | [global.json](../../global.json) |
 | Test stack | xUnit v3 and NSubstitute | [Directory.Packages.props](../../Directory.Packages.props) |
-| Packaging | `IsPackable=false`; no released package | [Directory.Build.props](../../Directory.Build.props) |
+| Packaging | `IsPackable=false` by default; the three libraries under `src/` are packable and published at 1.2.0 | [Directory.Build.props](../../Directory.Build.props) |
 
 ### Dependency updates
 
@@ -57,6 +57,8 @@ notation; omit the brackets when invoking a command.
 | `just zk-leader-faults` | Verify leader stop, replacement election, session/watch recovery and rollback on both versions; requires Docker, pinned .NET and Python 3 |
 | `just zk-follower-faults` | Verify a real follower outage, same-session/watch recovery and rollback on both versions; requires Docker, pinned .NET and Python 3 |
 | `just zk-security-matrix` | Verify client TLS/mTLS, rejection and secure recovery on both versions; requires Docker, .NET, OpenSSL and Python 3 |
+| `just zk-authentication` | Verify required digest authentication and explicit unsupported-SASL failure on both versions; requires Docker, .NET, Bash and OpenSSL |
+| `just zk-session-expiry` | Verify server-confirmed expiry, terminal watches and no session replacement or replay on both versions; requires Docker, pinned .NET, JDK and Python 3 |
 | `just zk-ttl-matrix` | Verify single/atomic TTL creates with enabled and disabled servers on both versions |
 | `just zk-operations-matrix` | Run live node/ACL/transaction/auxiliary/watch tests and examples on both versions; requires Docker, .NET, Bash and OpenSSL |
 | `just zk-driver-matrix` | Run the fixture matrix plus managed session/auth/sync/close on each node; requires .NET and OpenSSL |

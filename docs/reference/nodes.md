@@ -105,8 +105,8 @@ cleanup. For session ephemerals, descendant counts and identities, see
 verifies selected node/ACL/transaction operations over client TLS/mTLS on both
 versions. Broader fault qualification remains open.
 
-[Reference](README.md) · [Documentation home](../README.md)
-
 ## Array data
 
 `CreateAsync` and `SetDataAsync` accept both `byte[]?` and `ReadOnlyMemory<byte>?`. A null byte-array variable writes null data; an empty array writes zero bytes. Arrays and memory are captured before the method returns its Task, including calls that omit the optional cancellation token. `ZNodeData` constructors preserve the same distinction.
+
+[Reference](README.md) · [Documentation home](../README.md)
