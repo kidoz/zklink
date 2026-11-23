@@ -9,6 +9,8 @@ broader security, Native AOT or production qualification. See
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-24
+
 ### Added
 
 - Count inbound frames whose declared length exceeds `MaxFrameBytes` in the
