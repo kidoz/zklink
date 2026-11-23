@@ -14,7 +14,7 @@ on:
         description: Published NuGet version to verify (empty builds source candidates)
         required: false
         type: string
-        default: '1.0.3'
+        default: '1.2.0'
   workflow_call:
     inputs:
       published_version:

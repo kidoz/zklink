@@ -20,10 +20,10 @@ No code fixes or automatic retries are supplied. Credential storage, watch owner
 
 ## Use from this source checkout
 
-Install the analyzer package for a consuming project with:
+Install the latest stable analyzer package for a consuming project with:
 
 ```xml
-<PackageReference Include="ZkLink.Analyzers" Version="1.1.1" PrivateAssets="all" />
+<PackageReference Include="ZkLink.Analyzers" PrivateAssets="all" />
 ```
 
 Reference the analyzer without loading it as a runtime library:

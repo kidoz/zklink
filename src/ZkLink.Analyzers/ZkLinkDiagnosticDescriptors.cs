@@ -70,6 +70,7 @@ internal static class ZkLinkDiagnosticDescriptors
         "Retain and dispose the subscription returned by SubscribeStateChanges",
         "Usage",
         DiagnosticSeverity.Warning,
-        isEnabledByDefault: true
+        isEnabledByDefault: true,
+        description: "A state subscription owns a bounded queue of session transitions. Discarding it loses ordered state delivery and leaves the slot occupied until it is read."
     );
 }
