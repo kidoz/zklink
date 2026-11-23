@@ -33,6 +33,7 @@ public sealed class ZooKeeperTlsOptions
     }
 
     /// <summary>Requires platform chain/name validation; supplied certificates remain application-owned.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">The revocation mode is undefined or more than 256 trust roots were supplied.</exception>
     public static ZooKeeperTlsOptions Required(
         X509RevocationMode revocationMode = X509RevocationMode.Online,
         X509Certificate2? clientCertificate = null,
@@ -43,6 +44,7 @@ public sealed class ZooKeeperTlsOptions
     /// <summary>Requires TLS and fetches a fresh credential snapshot for each endpoint attempt.</summary>
     /// <remarks>Honor the attempt cancellation token. Only one callback can run per client.
     /// A callback that never completes prevents credential reload until a new client is created.</remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="credentialsProvider"/> is null.</exception>
     public static ZooKeeperTlsOptions RequiredWithProvider(
         Func<CancellationToken, ValueTask<ZooKeeperTlsCredentials>> credentialsProvider,
         X509RevocationMode revocationMode = X509RevocationMode.Online,

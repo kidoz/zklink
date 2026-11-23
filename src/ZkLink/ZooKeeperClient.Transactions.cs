@@ -6,6 +6,11 @@ public sealed partial class ZooKeeperClient
 {
     /// <summary>Executes a nonempty atomic write transaction, returning typed results in input order.</summary>
     /// <remarks>Captures inputs before returning. Rejected transactions commit no members; sent transactions are never replayed.</remarks>
+    /// <exception cref="ArgumentException">An argument is invalid, for example a relative path.</exception>
+    /// <exception cref="System.IO.InvalidDataException">The encoded request exceeds a configured data, collection or frame limit; nothing was sent.</exception>
+    /// <exception cref="ZooKeeperException">The request was not sent, was rejected by the server or has an unknown outcome; <see cref="ZooKeeperException.Outcome"/> says which. Local capacity, deadline and protocol failures use the derived types.</exception>
+    /// <exception cref="ZooKeeperOperationCanceledException">The caller canceled the wait. The request outcome is preserved.</exception>
+    /// <exception cref="ZooKeeperMultiException">The server definitively rejected the transaction; no member was committed. Member diagnostics are attached.</exception>
     public Task<IReadOnlyList<ZooKeeperWriteResult>> MultiAsync(
         IReadOnlyList<ZooKeeperWriteOperation> operations,
         CancellationToken cancellationToken = default
@@ -27,6 +32,10 @@ public sealed partial class ZooKeeperClient
 
     /// <summary>Executes a nonempty read batch, returning a typed result or error for every input member.</summary>
     /// <remarks>Read results do not form an atomic snapshot. Child results have names only, without parent Stat.</remarks>
+    /// <exception cref="ArgumentException">An argument is invalid, for example a relative path.</exception>
+    /// <exception cref="System.IO.InvalidDataException">The encoded request exceeds a configured data, collection or frame limit; nothing was sent.</exception>
+    /// <exception cref="ZooKeeperException">The request was not sent, was rejected by the server or has an unknown outcome; <see cref="ZooKeeperException.Outcome"/> says which. Local capacity, deadline and protocol failures use the derived types.</exception>
+    /// <exception cref="ZooKeeperOperationCanceledException">The caller canceled the wait. The request outcome is preserved.</exception>
     public Task<IReadOnlyList<ZooKeeperReadResult>> MultiReadAsync(
         IReadOnlyList<ZooKeeperReadOperation> operations,
         CancellationToken cancellationToken = default

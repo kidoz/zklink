@@ -9,6 +9,8 @@ public sealed class CreateOptions
     public const long MaxTtlMilliseconds = (1L << 40) - 1;
 
     /// <summary>Snapshots ACLs and validates TTL without admitting a network operation.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">The create mode or TTL is outside its supported range.</exception>
+    /// <exception cref="ArgumentException">TTL is missing for a TTL mode or supplied for another mode, or an ACL entry is null.</exception>
     public CreateOptions(
         IReadOnlyList<ZooKeeperAcl> acl,
         CreateMode mode = CreateMode.Persistent,

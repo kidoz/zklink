@@ -5,6 +5,10 @@ namespace ZkLink;
 public sealed partial class ZooKeeperClient
 {
     /// <summary>Reads stat without a watch, returning null only when the node does not exist.</summary>
+    /// <exception cref="ArgumentException">An argument is invalid, for example a relative path.</exception>
+    /// <exception cref="System.IO.InvalidDataException">The encoded request exceeds a configured data, collection or frame limit; nothing was sent.</exception>
+    /// <exception cref="ZooKeeperException">The request was not sent, was rejected by the server or has an unknown outcome; <see cref="ZooKeeperException.Outcome"/> says which. Local capacity, deadline and protocol failures use the derived types.</exception>
+    /// <exception cref="ZooKeeperOperationCanceledException">The caller canceled the wait. The request outcome is preserved.</exception>
     public Task<ZNodeStat?> ExistsAsync(
         string path,
         CancellationToken cancellationToken = default
@@ -19,6 +23,10 @@ public sealed partial class ZooKeeperClient
         );
 
     /// <summary>Reads an owned nullable data snapshot and stat without a watch.</summary>
+    /// <exception cref="ArgumentException">An argument is invalid, for example a relative path.</exception>
+    /// <exception cref="System.IO.InvalidDataException">The encoded request exceeds a configured data, collection or frame limit; nothing was sent.</exception>
+    /// <exception cref="ZooKeeperException">The request was not sent, was rejected by the server or has an unknown outcome; <see cref="ZooKeeperException.Outcome"/> says which. Local capacity, deadline and protocol failures use the derived types.</exception>
+    /// <exception cref="ZooKeeperOperationCanceledException">The caller canceled the wait. The request outcome is preserved.</exception>
     public Task<ZNodeData> GetDataAsync(
         string path,
         CancellationToken cancellationToken = default
@@ -33,6 +41,10 @@ public sealed partial class ZooKeeperClient
         );
 
     /// <summary>Reads child names and parent stat without a watch; child order is unspecified.</summary>
+    /// <exception cref="ArgumentException">An argument is invalid, for example a relative path.</exception>
+    /// <exception cref="System.IO.InvalidDataException">The encoded request exceeds a configured data, collection or frame limit; nothing was sent.</exception>
+    /// <exception cref="ZooKeeperException">The request was not sent, was rejected by the server or has an unknown outcome; <see cref="ZooKeeperException.Outcome"/> says which. Local capacity, deadline and protocol failures use the derived types.</exception>
+    /// <exception cref="ZooKeeperOperationCanceledException">The caller canceled the wait. The request outcome is preserved.</exception>
     public Task<ZNodeChildren> GetChildrenAsync(
         string path,
         CancellationToken cancellationToken = default
@@ -48,6 +60,11 @@ public sealed partial class ZooKeeperClient
 
     /// <summary>Creates one node with explicit ACLs and returns the actual client-relative path and stat.</summary>
     /// <remarks>Parents are not created implicitly. TTL modes require EnableTtlNodes and server extended node types.</remarks>
+    /// <exception cref="ArgumentException">An argument is invalid, for example a relative path.</exception>
+    /// <exception cref="System.IO.InvalidDataException">The encoded request exceeds a configured data, collection or frame limit; nothing was sent.</exception>
+    /// <exception cref="ZooKeeperException">The request was not sent, was rejected by the server or has an unknown outcome; <see cref="ZooKeeperException.Outcome"/> says which. Local capacity, deadline and protocol failures use the derived types.</exception>
+    /// <exception cref="ZooKeeperOperationCanceledException">The caller canceled the wait. The request outcome is preserved.</exception>
+    /// <exception cref="NotSupportedException">A TTL mode was requested without <c>EnableTtlNodes</c>.</exception>
     public Task<CreateResult> CreateAsync(
         string path,
         ReadOnlyMemory<byte>? data,
@@ -63,6 +80,11 @@ public sealed partial class ZooKeeperClient
     }
 
     /// <summary>Creates one node, preserving null arrays separately from empty arrays.</summary>
+    /// <exception cref="ArgumentException">An argument is invalid, for example a relative path.</exception>
+    /// <exception cref="System.IO.InvalidDataException">The encoded request exceeds a configured data, collection or frame limit; nothing was sent.</exception>
+    /// <exception cref="ZooKeeperException">The request was not sent, was rejected by the server or has an unknown outcome; <see cref="ZooKeeperException.Outcome"/> says which. Local capacity, deadline and protocol failures use the derived types.</exception>
+    /// <exception cref="ZooKeeperOperationCanceledException">The caller canceled the wait. The request outcome is preserved.</exception>
+    /// <exception cref="NotSupportedException">A TTL mode was requested without <c>EnableTtlNodes</c>.</exception>
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "ApiDesign",
         "RS0026",
@@ -111,6 +133,10 @@ public sealed partial class ZooKeeperClient
     }
 
     /// <summary>Writes an owned snapshot of data under a data-version condition and returns the updated stat.</summary>
+    /// <exception cref="ArgumentException">An argument is invalid, for example a relative path.</exception>
+    /// <exception cref="System.IO.InvalidDataException">The encoded request exceeds a configured data, collection or frame limit; nothing was sent.</exception>
+    /// <exception cref="ZooKeeperException">The request was not sent, was rejected by the server or has an unknown outcome; <see cref="ZooKeeperException.Outcome"/> says which. Local capacity, deadline and protocol failures use the derived types.</exception>
+    /// <exception cref="ZooKeeperOperationCanceledException">The caller canceled the wait. The request outcome is preserved.</exception>
     public Task<ZNodeStat> SetDataAsync(
         string path,
         ReadOnlyMemory<byte>? data,
@@ -127,6 +153,10 @@ public sealed partial class ZooKeeperClient
         );
 
     /// <summary>Writes an owned array snapshot, preserving null arrays separately from empty arrays.</summary>
+    /// <exception cref="ArgumentException">An argument is invalid, for example a relative path.</exception>
+    /// <exception cref="System.IO.InvalidDataException">The encoded request exceeds a configured data, collection or frame limit; nothing was sent.</exception>
+    /// <exception cref="ZooKeeperException">The request was not sent, was rejected by the server or has an unknown outcome; <see cref="ZooKeeperException.Outcome"/> says which. Local capacity, deadline and protocol failures use the derived types.</exception>
+    /// <exception cref="ZooKeeperOperationCanceledException">The caller canceled the wait. The request outcome is preserved.</exception>
     [System.Diagnostics.CodeAnalysis.SuppressMessage(
         "ApiDesign",
         "RS0026",
@@ -140,6 +170,10 @@ public sealed partial class ZooKeeperClient
     ) => SetDataAsync(path, Snapshot.AsNullableMemory(data), version, cancellationToken);
 
     /// <summary>Deletes one node under a data-version condition; nonempty nodes are rejected by the server.</summary>
+    /// <exception cref="ArgumentException">An argument is invalid, for example a relative path.</exception>
+    /// <exception cref="System.IO.InvalidDataException">The encoded request exceeds a configured data, collection or frame limit; nothing was sent.</exception>
+    /// <exception cref="ZooKeeperException">The request was not sent, was rejected by the server or has an unknown outcome; <see cref="ZooKeeperException.Outcome"/> says which. Local capacity, deadline and protocol failures use the derived types.</exception>
+    /// <exception cref="ZooKeeperOperationCanceledException">The caller canceled the wait. The request outcome is preserved.</exception>
     public Task DeleteAsync(
         string path,
         ZNodeVersion version,
@@ -155,6 +189,10 @@ public sealed partial class ZooKeeperClient
         );
 
     /// <summary>Reads immutable ACL entries and the corresponding stat, including ACL version.</summary>
+    /// <exception cref="ArgumentException">An argument is invalid, for example a relative path.</exception>
+    /// <exception cref="System.IO.InvalidDataException">The encoded request exceeds a configured data, collection or frame limit; nothing was sent.</exception>
+    /// <exception cref="ZooKeeperException">The request was not sent, was rejected by the server or has an unknown outcome; <see cref="ZooKeeperException.Outcome"/> says which. Local capacity, deadline and protocol failures use the derived types.</exception>
+    /// <exception cref="ZooKeeperOperationCanceledException">The caller canceled the wait. The request outcome is preserved.</exception>
     public Task<ZNodeAcl> GetAclAsync(string path, CancellationToken cancellationToken = default) =>
         ReadAclAsync(
             SubmitNode(
@@ -166,6 +204,10 @@ public sealed partial class ZooKeeperClient
         );
 
     /// <summary>Replaces ACLs under an ACL-version condition and returns the updated stat.</summary>
+    /// <exception cref="ArgumentException">An argument is invalid, for example a relative path.</exception>
+    /// <exception cref="System.IO.InvalidDataException">The encoded request exceeds a configured data, collection or frame limit; nothing was sent.</exception>
+    /// <exception cref="ZooKeeperException">The request was not sent, was rejected by the server or has an unknown outcome; <see cref="ZooKeeperException.Outcome"/> says which. Local capacity, deadline and protocol failures use the derived types.</exception>
+    /// <exception cref="ZooKeeperOperationCanceledException">The caller canceled the wait. The request outcome is preserved.</exception>
     public Task<ZNodeStat> SetAclAsync(
         string path,
         IReadOnlyList<ZooKeeperAcl> acl,

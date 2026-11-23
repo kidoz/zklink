@@ -50,6 +50,10 @@ public sealed class ZooKeeperWatch : IAsyncDisposable
     public ZooKeeperWatchMode Mode { get; }
 
     /// <summary>Reads ordered invalidations; one-shot streams end after one event. Buffered events precede any terminal session failure. Ending or canceling enumeration removes the handle locally and schedules best-effort server cleanup.</summary>
+    /// <exception cref="InvalidOperationException">This handle already has a consumer.</exception>
+    /// <exception cref="ZooKeeperSessionException">The session ended after buffered events were delivered.</exception>
+    /// <exception cref="ZooKeeperConnectionException">The session ended as Faulted after an endpoint attempt failure; buffered events were delivered first.</exception>
+    /// <exception cref="OperationCanceledException">The caller canceled the enumeration.</exception>
     public async IAsyncEnumerable<ZooKeeperWatchEvent> ReadEventsAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default
     )
@@ -74,6 +78,10 @@ public sealed class ZooKeeperWatch : IAsyncDisposable
     }
 
     /// <summary>Suppresses this handle immediately, optionally awaiting server removal; a failed wait never revives it.</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="mode"/> is not a defined value.</exception>
+    /// <exception cref="ZooKeeperBackpressureException">A server-confirmed removal is already outstanding for this path and category.</exception>
+    /// <exception cref="ZooKeeperException">The removal could not be sent or its outcome is unknown. A <c>NoWatcher</c> reply is returned as a result instead of an exception.</exception>
+    /// <exception cref="ZooKeeperOperationCanceledException">The caller canceled the wait.</exception>
     public Task<ZooKeeperWatchRemovalResult> RemoveAsync(
         WatchRemovalMode mode,
         CancellationToken cancellationToken = default

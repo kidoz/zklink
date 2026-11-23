@@ -13,6 +13,7 @@ public sealed class ZooKeeperAuthentication : IDisposable
     private ZooKeeperAuthentication(byte[] credentials) => _credentials = credentials;
 
     /// <summary>Creates UTF-8 digest credentials; no ACL is installed implicitly.</summary>
+    /// <exception cref="ArgumentException">The user name is empty or contains a colon, the input is not valid UTF-16, or the encoded credential exceeds its bound.</exception>
     public static ZooKeeperAuthentication Digest(string userName, string password)
     {
         ArgumentException.ThrowIfNullOrEmpty(userName);

@@ -25,6 +25,11 @@ public sealed class ZooKeeperStateSubscription : IAsyncDisposable
     internal Channel<ZooKeeperSessionSnapshot> Queue { get; }
 
     /// <summary>Reads the initial snapshot and transitions. Buffered snapshots are delivered before a subscription overflow or terminal session error.</summary>
+    /// <exception cref="InvalidOperationException">This subscription already has a consumer.</exception>
+    /// <exception cref="ZooKeeperEventOverflowException">The subscription queue overflowed; buffered snapshots were delivered first.</exception>
+    /// <exception cref="ZooKeeperSessionException">The session ended after buffered snapshots were delivered.</exception>
+    /// <exception cref="ZooKeeperConnectionException">The session ended as Faulted after an endpoint attempt failure; buffered snapshots were delivered first.</exception>
+    /// <exception cref="OperationCanceledException">The caller canceled the enumeration.</exception>
     public async IAsyncEnumerable<ZooKeeperSessionSnapshot> ReadStatesAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default
     )

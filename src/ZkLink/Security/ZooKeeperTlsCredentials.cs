@@ -9,6 +9,8 @@ public sealed class ZooKeeperTlsCredentials : IDisposable
     internal IReadOnlyList<X509Certificate2> TrustRoots { get; }
 
     /// <summary>Copies the supplied certificate handles. Original certificates remain application-owned.</summary>
+    /// <exception cref="ArgumentException">The client certificate has no private key.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">More than 256 trust roots were supplied.</exception>
     public ZooKeeperTlsCredentials(
         X509Certificate2? clientCertificate = null,
         IReadOnlyList<X509Certificate2>? trustRoots = null

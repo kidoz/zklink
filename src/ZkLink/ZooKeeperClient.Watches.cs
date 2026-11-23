@@ -3,6 +3,11 @@ namespace ZkLink;
 public sealed partial class ZooKeeperClient
 {
     /// <summary>Reads existence and establishes a buffered one-shot watch, including when the node is missing.</summary>
+    /// <exception cref="ArgumentException">An argument is invalid, for example a relative path.</exception>
+    /// <exception cref="System.IO.InvalidDataException">The encoded request exceeds a configured data, collection or frame limit; nothing was sent.</exception>
+    /// <exception cref="ZooKeeperException">The request was not sent, was rejected by the server or has an unknown outcome; <see cref="ZooKeeperException.Outcome"/> says which. Local capacity, deadline and protocol failures use the derived types.</exception>
+    /// <exception cref="ZooKeeperOperationCanceledException">The caller canceled the wait. The request outcome is preserved.</exception>
+    /// <exception cref="NotSupportedException">The ZooKeeper 3.8 compatibility profile cannot combine this watch mode with an existing registration at the same path.</exception>
     public Task<WatchedResult<ZNodeStat?>> ExistsAndWatchAsync(
         string path,
         CancellationToken cancellationToken = default
@@ -13,6 +18,11 @@ public sealed partial class ZooKeeperClient
     }
 
     /// <summary>Reads owned data and Stat while establishing a one-shot data watch in the same request.</summary>
+    /// <exception cref="ArgumentException">An argument is invalid, for example a relative path.</exception>
+    /// <exception cref="System.IO.InvalidDataException">The encoded request exceeds a configured data, collection or frame limit; nothing was sent.</exception>
+    /// <exception cref="ZooKeeperException">The request was not sent, was rejected by the server or has an unknown outcome; <see cref="ZooKeeperException.Outcome"/> says which. Local capacity, deadline and protocol failures use the derived types.</exception>
+    /// <exception cref="ZooKeeperOperationCanceledException">The caller canceled the wait. The request outcome is preserved.</exception>
+    /// <exception cref="NotSupportedException">The ZooKeeper 3.8 compatibility profile cannot combine this watch mode with an existing registration at the same path.</exception>
     public Task<WatchedResult<ZNodeData>> GetDataAndWatchAsync(
         string path,
         CancellationToken cancellationToken = default
@@ -23,6 +33,11 @@ public sealed partial class ZooKeeperClient
     }
 
     /// <summary>Reads child names and parent Stat while establishing a one-shot child watch in the same request.</summary>
+    /// <exception cref="ArgumentException">An argument is invalid, for example a relative path.</exception>
+    /// <exception cref="System.IO.InvalidDataException">The encoded request exceeds a configured data, collection or frame limit; nothing was sent.</exception>
+    /// <exception cref="ZooKeeperException">The request was not sent, was rejected by the server or has an unknown outcome; <see cref="ZooKeeperException.Outcome"/> says which. Local capacity, deadline and protocol failures use the derived types.</exception>
+    /// <exception cref="ZooKeeperOperationCanceledException">The caller canceled the wait. The request outcome is preserved.</exception>
+    /// <exception cref="NotSupportedException">The ZooKeeper 3.8 compatibility profile cannot combine this watch mode with an existing registration at the same path.</exception>
     public Task<WatchedResult<ZNodeChildren>> GetChildrenAndWatchAsync(
         string path,
         CancellationToken cancellationToken = default
@@ -37,6 +52,11 @@ public sealed partial class ZooKeeperClient
     }
 
     /// <summary>Registers a buffered persistent watch at a path, optionally including descendants. Reconnect gaps require rereading state.</summary>
+    /// <exception cref="ArgumentException">An argument is invalid, for example a relative path.</exception>
+    /// <exception cref="System.IO.InvalidDataException">The encoded request exceeds a configured data, collection or frame limit; nothing was sent.</exception>
+    /// <exception cref="ZooKeeperException">The request was not sent, was rejected by the server or has an unknown outcome; <see cref="ZooKeeperException.Outcome"/> says which. Local capacity, deadline and protocol failures use the derived types.</exception>
+    /// <exception cref="ZooKeeperOperationCanceledException">The caller canceled the wait. The request outcome is preserved.</exception>
+    /// <exception cref="NotSupportedException">The ZooKeeper 3.8 compatibility profile cannot combine this watch mode with an existing registration at the same path.</exception>
     public Task<ZooKeeperWatch> AddWatchAsync(
         string path,
         PersistentWatchMode mode,
