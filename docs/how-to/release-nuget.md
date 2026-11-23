@@ -14,6 +14,12 @@ indexed core/DI PDBs.
 Build and test jobs have read-only permissions. Only the publish job receives
 NuGet credentials through GitHub OIDC in the `nuget` environment.
 
+The validation job refuses a tag whose commit is not contained in `main`, so
+branch protection on `main` also bounds which sources can reach NuGet.
+nuget.org adds its repository signature to published packages, which changes
+their hash: verify build attestations against the assets retained by the
+candidate and release runs, not against packages downloaded from nuget.org.
+
 ## Publish a version
 
 Before preparing a new DI release, move declarations from the previous public

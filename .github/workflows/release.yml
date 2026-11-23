@@ -57,6 +57,13 @@ jobs:
           python3 dev/test-release-packages.py
           version=$(python3 dev/release_version.py --tag "${RELEASE_TAG}")
           source_sha=$(git rev-parse HEAD)
+          # A release is cut from main. Refuse a tag whose commit is not contained in it,
+          # so branch protection on main also bounds what can reach NuGet.
+          containment=$(gh api "repos/${GITHUB_REPOSITORY}/compare/main...${source_sha}" --jq .status)
+          if [[ "${containment}" != "behind" && "${containment}" != "identical" ]]; then
+            echo 'The release source must be contained in main.' >&2
+            exit 1
+          fi
           candidate_run=$(gh run list --repo "${GITHUB_REPOSITORY}" \
             --workflow release-candidate.yml --commit "${source_sha}" \
             --event workflow_dispatch --status success --limit 1 \
@@ -127,7 +134,9 @@ jobs:
       - name: Test and pack DI and analyzers
         env:
           PACKAGE_VERSION: ${{ needs.validate.outputs.version }}
+        shell: bash
         run: |
+          set -euo pipefail
           dotnet restore tests/ZkLink.Extensions.DependencyInjection.Tests --locked-mode
           dotnet restore tests/ZkLink.Analyzers.Tests --locked-mode
           dotnet test --project tests/ZkLink.Extensions.DependencyInjection.Tests -c Release --no-restore
@@ -206,7 +215,9 @@ jobs:
         env:
           PACKAGE_VERSION: ${{ needs.validate.outputs.version }}
           NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        shell: bash
         run: |
+          set -euo pipefail
           for package_id in ZkLink ZkLink.Extensions.DependencyInjection ZkLink.Analyzers; do
             dotnet nuget push "artifacts/candidate/${package_id}.${PACKAGE_VERSION}.nupkg" \
               --api-key "${NUGET_API_KEY}" --source https://api.nuget.org/v3/index.json
