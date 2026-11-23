@@ -12,18 +12,21 @@ All activities have `ActivityKind.Client`.
 | Activity | Interval |
 | --- | --- |
 | `zklink.connect` | Initial connection through readiness, including cleanup on failure |
-| `zklink.transport.connect` | One DNS/TCP/TLS connection attempt |
+| `zklink.transport.connect` | One endpoint attempt across its resolved addresses |
 | `zklink.authenticate` | Authentication and acknowledgment on one connection |
 | `zklink.restore` | Watch restoration on one connection, including an empty restore |
 | `zklink.operation` | Scheduler preparation/admission through caller completion |
 | `zklink.close` | The first close call through local cleanup |
 
 Tags are `operation` for an application operation, `lifecycle` for other
-activities, and `outcome`/`error`. Operation names come from `ZooKeeperOperation`.
+activities (`Connect`, `TransportConnect`, `Authenticate`, `Restore`, `Close`),
+and `outcome`/`error`. Operation names come from `ZooKeeperOperation`.
 Operation outcomes are `Success`, `NotSent`, `Rejected`, and `Unknown`;
 Close failures preserve their request outcome when available; other failed
 lifecycle work uses `Failed`. Errors use fixed categories such as
-`Cancelled`, `Timeout`, `Backpressure`, `Tls`, `Connection`, and `Protocol`.
+`Cancelled`, `Timeout`, `Backpressure`, `Tls`, `Connection`, `Protocol`, and
+`Server`. A connection-attempt deadline is categorized `Timeout`, a TLS failure
+that raced that deadline `Tls`, and a reply carrying a server error code `Server`.
 Successful activities have status `Ok`; failures have status `Error` without an
 exception message, status description, or exception event.
 
@@ -43,7 +46,8 @@ are correlated with the caller, without injecting trace headers into ZooKeeper.
 ## Metrics
 
 Observable totals are collected when the listener polls. Durations are histograms
-in seconds. Current values aggregate clients without a client or session label.
+in seconds that publish advisory bucket boundaries from 0.5 ms to 30 s;
+consumers honoring `InstrumentAdvice` use them instead of default buckets. Current values aggregate clients without a client or session label.
 
 | Instrument | Type | Meaning |
 | --- | --- | --- |
@@ -51,12 +55,14 @@ in seconds. Current values aggregate clients without a client or session label.
 | `zklink.operation.duration` | Histogram | Caller duration by operation, outcome and error |
 | `zklink.operation.unknown` | Observable counter | Operations completed with an unknown outcome |
 | `zklink.protocol.rejected_replies` | Observable counter | Matched replies whose invalid bodies the scheduler rejects. Counts once per reply, including a whole read batch or a late reply drained after cancellation or timeout. Untagged. |
+| `zklink.protocol.oversized_frames` | Observable counter | Inbound frames whose declared length exceeds `MaxFrameBytes`. Each is treated as transport loss without reading its body. Untagged. |
 | `zklink.lifecycle.duration` | Histogram | Connection/authentication/restoration/close durations by lifecycle, outcome and error |
 | `zklink.requests.outstanding` | Observable up/down counter | Queued and sent owned requests, including sent tombstones and control requests |
 | `zklink.requests.bytes` | Observable up/down counter | Bytes charged to the scheduler's request budget, including buffers still being written |
 | `zklink.requests.tombstones` | Observable up/down counter | Sent requests whose callers have completed but whose replies remain pending |
 | `zklink.reconnect.attempts` | Observable counter | Connection attempts after a session identity has been assigned |
 | `zklink.sessions.disconnected` | Observable up/down counter | Sessions disconnected while recovering |
+| `zklink.session.faults` | Observable counter | Sessions that ended `Faulted`, by a finite `error` cause: `Protocol`, `Connection`, `Overflow` or `Unexpected`. `Unexpected` means the session loop failed with an exception outside its expected set. No exception type or text is exported. |
 | `zklink.session.disconnected.duration` | Histogram | Disconnected intervals ending at readiness, close or a terminal state |
 | `zklink.session.negotiated_timeout` | Histogram | Server-negotiated session timeout on each accepted handshake |
 | `zklink.heartbeat.roundtrip` | Histogram | Writer selection through a valid ping acknowledgment |

@@ -1,11 +1,15 @@
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Text;
+using NSubstitute;
 using ZkLink.Configuration;
 using ZkLink.Diagnostics;
 using ZkLink.Protocol;
 using ZkLink.Requests;
 using ZkLink.Sessions;
 using ZkLink.Testing;
+using ZkLink.Transport;
+using ZkLink.Watches;
 
 namespace ZkLink.Protocol.Tests.Sessions;
 
@@ -387,6 +391,304 @@ public sealed class TelemetryTests
 
     [Fact(Timeout = TestTimeoutMilliseconds)]
     [Trait("Acceptance", "T34")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Reliability",
+        "CA2000",
+        Justification = "The connector's TransportConnection transfers to the client, which disposes it on every path."
+    )]
+    public async Task TerminalFaultsAreCountedByFiniteCause()
+    {
+        const string counter = "zklink.session.faults";
+        var token = TestContext.Current.CancellationToken;
+        using var capture = new TelemetryCapture();
+        await ZooKeeperTelemetry.FlushAsync(token).ConfigureAwait(true);
+        capture.Reset();
+        capture.Collect();
+        double protocol = capture.Value(counter + "|error=Protocol");
+        double overflow = capture.Value(counter + "|error=Overflow");
+        double unexpected = capture.Value(counter + "|error=Unexpected");
+
+        // Protocol: a reply whose xid does not match the pending FIFO.
+        using (var peer = new SessionPeer { ReplyApplications = false })
+        {
+            var fixture = new SessionFixture();
+            await using var lifetime = fixture.ConfigureAwait(true);
+            var client = await fixture
+                .ConnectAsync(peer, cancellationToken: token)
+                .ConfigureAwait(true);
+            var pending = client.SyncAsync(SecretPath, token);
+            var request = await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
+            peer.Inject(SessionPeer.Packet(request.Xid + 10, path: SecretPath));
+            await Assert.ThrowsAsync<ZooKeeperException>(() => pending).ConfigureAwait(true);
+            await SessionTestSupport.Bounded(client.Manager.Completion).ConfigureAwait(true);
+            Assert.Equal(ZooKeeperSessionState.Faulted, client.Session.State);
+        }
+
+        // Overflow: two persistent watches share one event above the event budget.
+        using (var peer = new SessionPeer())
+        {
+            var fixture = new SessionFixture();
+            await using var lifetime = fixture.ConfigureAwait(true);
+            var client = await fixture
+                .ConnectAsync(peer, SessionFixture.Options(events: 1), token)
+                .ConfigureAwait(true);
+            await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
+            foreach (var _ in new[] { 0, 1 })
+            {
+                await client
+                    .AddWatchAsync(SecretPath, PersistentWatchMode.Persistent, token)
+                    .ConfigureAwait(true);
+            }
+            NotifyNode(peer, ZooKeeperWatchEventKind.NodeCreated, SecretPath);
+            await SessionTestSupport.Bounded(client.Manager.Completion).ConfigureAwait(true);
+            Assert.Equal(ZooKeeperSessionState.Faulted, client.Session.State);
+        }
+
+        // Unexpected: the reconnect attempt fails with an exception outside the expected set.
+        using (var peer = new SessionPeer())
+        {
+            var fixture = new SessionFixture();
+            await using var lifetime = fixture.ConfigureAwait(true);
+            var options = ClientOptionsSnapshot.Capture(
+                SessionFixture.Options(connection: "one:2181,two:2181")
+            );
+            var connector = Substitute.For<ITransportConnector>();
+            connector
+                .ConnectAsync(
+                    Arg.Any<ZooKeeperEndpoint>(),
+                    Arg.Any<ClientOptionsSnapshot>(),
+                    Arg.Any<TransportDeadline>(),
+                    Arg.Any<CancellationToken>()
+                )
+                .Returns(
+                    call =>
+                        Task.FromResult(
+                            new TransportConnection(
+                                peer,
+                                call.Arg<ZooKeeperEndpoint>(),
+                                options.Limits
+                            )
+                        ),
+                    _ =>
+                        Task.FromException<TransportConnection>(
+                            new FormatException("private diagnostic")
+                        )
+                );
+            var client = await ZooKeeperClient
+                .ConnectCoreAsync(
+                    options,
+                    fixture.Time,
+                    connector,
+                    new SessionRandom(new Random(1)),
+                    token
+                )
+                .ConfigureAwait(true);
+            await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
+            peer.Drop();
+            await SessionTestSupport.Bounded(client.Manager.Completion).ConfigureAwait(true);
+            Assert.Equal(ZooKeeperSessionState.Faulted, client.Session.State);
+        }
+
+        capture.Collect();
+        Assert.Equal(protocol + 1, capture.Value(counter + "|error=Protocol"));
+        Assert.Equal(overflow + 1, capture.Value(counter + "|error=Overflow"));
+        Assert.Equal(unexpected + 1, capture.Value(counter + "|error=Unexpected"));
+        capture.AssertRedacted(SecretPath, SecretData, "private diagnostic");
+    }
+
+    [Theory(Timeout = TestTimeoutMilliseconds)]
+    [InlineData(false, "Timeout")]
+    [InlineData(true, "Cancelled")]
+    [Trait("Acceptance", "T34")]
+    public async Task StalledTransportRecordsTheCauseOfCancellation(
+        bool callerCancels,
+        string expectedError
+    )
+    {
+        var token = TestContext.Current.CancellationToken;
+        using var capture = new TelemetryCapture();
+        using var caller = CancellationTokenSource.CreateLinkedTokenSource(token);
+        var fixture = new SessionFixture();
+        await using var lifetime = fixture.ConfigureAwait(true);
+        var timeout = TimeSpan.FromMilliseconds(100);
+        var connecting = fixture.ConnectCoreAsync(
+            new ZooKeeperClientOptions
+            {
+                ConnectionString = "one:2181",
+                Tls = ZooKeeperTlsOptions.Disabled(),
+                InitialConnectTimeout = timeout,
+                ConnectAttemptTimeout = timeout,
+            },
+            caller.Token
+        );
+        await fixture.Connector.Attempts.Reader.ReadAsync(token);
+        if (callerCancels)
+        {
+            await caller.CancelAsync();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => connecting);
+        }
+        else
+        {
+            fixture.Time.Advance(timeout);
+            var error = await Assert.ThrowsAsync<ZooKeeperConnectionException>(() => connecting);
+            Assert.Equal(ZooKeeperConnectionFailure.Timeout, error.Failure);
+        }
+
+        await ZooKeeperTelemetry.FlushAsync(token);
+        foreach (var name in new[] { "zklink.transport.connect", "zklink.connect" })
+        {
+            var activity = Assert.Single(capture.Activities, activity => activity.Name == name);
+            Assert.True(HasTag(activity, "error", expectedError));
+        }
+    }
+
+    [Fact(Timeout = TestTimeoutMilliseconds)]
+    [Trait("Acceptance", "T34")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Reliability",
+        "CA2000",
+        Justification = "ConnectCoreAsync owns the options snapshot and disposes it on every failed path."
+    )]
+    public async Task TlsFailureRacingTheAttemptDeadlineIsCategorizedAsTls()
+    {
+        var token = TestContext.Current.CancellationToken;
+        using var capture = new TelemetryCapture();
+        var connector = new TlsFailureOnCancellationConnector();
+        var fixture = new SessionFixture();
+        await using var lifetime = fixture.ConfigureAwait(true);
+        var connecting = ZooKeeperClient.ConnectCoreAsync(
+            ClientOptionsSnapshot.Capture(
+                new ZooKeeperClientOptions
+                {
+                    ConnectionString = "one:2181",
+                    Tls = ZooKeeperTlsOptions.Disabled(),
+                    InitialConnectTimeout = TimeSpan.FromMilliseconds(100),
+                    ConnectAttemptTimeout = TimeSpan.FromMilliseconds(100),
+                }
+            ),
+            fixture.Time,
+            connector,
+            new SessionRandom(new Random(1)),
+            token
+        );
+        await SessionTestSupport.Bounded(connector.AttemptStarted).ConfigureAwait(true);
+        fixture.Time.Advance(TimeSpan.FromMilliseconds(100));
+        var error = await Assert
+            .ThrowsAsync<ZooKeeperConnectionException>(() => connecting)
+            .ConfigureAwait(true);
+        Assert.Equal(ZooKeeperConnectionFailure.Tls, error.Failure);
+
+        await capture
+            .WaitForAsync(activity => activity.Name == "zklink.transport.connect", token)
+            .ConfigureAwait(true);
+        Assert.Single(
+            capture.Activities,
+            activity =>
+                activity.Name == "zklink.transport.connect" && HasTag(activity, "error", "Tls")
+        );
+    }
+
+    [Fact(Timeout = TestTimeoutMilliseconds)]
+    [Trait("Acceptance", "T34")]
+    public async Task ServerRejectionIsCategorizedAsServer()
+    {
+        var token = TestContext.Current.CancellationToken;
+        using var capture = new TelemetryCapture();
+        using var peer = new SessionPeer { ReplyApplications = false };
+        var fixture = new SessionFixture();
+        await using var lifetime = fixture.ConfigureAwait(true);
+        var client = await fixture
+            .ConnectAsync(peer, cancellationToken: token)
+            .ConfigureAwait(true);
+        await SessionTestSupport.NextAsync(peer).ConfigureAwait(true);
+        var denied = client.GetDataAsync(SecretPath, token);
+        peer.Reply(
+            await SessionTestSupport.NextAsync(peer).ConfigureAwait(true),
+            (int)ZooKeeperErrorCode.NoAuth
+        );
+        var rejection = await Assert
+            .ThrowsAsync<ZooKeeperException>(() => denied)
+            .ConfigureAwait(true);
+        Assert.Equal(RequestOutcome.Rejected, rejection.Outcome);
+
+        await capture
+            .WaitForAsync(
+                activity =>
+                    activity.Name == "zklink.operation" && HasTag(activity, "outcome", "Rejected"),
+                token
+            )
+            .ConfigureAwait(true);
+        var activity = Assert.Single(
+            capture.Activities,
+            activity =>
+                activity.Name == "zklink.operation" && HasTag(activity, "outcome", "Rejected")
+        );
+        Assert.True(HasTag(activity, "operation", "GetData"));
+        Assert.True(HasTag(activity, "error", "Server"));
+    }
+
+    private static bool HasTag(CapturedActivity activity, string key, string value) =>
+        activity.Tags.Any(tag => tag.Key == key && Equals(tag.Value, value));
+
+    private sealed class TlsFailureOnCancellationConnector : ITransportConnector
+    {
+        private readonly TaskCompletionSource _attemptStarted = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+
+        internal Task AttemptStarted => _attemptStarted.Task;
+
+        public async Task<TransportConnection> ConnectAsync(
+            ZooKeeperEndpoint endpoint,
+            ClientOptionsSnapshot options,
+            TransportDeadline deadline,
+            CancellationToken cancellationToken
+        )
+        {
+            _attemptStarted.SetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken)
+                .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            throw new OperationCanceledException(
+                null,
+                new ZooKeeperConnectionException(ZooKeeperConnectionFailure.Tls, endpoint),
+                cancellationToken
+            );
+        }
+    }
+
+    [Fact]
+    [Trait("Acceptance", "T34")]
+    public void CaptureVocabularyMirrorsTheDriverEnums()
+    {
+        string[] driver =
+        [
+            .. Enum.GetNames<ZooKeeperOperation>(),
+            .. Enum.GetNames<TelemetryOutcome>(),
+            .. Enum.GetNames<TelemetryError>(),
+            .. Enum.GetNames<TelemetryFault>(),
+            .. Enum.GetNames<TelemetryKind>(),
+        ];
+        Assert.Equal(
+            driver.Distinct().Order(StringComparer.Ordinal),
+            TelemetryCapture.AllowedValues.Order(StringComparer.Ordinal)
+        );
+    }
+
+    private static void NotifyNode(SessionPeer peer, ZooKeeperWatchEventKind kind, string path)
+    {
+        var bytes = new byte[256];
+        var output = new JuteWriter(bytes, ProtocolFixtures.Limits);
+        output.WriteReplyHeader(
+            new ReplyHeader(WatchProtocol.NotificationXid, 12, WatchProtocol.Success)
+        );
+        output.WriteInt32((int)kind);
+        output.WriteInt32(WatchProtocol.ServerConnected);
+        output.WriteString(path);
+        peer.Inject(bytes[..output.WrittenCount]);
+    }
+
+    [Fact(Timeout = TestTimeoutMilliseconds)]
+    [Trait("Acceptance", "T34")]
     public async Task LifecycleHeartbeatRecoveryAndCloseUseOriginalDurationsAndSafeParentContext()
     {
         using var capture = new TelemetryCapture();
@@ -661,6 +963,7 @@ public sealed class TelemetryTests
             auth.Tags,
             static tag => tag.Key == "outcome" && Equals(tag.Value, "Failed")
         );
+        Assert.True(HasTag(auth, "error", "Server"));
         capture.AssertRedacted(SecretUser, SecretPassword);
     }
 

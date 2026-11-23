@@ -33,7 +33,17 @@ internal enum TelemetryError
     Connection,
     Session,
     Protocol,
+    Server,
     Other,
+}
+
+// Finite causes for sessions that end as Faulted. Exception text is never exported.
+internal enum TelemetryFault
+{
+    Protocol,
+    Connection,
+    Overflow,
+    Unexpected,
 }
 
 internal enum TelemetrySample
@@ -80,6 +90,8 @@ internal static class ZooKeeperTelemetry
     private static readonly long[][] Counts = Operations
         .Select(static _ => new long[Outcomes.Length])
         .ToArray();
+    private static readonly TelemetryFault[] FaultValues = Enum.GetValues<TelemetryFault>();
+    private static readonly long[] Faults = new long[FaultValues.Length];
     private static Histogram<double>? Duration,
         Lifecycle,
         Heartbeat,
@@ -101,6 +113,7 @@ internal static class ZooKeeperTelemetry
         DisconnectedSessions;
     private static long _unknown,
         _rejectedReplies,
+        _oversizedFrames,
         _reconnects,
         _overflows,
         _rejectedWatchNotifications,
@@ -147,17 +160,63 @@ internal static class ZooKeeperTelemetry
             return;
         }
         Meter = meter;
-        Publish(() => Duration = meter.CreateHistogram<double>("zklink.operation.duration", "s"));
-        Publish(() => Lifecycle = meter.CreateHistogram<double>("zklink.lifecycle.duration", "s"));
-        Publish(() => Heartbeat = meter.CreateHistogram<double>("zklink.heartbeat.roundtrip", "s"));
+        // Advisory boundaries in seconds, so consumers need not fall back to
+        // coarse default buckets for sub-second operations and heartbeats.
+        var advice = new InstrumentAdvice<double>
+        {
+            HistogramBucketBoundaries =
+            [
+                0.0005,
+                0.001,
+                0.0025,
+                0.005,
+                0.01,
+                0.025,
+                0.05,
+                0.1,
+                0.25,
+                0.5,
+                1,
+                2.5,
+                5,
+                10,
+                30,
+            ],
+        };
         Publish(() =>
-            Disconnected = meter.CreateHistogram<double>(
-                "zklink.session.disconnected.duration",
-                "s"
+            Duration = meter.CreateHistogram<double>(
+                "zklink.operation.duration",
+                "s",
+                advice: advice
             )
         );
         Publish(() =>
-            Negotiated = meter.CreateHistogram<double>("zklink.session.negotiated_timeout", "s")
+            Lifecycle = meter.CreateHistogram<double>(
+                "zklink.lifecycle.duration",
+                "s",
+                advice: advice
+            )
+        );
+        Publish(() =>
+            Heartbeat = meter.CreateHistogram<double>(
+                "zklink.heartbeat.roundtrip",
+                "s",
+                advice: advice
+            )
+        );
+        Publish(() =>
+            Disconnected = meter.CreateHistogram<double>(
+                "zklink.session.disconnected.duration",
+                "s",
+                advice: advice
+            )
+        );
+        Publish(() =>
+            Negotiated = meter.CreateHistogram<double>(
+                "zklink.session.negotiated_timeout",
+                "s",
+                advice: advice
+            )
         );
         Publish(() =>
             meter.CreateObservableCounter("zklink.operation.count", ObserveCounts, "{operation}")
@@ -175,6 +234,16 @@ internal static class ZooKeeperTelemetry
                 () => Interlocked.Read(ref _rejectedReplies),
                 "{reply}"
             )
+        );
+        Publish(() =>
+            meter.CreateObservableCounter(
+                "zklink.protocol.oversized_frames",
+                () => Interlocked.Read(ref _oversizedFrames),
+                "{frame}"
+            )
+        );
+        Publish(() =>
+            meter.CreateObservableCounter<long>("zklink.session.faults", ObserveFaults, "{session}")
         );
         Publish(() =>
             meter.CreateObservableCounter(
@@ -350,6 +419,10 @@ internal static class ZooKeeperTelemetry
             OperationCanceledException => TelemetryError.Cancelled,
             ZooKeeperTimeoutException or TimeoutException => TelemetryError.Timeout,
             ZooKeeperBackpressureException => TelemetryError.Backpressure,
+            ZooKeeperConnectionException { ErrorCode: not null }
+            or ZooKeeperException { ErrorCode: not null } => TelemetryError.Server,
+            ZooKeeperConnectionException { Failure: ZooKeeperConnectionFailure.Timeout } =>
+                TelemetryError.Timeout,
             ZooKeeperConnectionException { Failure: ZooKeeperConnectionFailure.Tls } =>
                 TelemetryError.Tls,
             ZooKeeperConnectionException { Failure: ZooKeeperConnectionFailure.Protocol } =>
@@ -388,6 +461,11 @@ internal static class ZooKeeperTelemetry
     }
 
     internal static void RejectReply() => Interlocked.Increment(ref _rejectedReplies);
+
+    internal static void RejectOversizedFrame() => Interlocked.Increment(ref _oversizedFrames);
+
+    internal static void Fault(TelemetryFault fault) =>
+        Interlocked.Increment(ref Faults[(int)fault]);
 
     internal static void Reconnect() => Interlocked.Increment(ref _reconnects);
 
@@ -429,6 +507,17 @@ internal static class ZooKeeperTelemetry
                     new("operation", Operations[i].ToString()),
                     new("outcome", outcome.ToString())
                 );
+    }
+
+    private static IEnumerable<Measurement<long>> ObserveFaults()
+    {
+        foreach (var fault in FaultValues)
+        {
+            yield return new Measurement<long>(
+                Interlocked.Read(ref Faults[(int)fault]),
+                new KeyValuePair<string, object?>("error", fault.ToString())
+            );
+        }
     }
 
 #if ZKLINK_TEST_ACCESS

@@ -72,7 +72,10 @@ internal sealed partial class SessionManager
                 if (!IsTerminal(Session.State))
                 {
                     _terminalCause = new ZooKeeperSessionException(ZooKeeperSessionState.Faulted);
-                    PublishTerminal(ZooKeeperSessionState.Faulted);
+                    PublishTerminal(
+                        ZooKeeperSessionState.Faulted,
+                        fault: TelemetryFault.Unexpected
+                    );
                 }
             }
         }
@@ -119,11 +122,11 @@ internal sealed partial class SessionManager
             {
                 ZooKeeperTelemetry.Reconnect();
             }
-            var transportSpan = ZooKeeperTelemetry.Begin(_time, TelemetryKind.TransportConnect);
-            transport = await ZooKeeperTelemetry
-                .ObserveAsync(
-                    _connector.ConnectAsync(endpoint, _options, transportDeadline, attempt.Token),
-                    transportSpan
+            transport = await ConnectTransportAsync(
+                    endpoint,
+                    transportDeadline,
+                    deadline.Token,
+                    attempt.Token
                 )
                 .ConfigureAwait(false);
             var restoredZxid = await new SessionEstablisher(
@@ -205,6 +208,44 @@ internal sealed partial class SessionManager
         }
     }
 
+    private async Task<TransportConnection> ConnectTransportAsync(
+        ZooKeeperEndpoint endpoint,
+        TransportDeadline deadline,
+        CancellationToken deadlineToken,
+        CancellationToken attemptToken
+    )
+    {
+        var span = ZooKeeperTelemetry.Begin(_time, TelemetryKind.TransportConnect);
+        try
+        {
+            var connection = await _connector
+                .ConnectAsync(endpoint, _options, deadline, attemptToken)
+                .ConfigureAwait(false);
+            span.Complete();
+            return connection;
+        }
+        catch (Exception error)
+        {
+            span.Complete(
+                error is OperationCanceledException canceled
+                && deadlineToken.IsCancellationRequested
+                && !_stop.IsCancellationRequested
+                    ? ClassifyAttemptCancellation(canceled, endpoint)
+                    : error
+            );
+            throw;
+        }
+    }
+
+    private static ZooKeeperConnectionException ClassifyAttemptCancellation(
+        OperationCanceledException error,
+        ZooKeeperEndpoint endpoint
+    ) =>
+        error.InnerException
+            is ZooKeeperConnectionException { Failure: ZooKeeperConnectionFailure.Tls } tls
+            ? tls
+            : new ZooKeeperConnectionException(ZooKeeperConnectionFailure.Timeout, endpoint);
+
     private void AdjustDeadlineAfterHandshake(CancellationTokenSource deadline, long initialStarted)
     {
         // Recovery now follows session liveness; initial authentication still has a total deadline.
@@ -275,17 +316,7 @@ internal sealed partial class SessionManager
     {
         var failure = error switch
         {
-            OperationCanceledException
-            {
-                InnerException: ZooKeeperConnectionException
-                {
-                    Failure: ZooKeeperConnectionFailure.Tls
-                } tls
-            } => tls,
-            OperationCanceledException => new ZooKeeperConnectionException(
-                ZooKeeperConnectionFailure.Timeout,
-                endpoint
-            ),
+            OperationCanceledException canceled => ClassifyAttemptCancellation(canceled, endpoint),
             InvalidDataException => new ZooKeeperConnectionException(
                 ZooKeeperConnectionFailure.Protocol,
                 endpoint
@@ -344,7 +375,12 @@ internal sealed partial class SessionManager
             {
                 _terminalCause = new ZooKeeperSessionException(state, _terminalCode);
             }
-            PublishTerminal(state);
+            PublishTerminal(
+                state,
+                fault: error.Failure == ZooKeeperConnectionFailure.Protocol
+                    ? TelemetryFault.Protocol
+                    : TelemetryFault.Connection
+            );
         }
     }
 
@@ -370,7 +406,12 @@ internal sealed partial class SessionManager
                     series.LastFailure.SocketError,
                     series.LastFailure.ProviderFailureReason
                 );
-                PublishTerminal(ZooKeeperSessionState.Faulted);
+                PublishTerminal(
+                    ZooKeeperSessionState.Faulted,
+                    fault: series.LastFailure.Failure == ZooKeeperConnectionFailure.Protocol
+                        ? TelemetryFault.Protocol
+                        : TelemetryFault.Connection
+                );
             }
             else
             {

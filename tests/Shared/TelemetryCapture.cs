@@ -22,6 +22,60 @@ internal sealed record CapturedActivity(
 internal sealed class TelemetryCapture : IDisposable
 {
     private static readonly string[] AllowedTags = ["operation", "outcome", "error", "lifecycle"];
+
+    // Test-side mirror of the driver's closed vocabularies: ZooKeeperOperation,
+    // TelemetryOutcome, TelemetryError, TelemetryFault and TelemetryKind. A tag value
+    // outside them fails the redaction check. A protocol test compares this mirror
+    // with those enums so it cannot drift.
+    internal static readonly string[] AllowedValues =
+    [
+        "Create",
+        "Delete",
+        "Exists",
+        "GetData",
+        "SetData",
+        "GetAcl",
+        "SetAcl",
+        "GetChildrenNames",
+        "GetChildren",
+        "Sync",
+        "Check",
+        "Multi",
+        "CreateWithStat",
+        "CheckWatches",
+        "RemoveWatches",
+        "CreateContainer",
+        "CreateTtl",
+        "MultiRead",
+        "GetEphemerals",
+        "GetAllChildrenNumber",
+        "AddWatch",
+        "WhoAmI",
+        "CloseSession",
+        "Success",
+        "NotSent",
+        "Rejected",
+        "Unknown",
+        "Failed",
+        "None",
+        "Cancelled",
+        "Timeout",
+        "Backpressure",
+        "Tls",
+        "Connection",
+        "Session",
+        "Protocol",
+        "Server",
+        "Other",
+        "Overflow",
+        "Unexpected",
+        "Connect",
+        "TransportConnect",
+        "Authenticate",
+        "Restore",
+        "Operation",
+        "Close",
+    ];
     private const int CaptureLimit = 8192;
     private static readonly TimeSpan Guard = TimeSpan.FromSeconds(15);
     private readonly ActivityListener _activities;
@@ -142,7 +196,7 @@ internal sealed class TelemetryCapture : IDisposable
             Assert.True(string.IsNullOrEmpty(activity.TraceState));
             Assert.Empty(activity.Baggage);
             Assert.Empty(activity.Events);
-            Assert.All(activity.Tags, static tag => Assert.Contains(tag.Key, AllowedTags));
+            Assert.All(activity.Tags, static tag => AssertFinite(tag.Key, tag.Value));
             foreach (string marker in markers)
             {
                 Assert.DoesNotContain(marker, activity.Name, StringComparison.Ordinal);
@@ -154,9 +208,25 @@ internal sealed class TelemetryCapture : IDisposable
             }
         }
         foreach (string key in Values.Keys)
-        foreach (string marker in markers)
-            Assert.DoesNotContain(marker, key, StringComparison.Ordinal);
+        {
+            // Keys are "<instrument>|<tag>=<value>..."; each tag must stay finite as well.
+            foreach (string part in key.Split('|').Skip(1))
+            {
+                int separator = part.IndexOf('=', StringComparison.Ordinal);
+                Assert.True(separator > 0, key);
+                AssertFinite(part[..separator], part[(separator + 1)..]);
+            }
+            foreach (string marker in markers)
+                Assert.DoesNotContain(marker, key, StringComparison.Ordinal);
+        }
         Assert.False(Overflowed);
+    }
+
+    private static void AssertFinite(string key, object? value)
+    {
+        Assert.Contains(key, AllowedTags);
+        string text = Assert.IsType<string>(value);
+        Assert.Contains(text, AllowedValues);
     }
 
     public void Dispose()

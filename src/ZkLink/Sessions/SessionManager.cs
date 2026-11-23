@@ -586,7 +586,10 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
     private void FaultOverflow()
     {
         if (_terminalCause is not ZooKeeperEventOverflowException)
+        {
             ZooKeeperTelemetry.Overflow();
+            ZooKeeperTelemetry.Fault(TelemetryFault.Overflow);
+        }
         Telemetry.State(ZooKeeperSessionState.Faulted, _time);
         _terminalCause = new ZooKeeperEventOverflowException();
         _watches.Finish(_terminalCause);
@@ -598,8 +601,17 @@ internal sealed partial class SessionManager : IAsyncDisposable, IWatchSession
         _ = _connectionReady.Task.Exception;
     }
 
-    private void PublishTerminal(ZooKeeperSessionState state, bool detach = true)
+    // The fault category is counted only for Faulted, a local failure with no server evidence.
+    private void PublishTerminal(
+        ZooKeeperSessionState state,
+        bool detach = true,
+        TelemetryFault fault = TelemetryFault.Protocol
+    )
     {
+        if (state == ZooKeeperSessionState.Faulted)
+        {
+            ZooKeeperTelemetry.Fault(fault);
+        }
         _watches.Finish(_terminalCause ?? new ZooKeeperSessionException(state, _terminalCode));
         Scheduler.StopAdmission();
         PublishState(state);

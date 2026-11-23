@@ -338,7 +338,7 @@ internal sealed class SessionFixture : IAsyncDisposable
         return ConnectCoreAsync(options ?? Options(), cancellationToken);
     }
 
-    private async Task<ZooKeeperClient> ConnectCoreAsync(
+    internal async Task<ZooKeeperClient> ConnectCoreAsync(
         ZooKeeperClientOptions options,
         CancellationToken cancellationToken
     )

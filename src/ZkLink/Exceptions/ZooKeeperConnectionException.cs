@@ -2,7 +2,7 @@ using System.Net.Sockets;
 
 namespace ZkLink;
 
-/// <summary>Initial connection failed and all partially owned resources were released.</summary>
+/// <summary>A ZooKeeper endpoint attempt failed and all partially owned resources were released. It is also the terminal cause when a session ends as Faulted after an endpoint attempt failure.</summary>
 public sealed class ZooKeeperConnectionException : IOException
 {
     /// <summary>Creates safe inspectable connection metadata without retaining a platform inner exception.</summary>
