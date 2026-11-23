@@ -52,6 +52,9 @@ internal sealed class SessionPeer : Stream
     internal int? FailWriteAt { get; set; }
     internal bool HoldApplicationWrite { get; set; }
     internal bool HoldPingWrite { get; set; }
+    internal System.Collections.Concurrent.ConcurrentQueue<
+        ReadOnlyMemory<byte>
+    >? CapturedReadBuffers { get; set; }
     internal ReadOnlyMemory<byte> HeldWriterMemory { get; private set; }
     internal int WrittenCount => _written;
     internal bool IsDisposed => Volatile.Read(ref _disposed) != 0;
@@ -236,6 +239,7 @@ internal sealed class SessionPeer : Stream
         CancellationToken cancellationToken = default
     )
     {
+        CapturedReadBuffers?.Enqueue(buffer);
         if (_incoming.PendingBytes == 0 && !_readWaits.Writer.TryWrite(true))
         {
             throw new IOException("Test reader signal bound exceeded.");

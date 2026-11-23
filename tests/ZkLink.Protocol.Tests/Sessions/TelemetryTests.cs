@@ -977,6 +977,7 @@ public sealed class TelemetryTests
         var fixture = new SessionFixture();
         await using var lifetime = fixture.ConfigureAwait(true);
         using var peer = new SessionPeer { AuthError = (int)ZooKeeperErrorCode.AuthFailed };
+        var buffers = peer.CapturedReadBuffers = new();
         using var authentication = ZooKeeperAuthentication.Digest(SecretUser, SecretPassword);
         await Assert
             .ThrowsAsync<ZooKeeperConnectionException>(() =>
@@ -1004,6 +1005,8 @@ public sealed class TelemetryTests
             static tag => tag.Key == "outcome" && Equals(tag.Value, "Failed")
         );
         Assert.True(HasTag(auth, "error", "Server"));
+        var acknowledgment = Assert.Single(buffers, buffer => buffer.Length == 16);
+        Assert.False(acknowledgment.Span.ContainsAnyExcept((byte)0));
         capture.AssertRedacted(SecretUser, SecretPassword);
     }
 

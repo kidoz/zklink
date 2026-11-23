@@ -145,30 +145,37 @@ internal sealed class SessionEstablisher(
                     var reply =
                         await transport.Reader.ReadAsync(cancellationToken).ConfigureAwait(false)
                         ?? throw new EndOfStreamException();
-                    var reader = new JuteReader(reply, options.Limits);
-                    var header = reader.ReadReplyHeader();
-                    if (header.Xid == Xids.Notification)
+                    try
                     {
-                        var notification = ReplyCodec.DecodeNotification(reply, options.Limits);
-                        if (notification.Type != WatchProtocol.SessionEvent)
+                        var reader = new JuteReader(reply, options.Limits);
+                        var header = reader.ReadReplyHeader();
+                        if (header.Xid == Xids.Notification)
                         {
-                            throw new InvalidDataException(
-                                "Unexpected authentication notification."
-                            );
+                            var notification = ReplyCodec.DecodeNotification(reply, options.Limits);
+                            if (notification.Type != WatchProtocol.SessionEvent)
+                            {
+                                throw new InvalidDataException(
+                                    "Unexpected authentication notification."
+                                );
+                            }
+                            CheckSessionNotification(notification.State);
+                            owner.EstablishmentInbound();
+                            continue;
                         }
-                        CheckSessionNotification(notification.State);
+                        var acknowledgment = ReplyCodec.DecodeForValidatedRequest(
+                            reply,
+                            Xids.Auth,
+                            request,
+                            options.Limits
+                        );
                         owner.EstablishmentInbound();
-                        continue;
+                        CheckAcknowledgment(acknowledgment.Header.Error, ReplyPhase.Authentication);
+                        break;
                     }
-                    var acknowledgment = ReplyCodec.DecodeForValidatedRequest(
-                        reply,
-                        Xids.Auth,
-                        request,
-                        options.Limits
-                    );
-                    owner.EstablishmentInbound();
-                    CheckAcknowledgment(acknowledgment.Header.Error, ReplyPhase.Authentication);
-                    break;
+                    finally
+                    {
+                        CryptographicOperations.ZeroMemory(reply);
+                    }
                 }
             }
         }
@@ -216,43 +223,50 @@ internal sealed class SessionEstablisher(
                 var packet =
                     await transport.Reader.ReadAsync(token).ConfigureAwait(false)
                     ?? throw new EndOfStreamException();
-                var input = new JuteReader(packet, options.Limits);
-                var header = input.ReadReplyHeader();
-                if (header.Xid == WatchProtocol.NotificationXid)
+                try
                 {
-                    var notification = ReplyCodec.DecodeNotification(packet, options.Limits);
-                    if (!notification.IsRecognized)
+                    var input = new JuteReader(packet, options.Limits);
+                    var header = input.ReadReplyHeader();
+                    if (header.Xid == WatchProtocol.NotificationXid)
                     {
-                        throw new InvalidDataException("Invalid restore notification.");
-                    }
-                    if (notification.Type == WatchProtocol.SessionEvent)
-                    {
-                        CheckSessionNotification(notification.State);
-                    }
-                    else
-                    {
-                        if (notification.State != WatchProtocol.ServerConnected)
+                        var notification = ReplyCodec.DecodeNotification(packet, options.Limits);
+                        if (!notification.IsRecognized)
                         {
-                            throw new InvalidDataException("Invalid restore event state.");
+                            throw new InvalidDataException("Invalid restore notification.");
                         }
-                        owner.DispatchRestoreNotification(notification);
+                        if (notification.Type == WatchProtocol.SessionEvent)
+                        {
+                            CheckSessionNotification(notification.State);
+                        }
+                        else
+                        {
+                            if (notification.State != WatchProtocol.ServerConnected)
+                            {
+                                throw new InvalidDataException("Invalid restore event state.");
+                            }
+                            owner.DispatchRestoreNotification(notification);
+                        }
+                        owner.EstablishmentInbound();
+                        continue;
                     }
+                    var reply = ReplyCodec.DecodeForValidatedRequest(
+                        packet,
+                        WatchProtocol.ResetXid,
+                        translated,
+                        options.Limits
+                    );
                     owner.EstablishmentInbound();
-                    continue;
+                    CheckAcknowledgment(reply.Header.Error, ReplyPhase.WatchRestore);
+                    if (reply.Header.Zxid > 0)
+                    {
+                        restoredZxid = reply.Header.Zxid;
+                    }
+                    break;
                 }
-                var reply = ReplyCodec.DecodeForValidatedRequest(
-                    packet,
-                    WatchProtocol.ResetXid,
-                    translated,
-                    options.Limits
-                );
-                owner.EstablishmentInbound();
-                CheckAcknowledgment(reply.Header.Error, ReplyPhase.WatchRestore);
-                if (reply.Header.Zxid > 0)
+                finally
                 {
-                    restoredZxid = reply.Header.Zxid;
+                    CryptographicOperations.ZeroMemory(packet);
                 }
-                break;
             }
         }
         return restoredZxid;

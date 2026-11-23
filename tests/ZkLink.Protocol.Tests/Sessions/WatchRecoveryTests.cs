@@ -559,6 +559,7 @@ public sealed class WatchRecoveryTests : IAsyncLifetime
         const long nextZxid = 41;
         await RegisterAsync("/node").ConfigureAwait(true);
         var second = Peer();
+        var buffers = second.CapturedReadBuffers = new();
         _fixture.Connector.Add(second);
         First.Drop();
         AssertResume(await NextDuringRecoveryAsync(second).ConfigureAwait(true));
@@ -572,12 +573,18 @@ public sealed class WatchRecoveryTests : IAsyncLifetime
         output.WriteInt32((int)ZooKeeperWatchEventKind.NodeDataChanged);
         output.WriteInt32(WatchProtocol.ServerConnected);
         output.WriteString("/node");
-        second.Inject(bytes[..output.WrittenCount]);
+        var notificationLength = output.WrittenCount;
+        second.Inject(bytes[..notificationLength]);
         second.Reply(reset, zxid: restoredZxid);
         await Client
             .WaitForConnectionAsync(TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
         Assert.Equal(restoredZxid, Client.Session.LastReplyZxid);
+
+        var notification = Assert.Single(buffers, buffer => buffer.Length == notificationLength);
+        var acknowledgment = Assert.Single(buffers, buffer => buffer.Length == 16);
+        Assert.False(notification.Span.ContainsAnyExcept((byte)0));
+        Assert.False(acknowledgment.Span.ContainsAnyExcept((byte)0));
 
         var third = Peer();
         _fixture.Connector.Add(third);

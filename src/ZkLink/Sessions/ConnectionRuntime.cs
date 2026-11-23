@@ -72,47 +72,56 @@ internal sealed class ConnectionRuntime(
                 {
                     return Stop(new(RuntimeStop.Disconnected));
                 }
-                cancellationToken.ThrowIfCancellationRequested();
-                var input = new JuteReader(packet, options.Limits);
-                var header = input.ReadReplyHeader();
-                if (header.Xid == Xids.Notification)
+                // Decoders copy everything they keep, so the frame is cleared once handled
+                // and znode data does not linger in the heap after its reply.
+                try
                 {
-                    var stop = owner.Notification(
-                        Generation,
-                        ReplyCodec.DecodeNotification(packet, options.Limits)
-                    );
-                    if (stop is { } value)
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var input = new JuteReader(packet, options.Limits);
+                    var header = input.ReadReplyHeader();
+                    if (header.Xid == Xids.Notification)
                     {
-                        return Stop(value);
+                        var stop = owner.Notification(
+                            Generation,
+                            ReplyCodec.DecodeNotification(packet, options.Limits)
+                        );
+                        if (stop is { } value)
+                        {
+                            return Stop(value);
+                        }
+                    }
+                    else if (header.Xid == Xids.Ping)
+                    {
+                        var acknowledgment = ReplyCodec.Decode(
+                            packet,
+                            Xids.Ping,
+                            new PingRequest(),
+                            options.Limits
+                        );
+                        var stop = owner.PingReply(Generation, acknowledgment.Header);
+                        if (stop is { } value)
+                        {
+                            return Stop(value);
+                        }
+                    }
+                    else
+                    {
+                        var pending = owner.Expected(Generation, header.Xid, out var expectedShape);
+                        if (pending is null)
+                        {
+                            return new(RuntimeStop.Stopped);
+                        }
+                        var reply = DecodeMatchedReply(ref input, header, expectedShape!);
+                        var stop = owner.Reply(Generation, pending, reply);
+                        if (stop is { } value)
+                        {
+                            return Stop(value);
+                        }
                     }
                 }
-                else if (header.Xid == Xids.Ping)
+                finally
                 {
-                    var acknowledgment = ReplyCodec.Decode(
-                        packet,
-                        Xids.Ping,
-                        new PingRequest(),
-                        options.Limits
-                    );
-                    var stop = owner.PingReply(Generation, acknowledgment.Header);
-                    if (stop is { } value)
-                    {
-                        return Stop(value);
-                    }
-                }
-                else
-                {
-                    var pending = owner.Expected(Generation, header.Xid, out var expectedShape);
-                    if (pending is null)
-                    {
-                        return new(RuntimeStop.Stopped);
-                    }
-                    var reply = DecodeMatchedReply(ref input, header, expectedShape!);
-                    var stop = owner.Reply(Generation, pending, reply);
-                    if (stop is { } value)
-                    {
-                        return Stop(value);
-                    }
+                    CryptographicOperations.ZeroMemory(packet);
                 }
                 _activity.Set();
             }

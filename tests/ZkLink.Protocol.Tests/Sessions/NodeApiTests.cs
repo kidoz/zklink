@@ -630,6 +630,40 @@ public sealed class NodeApiTests : IAsyncLifetime
         Assert.Equal(PublicStat, await exists.ConfigureAwait(true));
     }
 
+    [Fact(Timeout = TestTimeoutMilliseconds)]
+    [Trait("Acceptance", "T15")]
+    public async Task InboundFramesAreClearedAfterTheirReplyIsHandled()
+    {
+        // An odd size and a nonzero pattern distinguish this frame from any other traffic.
+        var data = new byte[61_033];
+        for (var i = 0; i < data.Length; i++)
+        {
+            data[i] = (byte)(i * 31 + 7);
+        }
+        var frameLength = data.Length + sizeof(int) + 16 + 68;
+        var buffers = _peer.CapturedReadBuffers = new();
+        var read = Client.GetDataAsync("/node", TestContext.Current.CancellationToken);
+        var packet = await NextPathAsync(4, "/app/node").ConfigureAwait(true);
+        var bytes = new byte[frameLength];
+        var writer = new JuteWriter(bytes, ProtocolFixtures.Limits);
+        writer.WriteReplyHeader(new ReplyHeader(packet.Xid, 12, 0));
+        writer.WriteBuffer(data);
+        writer.WriteStat(Stat);
+        Assert.Equal(frameLength, writer.WrittenCount);
+        _peer.Inject(bytes);
+        ZNodeData result = await read.ConfigureAwait(true);
+        Assert.Equal(PublicStat, result.Stat);
+        Assert.Equal(data, result.Data!.Value.ToArray());
+
+        // The reader handles frames in order, so this reply is a barrier for the
+        // frame above having been handled and cleared.
+        var exists = Client.ExistsAsync("/node", TestContext.Current.CancellationToken);
+        Reply(await NextPathAsync(3, "/app/node").ConfigureAwait(true), new StatResult(Stat));
+        Assert.Equal(PublicStat, await exists.ConfigureAwait(true));
+        var body = Assert.Single(buffers, buffer => buffer.Length == frameLength);
+        Assert.False(body.Span.ContainsAnyExcept((byte)0));
+    }
+
     private async Task<ReceivedPacket> NextPathAsync(int opcode, string path)
     {
         var packet = await SessionTestSupport.NextAsync(_peer).ConfigureAwait(false);
