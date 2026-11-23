@@ -32,7 +32,7 @@ The hosted registration connects asynchronously during `StartAsync`; it never bl
 
 Register ZkLink before dependent hosted services and keep sequential startup. A dependent service can constructor-inject the accessor and read `Client` from its `StartAsync` method. Concurrent startup requires an application-defined readiness barrier.
 
-`StopAsync` uses the client's acknowledged close. Disposing the container without graceful shutdown still releases local resources. A second `AddZkLink` call in the same service collection throws rather than silently selecting another connection or identity. Create and own a separate client explicitly when independent identities are required.
+`StopAsync` uses the client's acknowledged close. If the session is not connected at that moment, or the server does not acknowledge the close, the host still finishes stopping: it releases the connection locally and records the unacknowledged outcome as a trace warning, and session ephemerals may remain until the server expires the session. Disposing the container without graceful shutdown also releases local resources. Call `CloseAsync` on the client yourself when your application must observe an unacknowledged close as an exception. A second `AddZkLink` call in the same service collection throws rather than silently selecting another connection or identity. Create and own a separate client explicitly when independent identities are required.
 
 ### Startup, health and terminal sessions
 

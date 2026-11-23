@@ -183,7 +183,20 @@ internal sealed class ZkLinkConnectionHost(
                 await _monitorFinished.ConfigureAwait(false);
                 if (graceful && connection is not null)
                 {
-                    await connection.CloseAsync(cancellationToken).ConfigureAwait(false);
+                    try
+                    {
+                        await connection.CloseAsync(cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (ZooKeeperCloseException error)
+                    {
+                        // Local cleanup is complete. The server did not acknowledge the
+                        // close, so ephemerals may remain until it expires the session.
+                        System.Diagnostics.Trace.TraceWarning(
+                            FormattableString.Invariant(
+                                $"The ZkLink session was released without server acknowledgment during host shutdown ({error.Outcome})."
+                            )
+                        );
+                    }
                 }
             }
             finally

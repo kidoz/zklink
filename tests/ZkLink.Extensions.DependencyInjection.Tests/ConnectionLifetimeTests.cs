@@ -68,6 +68,36 @@ public sealed class ConnectionLifetimeTests
         Assert.Throws<InvalidOperationException>(() => host.Client);
     }
 
+    [Theory]
+    [InlineData(RequestOutcome.NotSent)]
+    [InlineData(RequestOutcome.Unknown)]
+    [Trait("Acceptance", "T40")]
+    public async Task UnacknowledgedCloseDuringGracefulStopStillStopsAndDisposesTheConnection(
+        RequestOutcome outcome
+    )
+    {
+        var (host, connection, _) = CreateStartedHost(out var startTask);
+        await startTask.ConfigureAwait(true);
+        connection
+            .CloseAsync(Arg.Any<CancellationToken>())
+            .Returns(
+                Task.FromException(
+                    new ZooKeeperCloseException(
+                        new ZooKeeperRequestInfo(ZooKeeperOperation.CloseSession),
+                        outcome
+                    )
+                )
+            );
+
+        await host.StopAsync(TestContext.Current.CancellationToken);
+
+        await connection.Received(1).CloseAsync(Arg.Any<CancellationToken>());
+        await connection.Received(1).DisposeAsync();
+        Assert.Throws<InvalidOperationException>(() => host.Client);
+        await host.DisposeAsync();
+        await connection.Received(1).DisposeAsync();
+    }
+
     [Fact]
     [Trait("Acceptance", "T40")]
     public async Task DisposeWithoutStopReleasesConnectionWithoutGracefulClose()

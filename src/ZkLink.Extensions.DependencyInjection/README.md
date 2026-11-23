@@ -42,6 +42,10 @@ Native TLS cleanup can delay completion beyond that deadline. Register ZkLink be
 sequential startup. Concurrent startup requires an application readiness barrier.
 During shutdown the accessor becomes unavailable, the host waits for any pending
 replacement to finish cleanup, and graceful shutdown requests acknowledged close.
+When the session is not connected or the server does not acknowledge, the host
+releases the connection locally, records the unacknowledged outcome as a trace
+warning and finishes stopping; ephemerals may remain until the server expires the
+session. Cancelling the stop token and other close failures still propagate.
 
 The factory overload accepts a `ZkLinkTerminalPolicy`. The default `Fail`
 keeps the terminal client available for inspection. `StopApplication` requests
@@ -60,7 +64,7 @@ is unhealthy.
 
 Calling `AddZkLink` twice in one service collection throws. Use an explicitly
 owned client for a separate security or coordination identity. The factory,
-terminal policies and health check are included in the published 1.1.1 package.
+terminal policies and health check are included in the published package.
 
 Native AOT verification uses packed core and DI packages, a rooted analysis
 consumer and an unrooted native host. The host checks constructor injection,

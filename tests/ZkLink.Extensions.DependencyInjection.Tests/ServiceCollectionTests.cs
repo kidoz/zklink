@@ -159,6 +159,63 @@ public sealed class ServiceCollectionTests
         }
     }
 
+    [Fact(Timeout = 15000)]
+    [Trait("Acceptance", "T40")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage(
+        "Reliability",
+        "CA2025",
+        Justification = "The server task is cancelled and awaited in finally before the listener and cancellation source are disposed."
+    )]
+    public async Task GracefulStopToleratesASessionTheServerNoLongerHas()
+    {
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken
+        );
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        // One handshake, then the only server disappears and nothing accepts again.
+        var server = ServeSessionAsync(
+            listener,
+            stop.Token,
+            negotiatedMilliseconds: 200,
+            dropAfterHandshake: true
+        );
+        try
+        {
+            using var host = new HostBuilder()
+                .ConfigureServices(services =>
+                    services.AddZkLink(
+                        new ZooKeeperClientOptions
+                        {
+                            ConnectionString =
+                                "127.0.0.1:" + ((IPEndPoint)listener.LocalEndpoint).Port,
+                            Tls = ZooKeeperTlsOptions.Disabled(),
+                        }
+                    )
+                )
+                .Build();
+            var accessor = host.Services.GetRequiredService<IZooKeeperClientAccessor>();
+            await host.StartAsync(stop.Token);
+            var client = accessor.Client;
+            await server.ConfigureAwait(true);
+            while (client.Session.State != ZooKeeperSessionState.Lost)
+            {
+                await Task.Delay(10, stop.Token).ConfigureAwait(true);
+            }
+
+            // A terminal session has no transport for closeSession; stopping still finishes.
+            await host.StopAsync(stop.Token);
+
+            Assert.Equal(ZooKeeperCloseStatus.Unacknowledged, client.Session.CloseStatus);
+            Assert.Throws<InvalidOperationException>(() => accessor.Client);
+        }
+        finally
+        {
+            await stop.CancelAsync();
+            await server.ConfigureAwait(true);
+        }
+    }
+
     private sealed class ClientConsumer(IZooKeeperClientAccessor accessor) : IHostedService
     {
         public ZooKeeperClient? StartedClient { get; private set; }
@@ -179,7 +236,9 @@ public sealed class ServiceCollectionTests
 
     private static async Task ServeSessionAsync(
         TcpListener listener,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        int negotiatedMilliseconds = 3000,
+        bool dropAfterHandshake = false
     )
     {
         try
@@ -187,16 +246,24 @@ public sealed class ServiceCollectionTests
             using var socket = await listener
                 .AcceptTcpClientAsync(cancellationToken)
                 .ConfigureAwait(false);
+            if (dropAfterHandshake)
+            {
+                listener.Stop();
+            }
             var stream = socket.GetStream();
             await using var streamLifetime = stream.ConfigureAwait(false);
             _ = await ReadFrameAsync(stream, cancellationToken).ConfigureAwait(false);
             // ConnectResponse: version, timeout, session ID, 16-byte password, read-only flag.
             var handshake = new byte[41];
             BinaryPrimitives.WriteInt32BigEndian(handshake, 37);
-            BinaryPrimitives.WriteInt32BigEndian(handshake.AsSpan(8), 3000);
+            BinaryPrimitives.WriteInt32BigEndian(handshake.AsSpan(8), negotiatedMilliseconds);
             BinaryPrimitives.WriteInt64BigEndian(handshake.AsSpan(12), 123);
             BinaryPrimitives.WriteInt32BigEndian(handshake.AsSpan(20), 16);
             await stream.WriteAsync(handshake, cancellationToken).ConfigureAwait(false);
+            if (dropAfterHandshake)
+            {
+                return;
+            }
             while (true)
             {
                 var request = await ReadFrameAsync(stream, cancellationToken).ConfigureAwait(false);
